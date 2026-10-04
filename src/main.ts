@@ -12,8 +12,10 @@ import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
 import { clearFx, onStateChange } from './ui/feed';
+import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
-import { boardHtml, esc, patronEmblem, pileGridHtml, sheetHtml, tileHtml, type SheetTarget } from './ui/render';
+import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tileHtml, type Focus } from './ui/render';
+import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -22,7 +24,8 @@ let selected = new Set<number>();
 let pendingKey = '';
 let autoPlay = false;
 let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'log' } | { kind: 'menu' } | null = null;
-let sheet: SheetTarget | null = null;
+let focus: Focus | null = null;
+let animatedFocus = '';
 let lastState: GameState | null = null;
 let lastError = '';
 
@@ -63,7 +66,7 @@ function leaveGame() {
   cancelHost = null;
   autoPlay = false;
   modal = null;
-  sheet = null;
+  focus = null;
   lastState = null;
   clearFx();
   const peer = new URLSearchParams(location.search).get('peer');
@@ -82,6 +85,7 @@ function menu(message = '') {
       <button data-go="host">Создать комнату</button>
       <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">Войти</button></div>
       <button class="ghost" data-go="sound">${soundLabel()}</button>
+      <button class="ghost" data-go="music">${musicLabel()}</button>
     </div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
     <details class="rules"><summary>Правила</summary>${rulesHtml()}</details>
@@ -97,6 +101,11 @@ function menu(message = '') {
         b.textContent = soundLabel();
         return;
       }
+      if (go === 'music') {
+        setMusic(!musicOn());
+        b.textContent = musicLabel();
+        return;
+      }
       if (go === 'bot') startGame(new BotController(n));
       else if (go === 'host') host(n);
       else join(n, normalizeCode(app.querySelector<HTMLInputElement>('#code')!.value));
@@ -105,7 +114,11 @@ function menu(message = '') {
 }
 
 function soundLabel() {
-  return soundOn() ? '🔊 Звук включён' : '🔇 Звук выключен';
+  return soundOn() ? '🔊 Звуки включены' : '🔇 Звуки выключены';
+}
+
+function musicLabel() {
+  return musicOn() ? '♪ Музыка включена' : '♪ Музыка выключена';
 }
 
 function rulesHtml() {
@@ -173,7 +186,7 @@ function startGame(c: Controller) {
   ctrl = c;
   selected = new Set();
   pendingKey = '';
-  sheet = null;
+  focus = null;
   modal = null;
   lastState = null;
   lastError = '';
@@ -201,8 +214,14 @@ function render() {
   } else {
     const myTurn = s.current === me && s.phase === 'play';
     const idle = myTurn && !s.pending && s.queue.length === 0;
-    app.innerHTML = boardHtml(s, me, { myTurn, idle }) + overlays(s, idle);
+    if (s.pending?.player === me || s.phase === 'over' || autoPlay) focus = null;
+    const view = focus ? focusView(s, me, focus, idle) : null;
+    if (!view) focus = null;
+    app.innerHTML = boardHtml(s, me, { myTurn, idle, focus }) + overlays(s);
+    if (view) showZoom(view.html, view.label, view.can);
   }
+  if (!focus) animatedFocus = '';
+  refreshTooltip();
   const log = app.querySelector('.log-view .log');
   if (log) log.scrollTop = log.scrollHeight;
   continueAutoPlay(s);
@@ -252,7 +271,7 @@ function draftHtml(s: GameState): string {
   </div>`;
 }
 
-function overlays(s: GameState, idle: boolean): string {
+function overlays(s: GameState): string {
   const me = ctrl!.me;
   let html = '';
   const banner = ctrl!.notice || ctrl!.error;
@@ -306,6 +325,7 @@ function overlays(s: GameState, idle: boolean): string {
         <button data-act="log">Журнал партии</button>
         <button data-act="rules">Правила</button>
         <button data-act="sound">${soundLabel()}</button>
+        <button data-act="music">${musicLabel()}</button>
         <button class="danger" data-act="concede">Сдаться</button>
         <button class="ghost" data-act="close">Вернуться к игре</button>
       </div></div></div>`;
@@ -315,20 +335,91 @@ function overlays(s: GameState, idle: boolean): string {
       <h2>${esc(modal.title)} (${cards.length})</h2>
       <div class="options">${pileGridHtml(cards) || '<p>Пусто</p>'}</div>
       <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
-  } else if (sheet && !s.pending) {
-    const body = sheetHtml(s, me, sheet, idle);
-    if (!body) sheet = null;
-    else html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet">${body}
-      <button class="ghost sheet-close" data-act="close">Закрыть</button></div></div>`;
   }
   return html;
+}
+
+const focusKey = (f: Focus) => (f.kind === 'card' ? `card:${f.uid}` : `patron:${f.patron}`);
+
+/**
+ * The selected card slides out of its place enlarged, without dimming the table;
+ * a second tap on it (or on its source) confirms the action.
+ */
+function showZoom(html: string, label: string, can: boolean) {
+  const f = focus!;
+  const src = app.querySelector<HTMLElement>(
+    f.kind === 'card' ? `.game [data-act="inspect"][data-uid="${f.uid}"]` : `.game [data-patron="${f.patron}"]`,
+  );
+  const zoom = document.createElement('div');
+  zoom.className = `zoom${can ? ' can' : ''}${f.kind === 'patron' ? ' patron-zoom' : ''}`;
+  zoom.dataset.act = 'confirm-focus';
+  zoom.innerHTML = `${html}${label ? `<div class="zoom-act">${esc(label)}</div>` : ''}`;
+  app.appendChild(zoom);
+  if (!src) return;
+  const r = src.getBoundingClientRect();
+  const w = zoom.offsetWidth;
+  const h = zoom.offsetHeight;
+  const vw = innerWidth;
+  const vh = innerHeight;
+  const x = Math.max(8, Math.min(vw - w - 8, r.left + r.width / 2 - w / 2));
+  // Cards in the lower half grow upward out of their place, the rest grow downward.
+  const below = r.top + r.height / 2 > vh / 2;
+  const y = Math.max(8, Math.min(vh - h - 8, below ? r.bottom - h : r.top));
+  zoom.style.left = `${x}px`;
+  zoom.style.top = `${y}px`;
+  const key = focusKey(f);
+  if (key === animatedFocus || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  animatedFocus = key;
+  const dx = r.left + r.width / 2 - (x + w / 2);
+  const dy = r.top + r.height / 2 - (y + h / 2);
+  zoom.animate(
+    [
+      { transform: `translate(${dx}px, ${dy}px) scale(${Math.max(0.2, r.width / w)})`, opacity: 0.4 },
+      { transform: 'none', opacity: 1 },
+    ],
+    { duration: 190, easing: 'cubic-bezier(.2,.9,.3,1.2)' },
+  );
+}
+
+/** First tap selects, a second tap on the same card or patron performs its action. */
+function tapFocus(next: Focus) {
+  const s = ctrl!.state!;
+  const me = ctrl!.me;
+  if (focus && focusKey(focus) === focusKey(next)) return confirmFocus();
+  focus = next;
+  const view = focusView(s, me, next, idleNow(s));
+  if (view) play('click');
+  render();
+}
+
+function confirmFocus() {
+  const s = ctrl!.state!;
+  const view = focus ? focusView(s, ctrl!.me, focus, idleNow(s)) : null;
+  if (!view?.can || !view.action) {
+    focus = null;
+    return render();
+  }
+  focus = null;
+  ctrl!.dispatch(view.action);
+}
+
+function idleNow(s: GameState) {
+  return s.current === ctrl!.me && s.phase === 'play' && !s.pending && s.queue.length === 0;
 }
 
 // ── input ────────────────────────────────────────────────
 
 app.addEventListener('click', (ev) => {
   const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
-  if (!el || !ctrl) return;
+  if (!ctrl) return;
+  if (!el) {
+    // Tapping the empty table puts the selected card back.
+    if (focus) {
+      focus = null;
+      render();
+    }
+    return;
+  }
   const s = ctrl.state;
   const act = el.dataset.act!;
   const uid = Number(el.dataset.uid);
@@ -337,14 +428,10 @@ app.addEventListener('click', (ev) => {
   if (act === 'close') {
     if (el.classList.contains('overlay') && ev.target !== el) return;
     modal = null;
-    sheet = null;
     return render();
   }
   if (!s) return;
-  if (['play', 'activate', 'attack', 'buy', 'patron', 'end', 'play-all', 'concede'].includes(act)) {
-    sheet = null;
-    modal = null;
-  }
+  if (['end', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':
@@ -380,16 +467,19 @@ app.addEventListener('click', (ev) => {
     case 'confirm':
       return ctrl.dispatch({ t: 'choose', picks: [...selected] });
     case 'inspect':
-      sheet = { kind: 'card', uid };
-      return render();
+      return tapFocus({ kind: 'card', uid });
     case 'inspect-patron':
-      sheet = { kind: 'patron', patron: el.dataset.patron as PatronId };
-      return render();
+      return tapFocus({ kind: 'patron', patron: el.dataset.patron as PatronId });
+    case 'confirm-focus':
+      return confirmFocus();
     case 'menu':
       modal = { kind: 'menu' };
       return render();
     case 'sound':
       setSound(!soundOn());
+      return render();
+    case 'music':
+      setMusic(!musicOn());
       return render();
     case 'rules':
       modal = null;
@@ -423,15 +513,34 @@ function showRules() {
 }
 
 // Audio can only start after a user gesture.
-document.addEventListener('pointerdown', unlock, { capture: true });
-document.addEventListener('keydown', unlock, { capture: true });
+const unlockAudio = () => {
+  unlock();
+  unlockMusic();
+};
+document.addEventListener('pointerdown', unlockAudio, { capture: true });
+document.addEventListener('keydown', unlockAudio, { capture: true });
 
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && (modal || sheet)) {
+  if (ev.key === 'Escape' && (modal || focus)) {
     modal = null;
-    sheet = null;
+    focus = null;
     render();
   }
+});
+
+// Card and patron details on hover (mouse) or long press (touch).
+initTooltips((el) => {
+  const s = ctrl?.state ?? null;
+  const me = ctrl?.me ?? 0;
+  if (el.dataset.patron) return patronTipHtml(s, me, el.dataset.patron as PatronId);
+  const id = el.dataset.card;
+  if (!id) return null;
+  const agent = s?.players.flatMap((p) => p.agents).find((a) => a.uid === Number(el.dataset.uid));
+  return cardHtml(id, { cls: 'big tip-card', agent });
+});
+window.addEventListener('resize', () => {
+  hideTooltip();
+  if (focus) render();
 });
 
 menu();

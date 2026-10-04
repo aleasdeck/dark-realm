@@ -277,13 +277,20 @@ input {
   margin: 0 auto;
   padding: max(6px, env(safe-area-inset-top)) 8px max(6px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto;
-  grid-template-areas: 'oppbar' 'oppag' 'patrons' 'tavern' 'table' 'hand' 'mybar';
+  /* the agent strips take whatever height the fanned hands leave free */
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'oppbar' 'opphand' 'oppag' 'tavern' 'patrons' 'table' 'hand' 'mybar';
+  /* hand cards are a little larger than tavern tiles; declared here so a zoomed --tw carries over */
+  --hw: calc(var(--tw) * 1.12);
+  --chip: calc(var(--tw) * 0.7);
   gap: 6px;
   overflow: hidden;
 }
 .opp-bar {
   grid-area: oppbar;
+}
+.opp-hand {
+  grid-area: opphand;
 }
 .opp-agents {
   grid-area: oppag;
@@ -394,6 +401,8 @@ input {
   align-items: center;
   gap: 6px;
   min-height: calc(var(--tw) * 0.55 + 8px);
+  flex-wrap: wrap;
+  align-content: center;
   padding: 3px 6px;
   border-radius: 10px;
   background: #0006;
@@ -423,8 +432,8 @@ input {
 .chip {
   position: relative;
   flex: 0 0 auto;
-  width: calc(var(--tw) * 0.55);
-  height: calc(var(--tw) * 0.55);
+  width: var(--chip);
+  height: var(--chip);
   border: 2px solid var(--accent);
   border-radius: 6px;
   overflow: visible;
@@ -453,8 +462,8 @@ input {
   filter: brightness(0.65);
 }
 .played-part .chip {
-  width: calc(var(--tw) * 0.38);
-  height: calc(var(--tw) * 0.38);
+  width: calc(var(--tw) * 0.42);
+  height: calc(var(--tw) * 0.42);
   border-width: 1px;
 }
 .chip.target {
@@ -466,50 +475,93 @@ input {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 5px;
-  padding: 8px 4px;
+  padding: 4px;
   border-radius: 10px;
-  background: linear-gradient(180deg, #2a1414 0%, #0a140e 25%, #0a140e 75%, #12331f 100%);
+  background: #0a140e;
   border: 1px solid var(--line);
 }
+/* each patron sits on a track: the opponent's end on top, yours at the bottom, toward your table */
 .patron {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 3px 2px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: transform 0.25s;
   min-width: 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  --emb: min(36px, 5dvh);
 }
-.patron img {
-  width: min(44px, 6dvh);
-  height: min(44px, 6dvh);
+.p-track {
+  position: relative;
+  width: 100%;
+  height: calc(var(--emb) * 1.75);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #3a161640 0%, transparent 35%, transparent 65%, #12382140 100%);
+}
+.p-track img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--emb);
+  height: var(--emb);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  transition: top 0.35s ease-out;
+}
+.patron.fav-mine .p-track {
+  border-color: var(--you);
+  background: linear-gradient(180deg, transparent 30%, #1f6a3a 100%);
+}
+.patron.fav-mine img {
+  top: calc(100% - var(--emb) / 2 - 1px);
+  filter: drop-shadow(0 0 5px var(--you));
+}
+.patron.fav-theirs .p-track {
+  border-color: var(--them);
+  background: linear-gradient(0deg, transparent 30%, #6a1f1f 100%);
+}
+.patron.fav-theirs img {
+  top: calc(var(--emb) / 2 + 1px);
+  filter: drop-shadow(0 0 5px var(--them));
 }
 .p-name {
   font-family: var(--title-font);
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.1;
   color: var(--glow);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.patron.fav-mine {
-  transform: translateY(5px);
-  border-color: var(--you);
-  background: #123821;
+.p-side {
+  font-family: var(--narrow-font);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--muted);
+  white-space: nowrap;
 }
-.patron.fav-theirs {
-  transform: translateY(-5px);
-  border-color: var(--them);
-  background: #3a1616;
+.fav-mine .p-side {
+  background: var(--you);
+  color: #04120a;
 }
-.patron.can {
+.fav-theirs .p-side {
+  background: var(--them);
+  color: #1a0505;
+}
+.patron.can .p-track {
   box-shadow: 0 0 10px var(--green-glow);
   border-color: var(--green-glow);
+}
+.patron.focused .p-track {
+  outline: 2px solid var(--glow);
 }
 
 .tavern {
@@ -659,26 +711,89 @@ input {
 .tile.dim {
   filter: saturate(0.6) brightness(0.75);
 }
-.tile.playable:active,
-.tile.buyable:active {
-  transform: translateY(-4px);
-}
 @media (hover: hover) {
-  .tile.playable:hover,
   .tile.buyable:hover {
-    transform: translateY(6px);
+    transform: translateY(3px);
     z-index: 2;
   }
 }
+.tile.focused,
+.chip.focused {
+  outline: 2px solid var(--glow);
+  outline-offset: 1px;
+}
 
+/* ── fanned hands ───────────────────────────────── */
 .hand {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 0;
-  padding: 4px 8px 0 4px;
+  position: relative;
+  height: calc(var(--hw) + 52px);
   border-radius: 10px;
   background: linear-gradient(0deg, #0f2418, transparent);
+  container-type: inline-size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fan {
+  /* cards overlap more as the hand grows, so it always fits the width */
+  --step: min(calc(var(--hw) * 0.9), calc((100cqw - var(--hw) - 12px) / max(var(--n) - 1, 1)));
+}
+.fan-slot {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: var(--hw);
+  margin-left: calc(var(--hw) / -2);
+  transform-origin: 50% 100%;
+  transform: translateX(calc(var(--o) * var(--step))) translateY(calc(var(--ao) * var(--ao) * 2.5px)) rotate(calc(var(--o) * 4deg));
+  transition:
+    transform 0.2s ease-out,
+    translate 0.15s ease-out,
+    opacity 0.15s;
+}
+.fan-slot .tile {
+  width: var(--hw);
+  height: calc(var(--hw) + 44px);
+  box-shadow: -3px 2px 8px #000c;
+}
+.fan-slot.focused {
+  opacity: 0.25;
+  translate: 0 -10px;
+}
+@media (hover: hover) {
+  .fan-slot:hover {
+    translate: 0 -12px;
+    z-index: 5;
+  }
+}
+.opp-hand {
+  position: relative;
+  height: 22px;
+  overflow: hidden;
+  margin: -6px 0 -2px;
+}
+.back {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 34px;
+  height: 48px;
+  margin-left: -17px;
+  border: 2px solid #6e3a2a;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 50% 70%, #5a1d1d 0 9px, transparent 10px),
+    repeating-linear-gradient(45deg, #2a1414 0 4px, #170909 4px 8px);
+  box-shadow: 0 2px 4px #000c;
+  transform-origin: 50% 0;
+  transform: translateX(calc(var(--o) * 20px)) translateY(calc(var(--ao) * var(--ao) * -1.5px)) rotate(calc(var(--o) * -5deg));
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  color: #c4705a;
+  font-family: var(--title-font);
+  font-size: 14px;
+  line-height: 22px;
 }
 
 .my-bar .res-group {
@@ -703,21 +818,17 @@ input {
   .game {
     max-width: none;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
       'oppbar table'
-      'oppag hand'
-      'patrons hand'
+      'opphand table'
+      'oppag table'
       'tavern hand'
-      'tavern mybar';
+      'patrons mybar';
     column-gap: 10px;
   }
-  .patrons {
-    padding: 5px 4px;
-  }
-  .patron img {
-    width: 32px;
-    height: 32px;
+  .patron {
+    --emb: 26px;
   }
 }
 
@@ -856,21 +967,6 @@ input {
 .sheet-actions.column button {
   width: 100%;
 }
-.sheet-close {
-  width: 100%;
-  max-width: 320px;
-}
-.patron-sheet img {
-  width: 96px;
-  height: 96px;
-}
-.patron-sheet p {
-  margin: 4px 0;
-  line-height: 1.4;
-}
-.patron-sheet h2 {
-  color: var(--glow);
-}
 .options {
   display: flex;
   flex-wrap: wrap;
@@ -956,29 +1052,6 @@ input {
   white-space: nowrap;
 }
 
-/* hand tiles stretch to the free height and show the full rules text */
-.hand .slot {
-  height: min(100%, calc(var(--tw) * 2.3));
-}
-.hand .tile.full {
-  height: 100%;
-  min-height: calc(var(--tw) + 40px);
-}
-.t-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  width: 100%;
-  margin-top: 2px;
-  font-family: var(--narrow-font);
-  font-size: clamp(10px, calc(var(--tw) * 0.125), 14px);
-  line-height: 1.12;
-  text-align: left;
-  overflow: hidden;
-}
-.t-text b {
-  color: var(--glow);
-}
 .my-table .counts {
   flex: 0 0 auto;
   padding-right: 6px;
@@ -992,6 +1065,20 @@ input {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* the narrowest phones keep the music switch in the menu only */
+@media (max-width: 360px) {
+  .my-bar [data-act='music'] {
+    display: none;
+  }
+  .my-bar .icon {
+    min-width: 34px;
+    padding: 8px 6px;
+  }
+  .my-bar .end {
+    font-size: 14px;
+    padding: 8px 6px;
+  }
 }
 @media (max-width: 400px) {
   .res {
@@ -1009,12 +1096,16 @@ input {
   .game {
     zoom: 1.3;
     height: calc(100dvh / 1.3);
+    /* the zoomed table has less height than the viewport, so tiles must not size off raw dvh */
+    --tw: min(124px, calc(11.5dvh / 1.3));
   }
 }
 @media (min-width: 1400px) and (min-height: 960px) {
   .game {
     zoom: 1.5;
     height: calc(100dvh / 1.5);
+    /* the zoomed table has less height than the viewport, so tiles must not size off raw dvh */
+    --tw: min(124px, calc(11.5dvh / 1.5));
   }
 }
 
@@ -1169,4 +1260,112 @@ input {
     transform: none;
     width: min(48vw, 420px);
   }
+}
+
+/* ── selected card: slides out enlarged, a second tap confirms ── */
+.zoom {
+  position: fixed;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  filter: drop-shadow(0 12px 24px #000);
+}
+.zoom .card.big {
+  width: min(230px, 62vw);
+}
+.zoom .card.big .c-art {
+  width: min(170px, 22dvh);
+  height: min(170px, 22dvh);
+}
+.zoom.can .card {
+  box-shadow: 0 0 0 2px var(--green-glow), 0 0 24px var(--green);
+}
+.zoom-act {
+  font-family: var(--title-font);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: #10261a;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.zoom.can .zoom-act {
+  background: linear-gradient(#3fb468, #237a43);
+  border-color: var(--green-glow);
+  color: #04120a;
+}
+.patron-zoom .tip-patron {
+  width: min(280px, 86vw);
+}
+
+/* ── tooltips: hover with a mouse, long press on touch ── */
+.tooltip {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  animation: tip-in 0.12s ease-out;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.tooltip .card.big {
+  width: 220px;
+}
+.tooltip .card.big .c-art {
+  width: 150px;
+  height: 150px;
+}
+.tip-patron {
+  width: min(280px, 86vw);
+  background: #0f2219f7;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.35;
+  box-shadow: 0 10px 30px #000d;
+}
+.tip-patron p {
+  margin: 4px 0 0;
+}
+.tp-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.tp-head img {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+.tp-head h3 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--glow);
+}
+.tp-head .p-title {
+  margin: 0;
+}
+.tp-side {
+  font-weight: 700;
+  color: var(--muted);
+}
+.tip-patron.fav-mine .tp-side {
+  color: var(--you);
+}
+.tip-patron.fav-theirs .tp-side {
+  color: var(--them);
+}
+.my-bar .icon.off {
+  color: var(--muted);
+  text-decoration: line-through;
 }
