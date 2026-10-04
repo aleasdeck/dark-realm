@@ -1,8 +1,8 @@
-import { artUrl, cardBackUrl, patronEmblemUrl, type Subject } from '../art';
+import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, hpLeft, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
-import type { AgentInPlay, Card, CardDef, GameState, PatronId, PlayerIdx } from '../engine/types';
+import type { AgentInPlay, Card, CardDef, Effect, GameState, PatronId, PlayerIdx } from '../engine/types';
 
 export const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -63,25 +63,55 @@ export function cardHtml(id: string, o: CardOpts = {}): string {
   </div>`;
 }
 
-/** Compact card for agents and played cards; hovering shows the full card in the preview. */
-export function miniHtml(id: string, o: CardOpts = {}): string {
+const FX: Partial<Record<Effect['k'], (n: number) => string>> = {
+  coin: (n) => `<i class="fx coin">+${n}</i>`,
+  power: (n) => `<i class="fx pow">+${n}</i>`,
+  prestige: (n) => `<i class="fx pre">+${n}</i>`,
+  oppLosePrestige: (n) => `<i class="fx bad">−${n}✦</i>`,
+  draw: (n) => `<i class="fx">+${n} карт.</i>`,
+  oppDiscard: (n) => `<i class="fx">сброс ${n}</i>`,
+  acquire: (n) => `<i class="fx">дар ≤${n}</i>`,
+  toss: (n) => `<i class="fx">отсев ${n}</i>`,
+  destroy: (n) => `<i class="fx">уничт. ${n}</i>`,
+  knockout: () => `<i class="fx">нокаут</i>`,
+  knockoutAll: () => `<i class="fx">нокаут всех</i>`,
+  returnTop: () => `<i class="fx">возврат</i>`,
+  replaceTavern: () => `<i class="fx">замена</i>`,
+  heal: (n) => `<i class="fx">лечение ${n}</i>`,
+  create: () => `<i class="fx">морок</i>`,
+  patronCall: () => `<i class="fx">+призыв</i>`,
+  donate: () => `<i class="fx">обмен</i>`,
+};
+
+/** Compact summary of a card's main effect for small tiles. */
+function shortFx(def: CardDef): string {
+  const one = (e: Effect): string =>
+    e.k === 'choice' ? e.options.map((o) => o.map(one).join('')).join('<i class="fx or">/</i>') : (FX[e.k]?.('n' in e ? e.n : 0) ?? '');
+  const main = def.play.map(one).join('');
+  const combos = Object.keys(def.combo ?? {}).length ? '<i class="fx combo">К</i>' : '';
+  return main + combos || '<i class="fx">—</i>';
+}
+
+/** Compact tile used everywhere on the board; tapping opens the card sheet. */
+export function tileHtml(id: string, o: CardOpts & { agent?: AgentInPlay; full?: boolean } = {}): string {
   const def = cardDef(id);
-  return `<div class="mini ${o.cls ?? ''}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
+  const text = o.full
+    ? `<span class="t-text">${cardLines(def).map((l) => `<span>${l.label ? `<b>${esc(l.label)}:</b> ` : ''}${esc(l.text)}</span>`).join('')}</span>`
+    : '';
+  return `<div class="tile ${o.cls ?? ''}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
     <img src="${cardArt(def)}" alt="" draggable="false">
-    <span class="m-name">${esc(def.name)}</span>
+    ${def.type === 'curse' ? '' : `<span class="t-cost">${def.cost}</span>`}
     ${hpBadge(def, o.agent)}
+    <span class="t-name">${esc(def.name)}</span>
+    ${o.full ? text : `<span class="t-fx">${shortFx(def)}</span>`}
   </div>`;
 }
 
-/** Tiny chip for cards already played this turn. */
-export function chipHtml(id: string): string {
+/** Small square used for agents and played cards. */
+export function chipHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {}): string {
   const def = cardDef(id);
-  return `<div class="chip" style="${styleVars(def)}" data-card="${def.id}"><img src="${cardArt(def)}" alt="" draggable="false"><span>${esc(def.name)}</span></div>`;
-}
-
-export function pileHtml(count: number, label: string, act?: string): string {
-  return `<div class="pile"${act ? ` data-act="${act}" data-tip="${esc(`${label}: нажмите, чтобы посмотреть`)}"` : ''}>
-    <img src="${cardBackUrl()}" alt="" draggable="false"><div><b>${count}</b><small>${label}</small></div>
+  return `<div class="chip ${o.cls ?? ''}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
+    <img src="${cardArt(def)}" alt="" draggable="false">${hpBadge(def, o.agent)}
   </div>`;
 }
 
@@ -93,35 +123,23 @@ function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId): string {
   const def = PATRONS[pid];
   const f = s.favor[pid];
   const favor = pid === 'treasury' ? 'fixed' : f === undefined || f === null ? 'neutral' : f === me ? 'mine' : 'theirs';
-  const favorText = { fixed: 'всегда нейтрален', neutral: 'нейтрален', mine: 'на вашей стороне', theirs: 'на стороне соперника' }[favor];
   const can = patronAvailable(s, me, pid);
-  const rules = PATRON_RULES[pid];
-  const tip = `${def.name}\n«${def.title}»\n\nЦена: ${rules.cost}\nЭффект: ${rules.effect}\n\nПосле воззвания покровитель переходит на вашу сторону (или из стороны соперника в нейтраль).`;
-  return `<div class="patron fav-${favor}${can ? ' can' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}"
-      ${can ? `data-act="patron" data-patron="${pid}"` : ''} data-tip="${esc(tip)}">
+  return `<div class="patron fav-${favor}${can ? ' can' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="${pid}">
     <img src="${patronEmblem(pid)}" alt="" draggable="false">
-    <div class="p-body">
-      <div class="p-name">${esc(def.name)}</div>
-      <div class="p-cost">${esc(rules.cost)} → ${esc(rules.effect.split('.')[0])}</div>
-      <div class="p-favor">${favorText}</div>
-    </div>
+    <span class="p-name">${esc(def.name.split(' ')[0])}</span>
   </div>`;
 }
 
-function playerPanel(s: GameState, pi: PlayerIdx, active: boolean, label: string) {
-  const p = s.players[pi];
-  return `<div class="player-panel${active ? ' active' : ''}">
-    <div class="pp-name"><span>${esc(p.name)}</span><small>${active ? 'ходит' : label}</small></div>
-    <div class="pp-stats">
-      <div class="stat st-prestige" data-tip="Престиж: очки победы. Нужно 40 и перевес после хода соперника, или 80 сразу."><b>${p.prestige}</b><small>престиж</small></div>
-      <div class="stat st-power" data-tip="Сила: в конце хода превращается в престиж. Можно тратить на атаку агентов соперника."><b>${p.power}</b><small>сила</small></div>
-      <div class="stat st-coin" data-tip="Монеты: покупка карт в таверне. Сгорают в конце хода."><b>${p.coin}</b><small>монеты</small></div>
-    </div>
-  </div>`;
+function res(p: { prestige: number; power: number; coin: number }) {
+  return `<span class="res pre"><i>✦</i>${p.prestige}</span><span class="res pow"><i>⚔</i>${p.power}</span><span class="res coin"><i>●</i>${p.coin}</span>`;
 }
 
-function emptyHint(text: string) {
-  return `<div class="empty">${text}</div>`;
+function count(n: number, label: string, act?: string) {
+  return `<span class="count"${act ? ` data-act="${act}"` : ''}><b>${n}</b><small>${label}</small></span>`;
+}
+
+function slots(tiles: string[]) {
+  return tiles.map((t) => `<div class="slot">${t}</div>`).join('');
 }
 
 export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; idle: boolean }): string {
@@ -129,72 +147,101 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
   const them = s.players[other(me)];
   const targets = new Set(opts.idle && you.power > 0 ? attackable(s, me).map((a) => a.uid) : []);
   const theirAgents = them.agents
-    .map((a) => miniHtml(a.id, { agent: a, act: targets.has(a.uid) ? 'attack' : undefined, uid: a.uid, cls: targets.has(a.uid) ? 'target' : '' }))
+    .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: targets.has(a.uid) ? 'target' : '' }))
     .join('');
   const myAgents = you.agents
-    .map((a) => {
-      const ready = opts.idle && !a.activated;
-      return miniHtml(a.id, { agent: a, act: ready ? 'activate' : undefined, uid: a.uid, cls: ready ? 'ready' : 'spent' });
-    })
+    .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: opts.idle && !a.activated ? 'ready' : 'spent' }))
     .join('');
-  const played = you.played.map((c) => chipHtml(c.id)).join('');
-  const tavern = s.tavern
-    .map((c) => {
-      const can = opts.idle && cardDef(c.id).cost <= you.coin;
-      return cardHtml(c.id, { act: can ? 'buy' : undefined, uid: c.uid, cls: can ? 'buyable' : 'tavern' });
-    })
-    .join('');
-  const hand = you.hand.map((c: Card) => cardHtml(c.id, { act: opts.idle ? 'play' : undefined, uid: c.uid, cls: opts.idle ? 'playable' : '' })).join('');
-  const oppHand = `<div class="opp-hand" data-tip="Карт в руке соперника">${Array.from({ length: them.hand.length }, () => `<img src="${cardBackUrl()}" alt="">`).join('')}<span>${them.hand.length}</span></div>`;
-  const attackHint = targets.size ? ' · нажмите на агента, чтобы атаковать силой' : '';
+  const played = you.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' })).join('');
+  const tavern = s.tavern.map((c) => {
+    const can = opts.idle && cardDef(c.id).cost <= you.coin;
+    return tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: can ? 'buyable' : 'dim' });
+  });
+  const hand = you.hand.map((c: Card) => tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: `full${opts.idle ? ' playable' : ''}`, full: true }));
 
-  return `<div class="board ${opts.myTurn ? 'my-turn' : 'their-turn'}">
-    <section class="zone zone-them">
-      ${playerPanel(s, other(me), !opts.myTurn, 'соперник')}
-      <div class="zone-cell grow"><div class="zone-title">Агенты соперника${attackHint}</div>
-        <div class="cards-row">${theirAgents || emptyHint('нет агентов')}</div></div>
-      <div class="zone-cell piles">${oppHand}${pileHtml(them.deck.length, 'колода')}${pileHtml(them.cooldown.length, 'сброс', 'pile-opp-cd')}</div>
+  return `<div class="game ${opts.myTurn ? 'my-turn' : 'their-turn'}">
+    <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
+      <span class="who">${esc(them.name)}</span>
+      <span class="res-group">${res(them)}</span>
+      <span class="counts">${count(them.hand.length, 'рука')}${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
+    </header>
+    <section class="strip opp-agents">${theirAgents || '<span class="empty">агентов нет</span>'}
+      ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
+    <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p)).join('')}</section>
+    <section class="tavern">
+      <div class="label"><span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small></div>
+      <div class="row">${slots(tavern)}</div>
     </section>
-
-    <section class="patron-strip">
-      <div class="strip-side them">↑ соперник</div>
-      <div class="patrons">${s.patrons.map((p) => patronHtml(s, me, p)).join('')}</div>
-      <div class="strip-side you">↓ вы</div>
+    <section class="strip my-table">
+      <div class="part counts">${count(you.deck.length, 'колода', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile-cd')}</div>
+      <div class="part">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
+      ${played ? `<div class="part played-part">${played}</div>` : ''}
     </section>
-
-    <section class="tavern-zone">
-      <div class="zone-title">Таверна: покупайте карты за монеты</div>
-      <div class="tavern-row"><div class="tavern-cards">${tavern}</div>
-        <div class="piles">${pileHtml(s.tavernDeck.length, 'в запасе')}</div></div>
-    </section>
-
-    <section class="zone zone-you">
-      <div class="zone-cell side-col">
-        ${playerPanel(s, me, opts.myTurn, 'вы')}
-        <div class="piles-row">${pileHtml(you.deck.length, 'колода', 'pile-deck')}${pileHtml(you.cooldown.length, 'сброс', 'pile-cd')}</div>
-      </div>
-      <div class="zone-cell grow hand-cell">
-        <div class="zone-title">Ваша рука${opts.idle && you.hand.length ? ' · нажмите на карту, чтобы сыграть' : ''}</div>
-        <div class="hand">${hand || emptyHint('рука пуста')}</div>
-      </div>
-      <div class="zone-cell table-col">
-        <div class="zone-title">Ваши агенты${opts.idle && you.agents.some((a) => !a.activated) ? ' · нажмите, чтобы применить' : ''}</div>
-        <div class="cards-row wrap">${myAgents || emptyHint('нет агентов')}</div>
-        <div class="zone-title">Сыграно в этот ход</div>
-        <div class="chips">${played || emptyHint('пока ничего')}</div>
-      </div>
-    </section>
-
-    <nav class="action-bar">
-      <div class="bar-left">
-        <button class="ghost" data-act="log">Журнал</button>
-        <button class="ghost" data-act="concede">Сдаться</button>
-      </div>
-      <div class="turn-badge ${opts.myTurn ? 'mine' : 'theirs'}">${opts.myTurn ? 'Ваш ход' : 'Ход соперника'} · ход ${s.turn}</div>
-      <div class="bar-right">
-        <button data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'}>Сыграть всё</button>
-        <button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>Конец хода</button>
-      </div>
-    </nav>
+    <section class="hand">${hand.length ? slots(hand) : '<span class="empty">рука пуста</span>'}</section>
+    <footer class="bar my-bar${opts.myTurn ? ' active' : ''}">
+      <span class="res-group">${res(you)}</span>
+      <button class="icon" data-act="menu" aria-label="Меню">☰</button>
+      <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">▶▶</button>
+      <button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? 'Конец хода' : 'Ход соперника'}</button>
+    </footer>
   </div>`;
+}
+
+export type SheetTarget = { kind: 'card'; uid: number } | { kind: 'patron'; patron: PatronId };
+
+/** Bottom sheet with the full card (or patron) and the actions available for it. */
+export function sheetHtml(s: GameState, me: PlayerIdx, t: SheetTarget, idle: boolean): string | null {
+  const you = s.players[me];
+  const them = s.players[other(me)];
+  if (t.kind === 'patron') {
+    const def = PATRONS[t.patron];
+    const rules = PATRON_RULES[t.patron];
+    const f = s.favor[t.patron];
+    const favor =
+      t.patron === 'treasury' ? 'Всегда нейтрален' : f === undefined || f === null ? 'Нейтрален' : f === me ? 'На вашей стороне' : 'На стороне соперника';
+    const can = patronAvailable(s, me, t.patron);
+    return `<div class="sheet-body patron-sheet" style="--accent:${def.palette.accent};--glow:${def.palette.glow}">
+      <img src="${patronEmblem(t.patron)}" alt="">
+      <h2>${esc(def.name)}</h2><p class="p-title">${esc(def.title)}</p>
+      <p><b>Цена:</b> ${esc(rules.cost)}</p><p><b>Эффект:</b> ${esc(rules.effect)}</p>
+      <p class="muted">${favor}. Воззвать можно один раз за ход; после этого покровитель смещается на вашу сторону.</p>
+      </div>
+      <div class="sheet-actions"><button class="end" data-act="patron" data-patron="${t.patron}" ${can ? '' : 'disabled'}>${can ? 'Воззвать' : 'Сейчас недоступно'}</button></div>`;
+  }
+  const uid = t.uid;
+  let action = '';
+  let card: { id: string; agent?: AgentInPlay } | null = null;
+  const inHand = you.hand.find((c) => c.uid === uid);
+  const inTavern = s.tavern.find((c) => c.uid === uid);
+  const mine = you.agents.find((c) => c.uid === uid);
+  const theirs = them.agents.find((c) => c.uid === uid);
+  const played = you.played.find((c) => c.uid === uid);
+  if (inHand) {
+    card = inHand;
+    action = `<button class="end" data-act="play" data-uid="${uid}" ${idle ? '' : 'disabled'}>Сыграть</button>`;
+  } else if (inTavern) {
+    card = inTavern;
+    const cost = cardDef(inTavern.id).cost;
+    const ok = idle && you.coin >= cost;
+    action = `<button class="end" data-act="buy" data-uid="${uid}" ${ok ? '' : 'disabled'}>${ok ? `Купить за ${cost} ●` : `Нужно ${cost} ●, у вас ${you.coin}`}</button>`;
+  } else if (mine) {
+    card = { id: mine.id, agent: mine };
+    action = `<button class="end" data-act="activate" data-uid="${uid}" ${idle && !mine.activated ? '' : 'disabled'}>${mine.activated ? 'Уже действовал в этот ход' : 'Применить'}</button>`;
+  } else if (theirs) {
+    card = { id: theirs.id, agent: theirs };
+    const can = idle && you.power > 0 && attackable(s, me).some((a) => a.uid === uid);
+    const dmg = Math.min(you.power, hpLeft(theirs));
+    action = `<button class="end danger" data-act="attack" data-uid="${uid}" ${can ? '' : 'disabled'}>${
+      can ? `Атаковать: −${dmg} силы` : you.power > 0 && idle ? 'Сначала агенты с провокацией' : 'Нужна сила для атаки'
+    }</button>`;
+  } else if (played) {
+    card = played;
+  }
+  if (!card) return null;
+  return `<div class="sheet-body">${cardHtml(card.id, { cls: 'big', agent: card.agent })}</div>
+    <div class="sheet-actions">${action}</div>`;
+}
+
+export function pileGridHtml(cards: Card[]): string {
+  return cards.map((c) => tileHtml(c.id)).join('');
 }
