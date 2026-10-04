@@ -11,6 +11,8 @@ import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
+import { clearFx, onStateChange } from './ui/feed';
+import { play, setSound, soundOn, unlock } from './ui/sound';
 import { boardHtml, esc, patronEmblem, pileGridHtml, sheetHtml, tileHtml, type SheetTarget } from './ui/render';
 
 const app = document.getElementById('app')!;
@@ -21,6 +23,8 @@ let pendingKey = '';
 let autoPlay = false;
 let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'log' } | { kind: 'menu' } | null = null;
 let sheet: SheetTarget | null = null;
+let lastState: GameState | null = null;
+let lastError = '';
 
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
@@ -60,6 +64,8 @@ function leaveGame() {
   autoPlay = false;
   modal = null;
   sheet = null;
+  lastState = null;
+  clearFx();
   const peer = new URLSearchParams(location.search).get('peer');
   history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
   menu();
@@ -75,6 +81,7 @@ function menu(message = '') {
       <button data-go="bot">Играть против бота</button>
       <button data-go="host">Создать комнату</button>
       <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">Войти</button></div>
+      <button class="ghost" data-go="sound">${soundLabel()}</button>
     </div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
     <details class="rules"><summary>Правила</summary>${rulesHtml()}</details>
@@ -85,11 +92,20 @@ function menu(message = '') {
       const n = nameInput.value.trim() || 'Странник';
       saveName(n);
       const go = b.dataset.go;
+      if (go === 'sound') {
+        setSound(!soundOn());
+        b.textContent = soundLabel();
+        return;
+      }
       if (go === 'bot') startGame(new BotController(n));
       else if (go === 'host') host(n);
       else join(n, normalizeCode(app.querySelector<HTMLInputElement>('#code')!.value));
     }),
   );
+}
+
+function soundLabel() {
+  return soundOn() ? '🔊 Звук включён' : '🔇 Звук выключен';
 }
 
 function rulesHtml() {
@@ -159,6 +175,9 @@ function startGame(c: Controller) {
   pendingKey = '';
   sheet = null;
   modal = null;
+  lastState = null;
+  lastError = '';
+  clearFx();
   c.subscribe(render);
   render();
 }
@@ -173,6 +192,10 @@ function render() {
     return;
   }
   const me = ctrl.me;
+  onStateChange(lastState, s, me);
+  lastState = s;
+  if (ctrl.error && ctrl.error !== lastError) play('error');
+  lastError = ctrl.error;
   if (s.phase === 'draft') {
     app.innerHTML = draftHtml(s);
   } else {
@@ -282,6 +305,7 @@ function overlays(s: GameState, idle: boolean): string {
       <div class="sheet-actions column">
         <button data-act="log">Журнал партии</button>
         <button data-act="rules">Правила</button>
+        <button data-act="sound">${soundLabel()}</button>
         <button class="danger" data-act="concede">Сдаться</button>
         <button class="ghost" data-act="close">Вернуться к игре</button>
       </div></div></div>`;
@@ -364,6 +388,9 @@ app.addEventListener('click', (ev) => {
     case 'menu':
       modal = { kind: 'menu' };
       return render();
+    case 'sound':
+      setSound(!soundOn());
+      return render();
     case 'rules':
       modal = null;
       showRules();
@@ -394,6 +421,10 @@ function showRules() {
   document.body.appendChild(box);
   render();
 }
+
+// Audio can only start after a user gesture.
+document.addEventListener('pointerdown', unlock, { capture: true });
+document.addEventListener('keydown', unlock, { capture: true });
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && (modal || sheet)) {
