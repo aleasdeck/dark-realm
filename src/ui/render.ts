@@ -73,9 +73,15 @@ export function miniHtml(id: string, o: CardOpts = {}): string {
   </div>`;
 }
 
-export function backHtml(count: number, label: string, act?: string): string {
-  return `<div class="pile"${act ? ` data-act="${act}"` : ''}>
-    <img src="${cardBackUrl()}" alt="" draggable="false"><span class="pile-n">${count}</span><span class="pile-l">${label}</span>
+/** Tiny chip for cards already played this turn. */
+export function chipHtml(id: string): string {
+  const def = cardDef(id);
+  return `<div class="chip" style="${styleVars(def)}" data-card="${def.id}"><img src="${cardArt(def)}" alt="" draggable="false"><span>${esc(def.name)}</span></div>`;
+}
+
+export function pileHtml(count: number, label: string, act?: string): string {
+  return `<div class="pile"${act ? ` data-act="${act}" data-tip="${esc(`${label}: нажмите, чтобы посмотреть`)}"` : ''}>
+    <img src="${cardBackUrl()}" alt="" draggable="false"><div><b>${count}</b><small>${label}</small></div>
   </div>`;
 }
 
@@ -86,34 +92,36 @@ export function patronEmblem(pid: PatronId) {
 function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId): string {
   const def = PATRONS[pid];
   const f = s.favor[pid];
-  const favor = pid === 'treasury' ? 'neutral-fixed' : f === undefined || f === null ? 'neutral' : f === me ? 'mine' : 'theirs';
-  const favorText = { 'neutral-fixed': 'всегда нейтральна', neutral: 'нейтрален', mine: 'благоволит вам', theirs: 'благоволит сопернику' }[favor];
+  const favor = pid === 'treasury' ? 'fixed' : f === undefined || f === null ? 'neutral' : f === me ? 'mine' : 'theirs';
+  const favorText = { fixed: 'всегда нейтрален', neutral: 'нейтрален', mine: 'на вашей стороне', theirs: 'на стороне соперника' }[favor];
   const can = patronAvailable(s, me, pid);
   const rules = PATRON_RULES[pid];
-  return `<div class="patron fav-${favor}${can ? ' can' : ''}" style="${`--accent:${def.palette.accent};--glow:${def.palette.glow}`}"
-      ${can ? `data-act="patron" data-patron="${pid}"` : ''} data-tip="${esc(`${def.name}\nЦена: ${rules.cost}\n${rules.effect}`)}">
+  const tip = `${def.name}\n«${def.title}»\n\nЦена: ${rules.cost}\nЭффект: ${rules.effect}\n\nПосле воззвания покровитель переходит на вашу сторону (или из стороны соперника в нейтраль).`;
+  return `<div class="patron fav-${favor}${can ? ' can' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}"
+      ${can ? `data-act="patron" data-patron="${pid}"` : ''} data-tip="${esc(tip)}">
     <img src="${patronEmblem(pid)}" alt="" draggable="false">
-    <div class="p-name">${esc(def.name)}</div>
-    <div class="p-favor">${favorText}</div>
+    <div class="p-body">
+      <div class="p-name">${esc(def.name)}</div>
+      <div class="p-cost">${esc(rules.cost)} → ${esc(rules.effect.split('.')[0])}</div>
+      <div class="p-favor">${favorText}</div>
+    </div>
   </div>`;
 }
 
-function stats(s: GameState, pi: PlayerIdx) {
+function playerPanel(s: GameState, pi: PlayerIdx, active: boolean, label: string) {
   const p = s.players[pi];
-  return `<span class="stat st-prestige" title="Престиж">✦ ${p.prestige}</span>
-    <span class="stat st-power" title="Сила">⚔ ${p.power}</span>
-    <span class="stat st-coin" title="Монеты">● ${p.coin}</span>`;
+  return `<div class="player-panel${active ? ' active' : ''}">
+    <div class="pp-name"><span>${esc(p.name)}</span><small>${active ? 'ходит' : label}</small></div>
+    <div class="pp-stats">
+      <div class="stat st-prestige" data-tip="Престиж: очки победы. Нужно 40 и перевес после хода соперника, или 80 сразу."><b>${p.prestige}</b><small>престиж</small></div>
+      <div class="stat st-power" data-tip="Сила: в конце хода превращается в престиж. Можно тратить на атаку агентов соперника."><b>${p.power}</b><small>сила</small></div>
+      <div class="stat st-coin" data-tip="Монеты: покупка карт в таверне. Сгорают в конце хода."><b>${p.coin}</b><small>монеты</small></div>
+    </div>
+  </div>`;
 }
 
-function track(s: GameState, me: PlayerIdx) {
-  const pct = (v: number) => Math.min(100, (v / 40) * 100);
-  const mine = s.players[me].prestige;
-  const theirs = s.players[other(me)].prestige;
-  return `<div class="track" title="Победа: 40 престижа и удержать перевес, или 80 сразу">
-    <div class="track-bar them" style="width:${pct(theirs)}%"></div>
-    <div class="track-bar you" style="width:${pct(mine)}%"></div>
-    <span>${mine} : ${theirs} / 40</span>
-  </div>`;
+function emptyHint(text: string) {
+  return `<div class="empty">${text}</div>`;
 }
 
 export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; idle: boolean }): string {
@@ -129,7 +137,7 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       return miniHtml(a.id, { agent: a, act: ready ? 'activate' : undefined, uid: a.uid, cls: ready ? 'ready' : 'spent' });
     })
     .join('');
-  const played = you.played.map((c) => miniHtml(c.id, { cls: 'spent' })).join('');
+  const played = you.played.map((c) => chipHtml(c.id)).join('');
   const tavern = s.tavern
     .map((c) => {
       const can = opts.idle && cardDef(c.id).cost <= you.coin;
@@ -137,37 +145,56 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
     })
     .join('');
   const hand = you.hand.map((c: Card) => cardHtml(c.id, { act: opts.idle ? 'play' : undefined, uid: c.uid, cls: opts.idle ? 'playable' : '' })).join('');
-  const oppHand = Array.from({ length: them.hand.length }, () => `<img class="opp-card" src="${cardBackUrl()}" alt="">`).join('');
-  const logLines = s.log.slice(-40).map((l) => `<div>${esc(l)}</div>`).join('');
+  const oppHand = `<div class="opp-hand" data-tip="Карт в руке соперника">${Array.from({ length: them.hand.length }, () => `<img src="${cardBackUrl()}" alt="">`).join('')}<span>${them.hand.length}</span></div>`;
+  const attackHint = targets.size ? ' · нажмите на агента, чтобы атаковать силой' : '';
 
   return `<div class="board ${opts.myTurn ? 'my-turn' : 'their-turn'}">
-    <section class="side them">
-      <div class="who"><span class="pname">${esc(them.name)}</span>${stats(s, other(me))}</div>
-      <div class="opp-hand">${oppHand}</div>
-      ${backHtml(them.deck.length, 'колода')}${backHtml(them.cooldown.length, 'сброс', 'pile-opp-cd')}
+    <section class="zone zone-them">
+      ${playerPanel(s, other(me), !opts.myTurn, 'соперник')}
+      <div class="zone-cell grow"><div class="zone-title">Агенты соперника${attackHint}</div>
+        <div class="cards-row">${theirAgents || emptyHint('нет агентов')}</div></div>
+      <div class="zone-cell piles">${oppHand}${pileHtml(them.deck.length, 'колода')}${pileHtml(them.cooldown.length, 'сброс', 'pile-opp-cd')}</div>
     </section>
-    <section class="row agents-row them-agents"><div class="row-label">Агенты соперника</div>${theirAgents || '<div class="empty">нет агентов</div>'}</section>
-    <section class="middle">
+
+    <section class="patron-strip">
+      <div class="strip-side them">↑ соперник</div>
       <div class="patrons">${s.patrons.map((p) => patronHtml(s, me, p)).join('')}</div>
-      <div class="tavern"><div class="row-label">Таверна</div><div class="tavern-cards">${tavern}</div>
-        <div class="tavern-deck">${backHtml(s.tavernDeck.length, 'в запасе')}</div></div>
-      <aside class="side-panel">
-        <div class="preview" id="preview"><div class="hint">Наведите на карту, чтобы рассмотреть её</div></div>
-        <div class="log" id="log">${logLines}</div>
-      </aside>
+      <div class="strip-side you">↓ вы</div>
     </section>
-    ${track(s, me)}
-    <section class="row agents-row my-agents"><div class="row-label">Ваши агенты</div>${myAgents || '<div class="empty">нет агентов</div>'}
-      <div class="row-label played-label">Сыграно</div>${played}</section>
-    <section class="hand">${hand || '<div class="empty">рука пуста</div>'}</section>
-    <section class="side you">
-      <div class="who"><span class="pname">${esc(you.name)}</span>${stats(s, me)}</div>
-      ${backHtml(you.deck.length, 'колода', 'pile-deck')}${backHtml(you.cooldown.length, 'сброс', 'pile-cd')}
-      <div class="buttons">
-        <button data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'}>Сыграть всё</button>
-        <button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>Конец хода</button>
-        <button class="ghost" data-act="concede">Сдаться</button>
+
+    <section class="tavern-zone">
+      <div class="zone-title">Таверна: покупайте карты за монеты</div>
+      <div class="tavern-row"><div class="tavern-cards">${tavern}</div>
+        <div class="piles">${pileHtml(s.tavernDeck.length, 'в запасе')}</div></div>
+    </section>
+
+    <section class="zone zone-you">
+      <div class="zone-cell side-col">
+        ${playerPanel(s, me, opts.myTurn, 'вы')}
+        <div class="piles-row">${pileHtml(you.deck.length, 'колода', 'pile-deck')}${pileHtml(you.cooldown.length, 'сброс', 'pile-cd')}</div>
+      </div>
+      <div class="zone-cell grow hand-cell">
+        <div class="zone-title">Ваша рука${opts.idle && you.hand.length ? ' · нажмите на карту, чтобы сыграть' : ''}</div>
+        <div class="hand">${hand || emptyHint('рука пуста')}</div>
+      </div>
+      <div class="zone-cell table-col">
+        <div class="zone-title">Ваши агенты${opts.idle && you.agents.some((a) => !a.activated) ? ' · нажмите, чтобы применить' : ''}</div>
+        <div class="cards-row wrap">${myAgents || emptyHint('нет агентов')}</div>
+        <div class="zone-title">Сыграно в этот ход</div>
+        <div class="chips">${played || emptyHint('пока ничего')}</div>
       </div>
     </section>
+
+    <nav class="action-bar">
+      <div class="bar-left">
+        <button class="ghost" data-act="log">Журнал</button>
+        <button class="ghost" data-act="concede">Сдаться</button>
+      </div>
+      <div class="turn-badge ${opts.myTurn ? 'mine' : 'theirs'}">${opts.myTurn ? 'Ваш ход' : 'Ход соперника'} · ход ${s.turn}</div>
+      <div class="bar-right">
+        <button data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'}>Сыграть всё</button>
+        <button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>Конец хода</button>
+      </div>
+    </nav>
   </div>`;
 }

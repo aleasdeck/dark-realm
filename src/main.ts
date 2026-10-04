@@ -1,3 +1,9 @@
+import '@fontsource/philosopher/400.css';
+import '@fontsource/philosopher/700.css';
+import '@fontsource/pt-sans/400.css';
+import '@fontsource/pt-sans/700.css';
+import '@fontsource/pt-sans-narrow/400.css';
+import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
 import { cardDef, PATRONS } from './engine/cards';
 import { actingPlayer } from './engine/engine';
@@ -13,7 +19,7 @@ let cancelHost: (() => void) | null = null;
 let selected = new Set<number>();
 let pendingKey = '';
 let autoPlay = false;
-let modal: { title: string; cards: Card[] } | null = null;
+let modal: { title: string; cards: Card[] } | { title: string; log: true } | null = null;
 
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
@@ -89,7 +95,7 @@ function rulesHtml() {
     .map((p) => `<li><b>${esc(PATRONS[p].name)}</b>: ${esc(PATRON_RULES[p].cost)} → ${esc(PATRON_RULES[p].effect)}</li>`)
     .join('');
   return `<ul>
-    <li>Игроки по очереди выбирают 4 покровителей; их колоды образуют таверну. Казна есть всегда.</li>
+    <li>Игроки по очереди выбирают 4 покровителей; их колоды образуют таверну. Сундук Бездны есть всегда.</li>
     <li>Начальная колода: 6 «Золота» и по одной начальной карте каждого покровителя. В руке 5 карт.</li>
     <li>Сыгранные карты дают <b>монеты</b> (покупка карт в таверне) и <b>силу</b> (в конце хода становится престижем или идёт на атаку агентов).</li>
     <li><b>Комбо N</b> срабатывает, когда за ход сыграно N карт одного покровителя, даже задним числом.</li>
@@ -163,7 +169,6 @@ function render() {
     return;
   }
   const me = ctrl.me;
-  const scrollLog = app.querySelector('#log')?.scrollTop;
   if (s.phase === 'draft') {
     app.innerHTML = draftHtml(s);
   } else {
@@ -171,8 +176,9 @@ function render() {
     const idle = myTurn && !s.pending && s.queue.length === 0;
     app.innerHTML = boardHtml(s, me, { myTurn, idle }) + overlays(s);
   }
-  const log = app.querySelector('#log');
-  if (log) log.scrollTop = scrollLog !== undefined && scrollLog < log.scrollHeight - log.clientHeight - 40 ? scrollLog : log.scrollHeight;
+  const log = app.querySelector('.log-view .log');
+  if (log) log.scrollTop = log.scrollHeight;
+  hideTip();
   continueAutoPlay(s);
 }
 
@@ -262,7 +268,12 @@ function overlays(s: GameState): string {
       </div></div>`;
     }
   }
-  if (modal) {
+  if (modal && 'log' in modal) {
+    html += `<div class="overlay" data-act="close"><div class="dialog log-view">
+      <h2>${esc(modal.title)}</h2>
+      <div class="log">${s.log.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
+      <div class="buttons"><button data-act="close">Закрыть</button></div></div></div>`;
+  } else if (modal) {
     const cards = [...modal.cards].sort((a, b) => cardDef(a.id).name.localeCompare(cardDef(b.id).name));
     html += `<div class="overlay" data-act="close"><div class="dialog pile-view">
       <h2>${esc(modal.title)} (${cards.length})</h2>
@@ -322,6 +333,9 @@ app.addEventListener('click', (ev) => {
     }
     case 'confirm':
       return ctrl.dispatch({ t: 'choose', picks: [...selected] });
+    case 'log':
+      modal = { title: 'Журнал партии', log: true };
+      return render();
     case 'pile-deck':
       modal = { title: 'Ваша колода (порядок скрыт)', cards: s.players[me].deck };
       return render();
@@ -334,19 +348,54 @@ app.addEventListener('click', (ev) => {
   }
 });
 
-// Card preview and patron tooltips on hover.
+// Floating card preview and tooltips: positioned over the page so nothing shifts.
+const tip = document.createElement('div');
+tip.className = 'float-tip';
+document.body.appendChild(tip);
+let tipFor: HTMLElement | null = null;
+
+function hideTip() {
+  tip.style.display = 'none';
+  tipFor = null;
+}
+
+function placeTip(x: number, y: number) {
+  const w = tip.offsetWidth;
+  const h = tip.offsetHeight;
+  let left = x + 18;
+  let top = y - h / 2;
+  if (left + w > innerWidth - 8) left = x - w - 18;
+  top = Math.max(8, Math.min(top, innerHeight - h - 8));
+  tip.style.left = `${Math.max(8, left)}px`;
+  tip.style.top = `${top}px`;
+}
+
 app.addEventListener('mouseover', (ev) => {
   const t = ev.target as HTMLElement;
-  const preview = app.querySelector('#preview');
-  const cardEl = t.closest<HTMLElement>('[data-card]');
-  const tipEl = t.closest<HTMLElement>('[data-tip]');
-  if (!preview) return;
-  if (cardEl && !cardEl.closest('.preview')) {
-    preview.innerHTML = cardHtml(cardEl.dataset.card!, { cls: 'big' });
-  } else if (tipEl) {
-    preview.innerHTML = `<div class="tip">${esc(tipEl.dataset.tip!).replace(/\n/g, '<br>')}</div>`;
+  const el = t.closest<HTMLElement>('[data-card], [data-tip]');
+  if (!el || el === tipFor || el.closest('.dialog')) {
+    if (!el) hideTip();
+    return;
   }
+  tipFor = el;
+  // Full size cards already show their text; only compact ones get a preview.
+  if (el.dataset.card && (el.classList.contains('mini') || el.classList.contains('chip'))) {
+    tip.className = 'float-tip card-tip';
+    tip.innerHTML = cardHtml(el.dataset.card, { cls: 'big' });
+  } else if (el.dataset.tip) {
+    tip.className = 'float-tip text-tip';
+    tip.innerHTML = esc(el.dataset.tip).replace(/\n/g, '<br>');
+  } else {
+    hideTip();
+    return;
+  }
+  tip.style.display = 'block';
+  placeTip(ev.clientX, ev.clientY);
 });
+app.addEventListener('mousemove', (ev) => {
+  if (tipFor) placeTip(ev.clientX, ev.clientY);
+});
+app.addEventListener('mouseleave', hideTip);
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && modal) {
