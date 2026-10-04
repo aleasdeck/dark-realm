@@ -1,4 +1,4 @@
-import Peer, { type DataConnection } from 'peerjs';
+import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 import type { Action, GameState } from '../engine/types';
 
 /*
@@ -15,6 +15,15 @@ export type NetMessage =
   | { type: 'bye' };
 
 const PREFIX = 'dark-realm-tot-';
+
+/** `?peer=host:port` points at a self-hosted PeerJS server instead of the public broker. */
+function peerOptions(): PeerOptions {
+  const custom = new URLSearchParams(location.search).get('peer');
+  if (!custom) return {};
+  const [host, port] = custom.split(':');
+  const local = host === 'localhost' || host === '127.0.0.1';
+  return { host, port: Number(port) || (local ? 9000 : 443), secure: !local, path: '/' };
+}
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export function newRoomCode(): string {
@@ -76,7 +85,7 @@ export function hostRoom(
   onGuest: (link: (h: LinkHandlers) => Link) => void,
 ): Promise<{ cancel(): void }> {
   return new Promise((resolve, reject) => {
-    const peer = new Peer(PREFIX + code);
+    const peer = new Peer(PREFIX + code, peerOptions());
     let taken = false;
     peer.on('open', () => resolve({ cancel: () => peer.destroy() }));
     peer.on('error', (err) => reject(new Error(peerError(err))));
@@ -96,7 +105,7 @@ export function hostRoom(
 
 export function joinRoom(code: string, h: LinkHandlers): Promise<Link> {
   return new Promise((resolve, reject) => {
-    const peer = new Peer();
+    const peer = new Peer(peerOptions());
     const timer = setTimeout(() => {
       peer.destroy();
       reject(new Error('Не удалось подключиться к комнате.'));

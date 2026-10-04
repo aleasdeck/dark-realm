@@ -37,7 +37,8 @@ function roomFromUrl(): string {
 
 function roomLink(code: string) {
   const u = new URL(location.href);
-  u.search = `?room=${code}`;
+  const peer = u.searchParams.get('peer');
+  u.search = `?room=${code}${peer ? `&peer=${encodeURIComponent(peer)}` : ''}`;
   u.hash = '';
   return u.toString();
 }
@@ -51,7 +52,8 @@ function leaveGame() {
   cancelHost = null;
   autoPlay = false;
   modal = null;
-  history.replaceState(null, '', location.pathname);
+  const peer = new URLSearchParams(location.search).get('peer');
+  history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
   menu();
 }
 
