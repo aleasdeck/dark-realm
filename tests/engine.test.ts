@@ -103,4 +103,14 @@ describe('engine', () => {
     }
     expect(wins[0] + wins[1]).toBe(40);
   });
+
+  it('reports the events of each action for sounds and the opponent feed', () => {
+    let s = draftAll(createGame(1, ['A', 'B']));
+    expect(s.events.at(-1)).toEqual({ k: 'turn', p: 0 });
+    const card = s.players[0].hand[0];
+    s = applyAction(s, 0, { t: 'play', uid: card.uid });
+    expect(s.events[0]).toEqual({ k: 'play', p: 0, card: card.id });
+    s = applyAction(s, 0, { t: 'end' });
+    expect(s.events.at(-1)).toEqual({ k: 'turn', p: 1 });
+  });
 });

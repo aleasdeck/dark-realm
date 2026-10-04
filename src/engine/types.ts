@@ -128,6 +128,18 @@ export interface TurnPlay {
   fired: number[];
 }
 
+/** What happened during the last applied action, for sounds and the opponent feed. */
+export type GameEvent =
+  | { k: 'draft'; p: PlayerIdx; patron: PatronId }
+  | { k: 'play' | 'activate' | 'buy' | 'gain' | 'destroy'; p: PlayerIdx; card: string }
+  | { k: 'attack'; p: PlayerIdx; card: string; n: number }
+  | { k: 'knockout'; p: PlayerIdx; card: string }
+  | { k: 'patron'; p: PlayerIdx; patron: PatronId }
+  | { k: 'discard'; p: PlayerIdx; n: number }
+  | { k: 'prestige'; p: PlayerIdx; n: number }
+  | { k: 'turn'; p: PlayerIdx }
+  | { k: 'win'; p: PlayerIdx };
+
 export interface GameState {
   phase: 'draft' | 'play' | 'over';
   rng: number;
@@ -149,6 +161,8 @@ export interface GameState {
   pending: Pending | null;
   turnPlays: TurnPlay[];
   log: string[];
+  /** Events of the last applied action (cleared by every applyAction). */
+  events: GameEvent[];
   winner: PlayerIdx | null;
   winReason: string;
 }

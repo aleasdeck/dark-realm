@@ -152,6 +152,7 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
   const myAgents = you.agents
     .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: opts.idle && !a.activated ? 'ready' : 'spent' }))
     .join('');
+  const theirPlayed = them.played.map((c) => chipHtml(c.id, { cls: 'played' })).join('');
   const played = you.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' })).join('');
   const tavern = s.tavern.map((c) => {
     const can = opts.idle && cardDef(c.id).cost <= you.coin;
@@ -165,7 +166,8 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       <span class="res-group">${res(them)}</span>
       <span class="counts">${count(them.hand.length, 'рука')}${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
     </header>
-    <section class="strip opp-agents">${theirAgents || '<span class="empty">агентов нет</span>'}
+    <section class="strip opp-agents">${theirAgents || (theirPlayed ? '' : '<span class="empty">агентов нет</span>')}
+      ${theirPlayed ? `<div class="part played-part">${theirPlayed}</div>` : ''}
       ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
     <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p)).join('')}</section>
     <section class="tavern">

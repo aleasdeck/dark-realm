@@ -666,7 +666,7 @@ input {
 @media (hover: hover) {
   .tile.playable:hover,
   .tile.buyable:hover {
-    transform: translateY(-6px);
+    transform: translateY(6px);
     z-index: 2;
   }
 }
@@ -1047,5 +1047,126 @@ input {
   .draft-tile p {
     font-size: 12px;
     line-height: 1.2;
+  }
+}
+
+/* ── opponent turn: banner, move feed, "thinking" dots ── */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+.turn-banner {
+  position: absolute;
+  top: 38%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--title-font);
+  font-weight: 700;
+  font-size: clamp(30px, 9vw, 52px);
+  letter-spacing: 1px;
+  padding: 14px 0;
+  background: linear-gradient(90deg, transparent, #000c 20%, #000c 80%, transparent);
+  animation: turn-banner 1.5s ease-out forwards;
+}
+.turn-banner.mine {
+  color: var(--green-glow);
+  text-shadow: 0 0 18px var(--green);
+}
+.turn-banner.theirs {
+  color: var(--them);
+  text-shadow: 0 0 18px #ff3b2f;
+}
+@keyframes turn-banner {
+  0% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  15%,
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+/* sits over the hand, which is idle while the opponent moves */
+.feed {
+  position: absolute;
+  bottom: calc(max(6px, env(safe-area-inset-bottom)) + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(94vw, 440px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.feed-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 5px;
+  min-height: 40px;
+  background: #1a0b0bf0;
+  border: 1px solid var(--them);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px #000a;
+  font-size: 14px;
+  line-height: 1.2;
+  animation: feed-in 0.25s ease-out;
+  transition: opacity 0.4s, transform 0.4s;
+}
+.feed-item.out {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.feed-item img {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+.feed-item b {
+  color: var(--gold);
+  font-weight: 700;
+}
+.feed-item em {
+  font-style: normal;
+  font-weight: 700;
+}
+.feed-item .bad {
+  color: var(--them);
+}
+.feed-item .pre {
+  color: var(--prestige);
+}
+@keyframes feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+/* the opponent's bar breathes while they move */
+.opp-bar.active {
+  animation: their-turn 1.6s ease-in-out infinite;
+}
+@keyframes their-turn {
+  50% {
+    box-shadow: 0 0 22px #ff3b2fbb;
+  }
+}
+/* landscape: keep the feed over the hand column */
+@media (orientation: landscape) and (max-height: 560px) {
+  .feed {
+    left: auto;
+    right: 12px;
+    transform: none;
+    width: min(48vw, 420px);
   }
 }

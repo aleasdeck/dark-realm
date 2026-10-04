@@ -27,6 +27,13 @@ export abstract class Controller {
   }
 }
 
+/** Pause before the bot's next move, long enough to follow what it does. */
+function botDelay(s: GameState): number {
+  if (s.phase === 'draft') return 900;
+  if (s.events?.some((e) => e.k === 'turn')) return 1400; // let the turn banner play first
+  return 950;
+}
+
 export class BotController extends Controller {
   readonly me: PlayerIdx = 0;
   readonly kind = 'bot';
@@ -66,7 +73,7 @@ export class BotController extends Controller {
       if (a) this.state = applyAction(cur, 1, a);
       this.emit();
       this.schedule();
-    }, s.phase === 'draft' ? 700 : 420);
+    }, botDelay(s));
   }
 
   dispose() {
