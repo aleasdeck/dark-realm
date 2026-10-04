@@ -11,7 +11,7 @@ import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
-import { boardHtml, cardHtml, esc, miniHtml, patronEmblem } from './ui/render';
+import { boardHtml, esc, patronEmblem, pileGridHtml, sheetHtml, tileHtml, type SheetTarget } from './ui/render';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -19,7 +19,8 @@ let cancelHost: (() => void) | null = null;
 let selected = new Set<number>();
 let pendingKey = '';
 let autoPlay = false;
-let modal: { title: string; cards: Card[] } | { title: string; log: true } | null = null;
+let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'log' } | { kind: 'menu' } | null = null;
+let sheet: SheetTarget | null = null;
 
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
@@ -58,6 +59,7 @@ function leaveGame() {
   cancelHost = null;
   autoPlay = false;
   modal = null;
+  sheet = null;
   const peer = new URLSearchParams(location.search).get('peer');
   history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
   menu();
@@ -155,6 +157,8 @@ function startGame(c: Controller) {
   ctrl = c;
   selected = new Set();
   pendingKey = '';
+  sheet = null;
+  modal = null;
   c.subscribe(render);
   render();
 }
@@ -174,11 +178,10 @@ function render() {
   } else {
     const myTurn = s.current === me && s.phase === 'play';
     const idle = myTurn && !s.pending && s.queue.length === 0;
-    app.innerHTML = boardHtml(s, me, { myTurn, idle }) + overlays(s);
+    app.innerHTML = boardHtml(s, me, { myTurn, idle }) + overlays(s, idle);
   }
   const log = app.querySelector('.log-view .log');
   if (log) log.scrollTop = log.scrollHeight;
-  hideTip();
   continueAutoPlay(s);
 }
 
@@ -226,7 +229,7 @@ function draftHtml(s: GameState): string {
   </div>`;
 }
 
-function overlays(s: GameState): string {
+function overlays(s: GameState, idle: boolean): string {
   const me = ctrl!.me;
   let html = '';
   const banner = ctrl!.notice || ctrl!.error;
@@ -255,30 +258,44 @@ function overlays(s: GameState): string {
         .map((o) => {
           const sel = selected.has(o.ref) ? ' selected' : '';
           return o.cardId
-            ? `<div class="opt-card${sel}" data-act="pick" data-ref="${o.ref}">${cardHtml(o.cardId)}<span>${esc(o.label)}</span></div>`
+            ? `<div class="opt-card${sel}" data-act="pick" data-ref="${o.ref}">${tileHtml(o.cardId)}<span>${esc(o.label)}</span></div>`
             : `<button class="opt${sel}" data-act="pick" data-ref="${o.ref}">${esc(o.label)}</button>`;
         })
         .join('');
       const ok = selected.size >= p.min && selected.size <= p.max;
       const range = p.min === p.max ? `${p.min}` : `${p.min}–${p.max}`;
-      html += `<div class="overlay"><div class="dialog choice">
+      html += `<div class="overlay sheet-wrap"><div class="sheet choice">
         <h2>${esc(p.prompt)}</h2><p class="hint">Выберите ${range}</p>
         <div class="options">${opts}</div>
         ${single ? '' : `<div class="buttons"><button data-act="confirm" ${ok ? '' : 'disabled'}>Готово (${selected.size})</button></div>`}
       </div></div>`;
     }
   }
-  if (modal && 'log' in modal) {
-    html += `<div class="overlay" data-act="close"><div class="dialog log-view">
-      <h2>${esc(modal.title)}</h2>
+  if (modal?.kind === 'log') {
+    html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
+      <h2>Журнал партии</h2>
       <div class="log">${s.log.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
-      <div class="buttons"><button data-act="close">Закрыть</button></div></div></div>`;
-  } else if (modal) {
+      <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
+  } else if (modal?.kind === 'menu') {
+    html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
+      <h2>Меню</h2>
+      <div class="sheet-actions column">
+        <button data-act="log">Журнал партии</button>
+        <button data-act="rules">Правила</button>
+        <button class="danger" data-act="concede">Сдаться</button>
+        <button class="ghost" data-act="close">Вернуться к игре</button>
+      </div></div></div>`;
+  } else if (modal?.kind === 'pile') {
     const cards = [...modal.cards].sort((a, b) => cardDef(a.id).name.localeCompare(cardDef(b.id).name));
-    html += `<div class="overlay" data-act="close"><div class="dialog pile-view">
+    html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet pile-view">
       <h2>${esc(modal.title)} (${cards.length})</h2>
-      <div class="options">${cards.map((c) => miniHtml(c.id)).join('') || '<p>Пусто</p>'}</div>
-      <div class="buttons"><button data-act="close">Закрыть</button></div></div></div>`;
+      <div class="options">${pileGridHtml(cards) || '<p>Пусто</p>'}</div>
+      <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
+  } else if (sheet && !s.pending) {
+    const body = sheetHtml(s, me, sheet, idle);
+    if (!body) sheet = null;
+    else html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet">${body}
+      <button class="ghost sheet-close" data-act="close">Закрыть</button></div></div>`;
   }
   return html;
 }
@@ -296,9 +313,14 @@ app.addEventListener('click', (ev) => {
   if (act === 'close') {
     if (el.classList.contains('overlay') && ev.target !== el) return;
     modal = null;
+    sheet = null;
     return render();
   }
   if (!s) return;
+  if (['play', 'activate', 'attack', 'buy', 'patron', 'end', 'play-all', 'concede'].includes(act)) {
+    sheet = null;
+    modal = null;
+  }
   const me = ctrl.me;
   switch (act) {
     case 'draft':
@@ -333,73 +355,50 @@ app.addEventListener('click', (ev) => {
     }
     case 'confirm':
       return ctrl.dispatch({ t: 'choose', picks: [...selected] });
+    case 'inspect':
+      sheet = { kind: 'card', uid };
+      return render();
+    case 'inspect-patron':
+      sheet = { kind: 'patron', patron: el.dataset.patron as PatronId };
+      return render();
+    case 'menu':
+      modal = { kind: 'menu' };
+      return render();
+    case 'rules':
+      modal = null;
+      showRules();
+      return;
     case 'log':
-      modal = { title: 'Журнал партии', log: true };
+      modal = { kind: 'log' };
       return render();
     case 'pile-deck':
-      modal = { title: 'Ваша колода (порядок скрыт)', cards: s.players[me].deck };
+      modal = { kind: 'pile', title: 'Ваша колода (порядок скрыт)', cards: s.players[me].deck };
       return render();
     case 'pile-cd':
-      modal = { title: 'Ваш сброс', cards: s.players[me].cooldown };
+      modal = { kind: 'pile', title: 'Ваш сброс', cards: s.players[me].cooldown };
       return render();
     case 'pile-opp-cd':
-      modal = { title: 'Сброс соперника', cards: s.players[me === 0 ? 1 : 0].cooldown };
+      modal = { kind: 'pile', title: 'Сброс соперника', cards: s.players[me === 0 ? 1 : 0].cooldown };
       return render();
   }
 });
 
-// Floating card preview and tooltips: positioned over the page so nothing shifts.
-const tip = document.createElement('div');
-tip.className = 'float-tip';
-document.body.appendChild(tip);
-let tipFor: HTMLElement | null = null;
-
-function hideTip() {
-  tip.style.display = 'none';
-  tipFor = null;
+function showRules() {
+  const box = document.createElement('div');
+  box.className = 'overlay sheet-wrap';
+  box.innerHTML = `<div class="sheet rules-sheet"><h2>Правила</h2><div class="rules-body">${rulesHtml()}</div>
+    <div class="sheet-actions"><button>Закрыть</button></div></div>`;
+  box.addEventListener('click', (ev) => {
+    if (ev.target === box || (ev.target as HTMLElement).tagName === 'BUTTON') box.remove();
+  });
+  document.body.appendChild(box);
+  render();
 }
-
-function placeTip(x: number, y: number) {
-  const w = tip.offsetWidth;
-  const h = tip.offsetHeight;
-  let left = x + 18;
-  let top = y - h / 2;
-  if (left + w > innerWidth - 8) left = x - w - 18;
-  top = Math.max(8, Math.min(top, innerHeight - h - 8));
-  tip.style.left = `${Math.max(8, left)}px`;
-  tip.style.top = `${top}px`;
-}
-
-app.addEventListener('mouseover', (ev) => {
-  const t = ev.target as HTMLElement;
-  const el = t.closest<HTMLElement>('[data-card], [data-tip]');
-  if (!el || el === tipFor || el.closest('.dialog')) {
-    if (!el) hideTip();
-    return;
-  }
-  tipFor = el;
-  // Full size cards already show their text; only compact ones get a preview.
-  if (el.dataset.card && (el.classList.contains('mini') || el.classList.contains('chip'))) {
-    tip.className = 'float-tip card-tip';
-    tip.innerHTML = cardHtml(el.dataset.card, { cls: 'big' });
-  } else if (el.dataset.tip) {
-    tip.className = 'float-tip text-tip';
-    tip.innerHTML = esc(el.dataset.tip).replace(/\n/g, '<br>');
-  } else {
-    hideTip();
-    return;
-  }
-  tip.style.display = 'block';
-  placeTip(ev.clientX, ev.clientY);
-});
-app.addEventListener('mousemove', (ev) => {
-  if (tipFor) placeTip(ev.clientX, ev.clientY);
-});
-app.addEventListener('mouseleave', hideTip);
 
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && modal) {
+  if (ev.key === 'Escape' && (modal || sheet)) {
     modal = null;
+    sheet = null;
     render();
   }
 });
