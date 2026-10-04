@@ -28,43 +28,43 @@ const curse = (n: number): Effect => ({ k: 'create', card: 'bewilderment', n, to
 export const PATRONS: Record<PatronId, PatronDef> = {
   crows: {
     id: 'crows',
-    name: 'Князь Ворон',
-    title: 'Власть над голодной стаей',
+    name: 'Карраг Падальщик',
+    title: 'Владыка голодной стаи',
     palette: { bg1: '#0b0710', bg2: '#2a0f22', accent: '#7a2440', glow: '#d8405a' },
   },
   hlaalu: {
     id: 'hlaalu',
-    name: 'Магистр Пепла',
+    name: 'Ростовщица Вейла',
     title: 'Всё имеет цену',
     palette: { bg1: '#140c05', bg2: '#3b2410', accent: '#b8862b', glow: '#ffd36b' },
   },
   pelin: {
     id: 'pelin',
-    name: 'Святой Велиор',
+    name: 'Гримвальд Костяной',
     title: 'Мёртвые не покидают строй',
     palette: { bg1: '#070b12', bg2: '#1b2638', accent: '#8a9bb5', glow: '#d9e6ff' },
   },
   psijic: {
     id: 'psijic',
-    name: 'Слепой Провидец',
+    name: 'Иссерия Безглазая',
     title: 'Видит то, чего ещё нет',
     palette: { bg1: '#04100f', bg2: '#0f3330', accent: '#2f8f84', glow: '#7affe4' },
   },
   rajhin: {
     id: 'rajhin',
-    name: 'Шепчущий Лжец',
+    name: 'Шут Морвен',
     title: 'Улыбка в темноте',
     palette: { bg1: '#0c0612', bg2: '#2a1638', accent: '#6d3f8f', glow: '#b98cff' },
   },
   eagle: {
     id: 'eagle',
-    name: 'Алый Орёл',
-    title: 'Король пустошей',
+    name: 'Хротгар Кровавое Перо',
+    title: 'Вождь пепельных пустошей',
     palette: { bg1: '#120504', bg2: '#3a120b', accent: '#a33a20', glow: '#ff7a3d' },
   },
   treasury: {
     id: 'treasury',
-    name: 'Казна',
+    name: 'Сундук Бездны',
     title: 'Нейтральный покровитель',
     palette: { bg1: '#0a0a0a', bg2: '#262019', accent: '#7d6a4d', glow: '#e8c98a' },
   },
@@ -81,7 +81,7 @@ export const CARDS: CardDef[] = [
     flavor: 'Пустые глаза, пустые руки.',
   },
 
-  // ── Князь Ворон (Duke of Crows): сила, сброс, нокаут ────
+  // ── Карраг Падальщик (Duke of Crows): сила, сброс, нокаут ────
   { id: 'crows_starter', name: 'Вороний грай', patron: 'crows', cost: 0, type: 'starter', copies: 0, play: [power(1)], combo: { 2: [power(1)] }, art: 'crow', seed: 11 },
   { id: 'crows_peck', name: 'Клевок', patron: 'crows', cost: 1, type: 'action', copies: 2, play: [power(1)], combo: { 2: [coin(1)] }, art: 'feather', seed: 12 },
   { id: 'crows_knave', name: 'Чернокрылый плут', patron: 'crows', cost: 3, type: 'agent', hp: 1, copies: 2, play: [power(1)], combo: { 2: [coin(1)] }, art: 'assassin', seed: 13 },
@@ -94,19 +94,19 @@ export const CARDS: CardDef[] = [
   { id: 'crows_law', name: 'Закон Вороньего Гнезда', patron: 'crows', cost: 8, type: 'action', copies: 1, play: [power(4), knockout(1)], combo: { 3: [oppLose(2)] }, art: 'throne', seed: 20 },
   { id: 'crows_murder', name: 'Стая-убийца', patron: 'crows', cost: 9, type: 'action', copies: 1, play: [power(5)], combo: { 2: [oppDiscard(1)], 4: [power(3)] }, art: 'crow', seed: 21 },
 
-  // ── Магистр Пепла (Hlaalu): монеты, престиж, приобретение ─
+  // ── Ростовщица Вейла (Hlaalu): монеты, престиж, приобретение ─
   { id: 'hlaalu_starter', name: 'Пепельная поставка', patron: 'hlaalu', cost: 0, type: 'starter', copies: 0, play: [coin(1)], combo: { 2: [coin(1)] }, art: 'chest', seed: 31 },
   { id: 'hlaalu_ledger', name: 'Долговая книга', patron: 'hlaalu', cost: 2, type: 'action', copies: 2, play: [coin(2)], combo: { 2: [prestige(1)] }, art: 'book', seed: 32 },
   { id: 'hlaalu_clerk', name: 'Пепельный писарь', patron: 'hlaalu', cost: 3, type: 'agent', hp: 2, copies: 2, play: [coin(1), prestige(1)], art: 'merchant', seed: 33 },
   { id: 'hlaalu_bribe', name: 'Взятка', patron: 'hlaalu', cost: 3, type: 'action', copies: 2, play: [or([coin(3)], [power(2)])], combo: { 3: [prestige(2)] }, art: 'hand', seed: 34 },
-  { id: 'hlaalu_scales', name: 'Весы Магистра', patron: 'hlaalu', cost: 4, type: 'action', copies: 1, play: [coin(2), replaceTavern(2)], combo: { 2: [prestige(2)] }, art: 'scales', seed: 35 },
+  { id: 'hlaalu_scales', name: 'Весы ростовщицы', patron: 'hlaalu', cost: 4, type: 'action', copies: 1, play: [coin(2), replaceTavern(2)], combo: { 2: [prestige(2)] }, art: 'scales', seed: 35 },
   { id: 'hlaalu_caravan', name: 'Траурный караван', patron: 'hlaalu', cost: 5, type: 'contractAction', copies: 1, play: [coin(3), prestige(2)], art: 'ship', seed: 36 },
   { id: 'hlaalu_broker', name: 'Маклер душ', patron: 'hlaalu', cost: 5, type: 'agent', hp: 3, copies: 1, play: [acquire(3)], art: 'mask', seed: 37 },
   { id: 'hlaalu_vault', name: 'Пепельное хранилище', patron: 'hlaalu', cost: 6, type: 'action', copies: 1, play: [coin(4)], combo: { 3: [prestige(3)] }, art: 'gate', seed: 38 },
   { id: 'hlaalu_auction', name: 'Аукцион костей', patron: 'hlaalu', cost: 7, type: 'action', copies: 1, play: [acquire(6)], combo: { 2: [prestige(2)] }, art: 'bones', seed: 39 },
   { id: 'hlaalu_monopoly', name: 'Монополия на скорбь', patron: 'hlaalu', cost: 9, type: 'action', copies: 1, play: [coin(5), prestige(3)], combo: { 3: [prestige(4)] }, art: 'crown', seed: 40 },
 
-  // ── Святой Велиор (Pelin): агенты, лечение, возврат ──────
+  // ── Гримвальд Костяной (Pelin): агенты, лечение, возврат ──────
   { id: 'pelin_starter', name: 'Клятва стража', patron: 'pelin', cost: 0, type: 'starter', copies: 0, play: [power(1)], combo: { 2: [heal(2)] }, art: 'shield', seed: 51 },
   { id: 'pelin_squire', name: 'Оруженосец-призрак', patron: 'pelin', cost: 2, type: 'agent', hp: 2, taunt: true, copies: 2, play: [power(1)], art: 'ghost', seed: 52 },
   { id: 'pelin_vigil', name: 'Ночное бдение', patron: 'pelin', cost: 2, type: 'action', copies: 2, play: [power(1), heal(2)], combo: { 2: [power(1)] }, art: 'candle', seed: 53 },
@@ -118,7 +118,7 @@ export const CARDS: CardDef[] = [
   { id: 'pelin_relic', name: 'Мощи святого', patron: 'pelin', cost: 7, type: 'action', copies: 1, play: [power(3), returnTop(2)], combo: { 3: [prestige(3)] }, art: 'chalice', seed: 59 },
   { id: 'pelin_saint', name: 'Неупокоенный святой', patron: 'pelin', cost: 9, type: 'agent', hp: 6, taunt: true, copies: 1, play: [power(4), prestige(1)], art: 'priest', seed: 60 },
 
-  // ── Слепой Провидец (Psijic): нокаут, добор, призыв ──────
+  // ── Иссерия Безглазая (Psijic): нокаут, добор, призыв ──────
   { id: 'psijic_starter', name: 'Прозрение', patron: 'psijic', cost: 0, type: 'starter', copies: 0, play: [coin(1)], combo: { 2: [toss(1)] }, art: 'eye', seed: 71 },
   { id: 'psijic_acolyte', name: 'Безглазый послушник', patron: 'psijic', cost: 2, type: 'action', copies: 2, play: [coin(1), toss(2)], combo: { 2: [draw(1)] }, art: 'hooded', seed: 72 },
   { id: 'psijic_rune', name: 'Руна забвения', patron: 'psijic', cost: 3, type: 'action', copies: 2, play: [power(2)], combo: { 2: [knockout(1)] }, art: 'rune', seed: 73 },
@@ -129,7 +129,7 @@ export const CARDS: CardDef[] = [
   { id: 'psijic_warden', name: 'Хранитель безмолвия', patron: 'psijic', cost: 6, type: 'agent', hp: 4, taunt: true, copies: 1, play: [power(2), toss(1)], art: 'mage', seed: 78 },
   { id: 'psijic_rift', name: 'Разлом', patron: 'psijic', cost: 8, type: 'action', copies: 1, play: [{ k: 'knockoutAll' }, power(3)], combo: { 3: [draw(2)] }, art: 'eye', seed: 79 },
 
-  // ── Шепчущий Лжец (Rajhin): морок, сброс, добор ──────────
+  // ── Шут Морвен (Rajhin): морок, сброс, добор ──────────
   { id: 'rajhin_starter', name: 'Мешок фокусов', patron: 'rajhin', cost: 0, type: 'starter', copies: 0, play: [coin(1)], combo: { 2: [curse(1)] }, art: 'cat', seed: 91 },
   { id: 'rajhin_pickpocket', name: 'Карманник', patron: 'rajhin', cost: 2, type: 'action', copies: 2, play: [coin(2)], combo: { 2: [curse(1)] }, art: 'rat', seed: 92 },
   { id: 'rajhin_lie', name: 'Сладкая ложь', patron: 'rajhin', cost: 3, type: 'action', copies: 2, play: [curse(1), draw(1)], combo: { 3: [oppDiscard(1)] }, art: 'mask', seed: 93 },
@@ -140,7 +140,7 @@ export const CARDS: CardDef[] = [
   { id: 'rajhin_jester', name: 'Смеющийся шут', patron: 'rajhin', cost: 6, type: 'agent', hp: 4, copies: 1, play: [curse(1), power(1)], art: 'mask', seed: 98 },
   { id: 'rajhin_grin', name: 'Улыбка во тьме', patron: 'rajhin', cost: 8, type: 'action', copies: 1, play: [oppDiscard(2), power(3)], combo: { 3: [oppLose(3)] }, art: 'cat', seed: 99 },
 
-  // ── Алый Орёл (Red Eagle): сила, добор, агенты ───────────
+  // ── Хротгар Кровавое Перо (Red Eagle): сила, добор, агенты ───────────
   { id: 'eagle_starter', name: 'Клич пустоши', patron: 'eagle', cost: 0, type: 'starter', copies: 0, play: [power(1)], combo: { 2: [draw(1)] }, art: 'eagle', seed: 111 },
   { id: 'eagle_scout', name: 'Разведчик холмов', patron: 'eagle', cost: 1, type: 'action', copies: 2, play: [or([coin(1)], [power(1)])], combo: { 2: [draw(1)] }, art: 'bow', seed: 112 },
   { id: 'eagle_raider', name: 'Налётчик в шкурах', patron: 'eagle', cost: 3, type: 'agent', hp: 2, copies: 2, play: [power(2)], art: 'axe', seed: 113 },

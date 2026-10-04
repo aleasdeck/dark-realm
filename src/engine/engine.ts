@@ -383,7 +383,7 @@ function resolvePending(s: GameState, picks: number[]) {
         if (!c) continue;
         const gain = Math.max(0, cardDef(c.id).cost - 1);
         p.prestige += gain;
-        log(s, `${p.name} жертвует «${name(c.id)}» Магистру: +${gain} престижа`);
+        log(s, `${p.name} жертвует «${name(c.id)}» Ростовщице: +${gain} престижа`);
       }
       break;
     case 'knockout':
@@ -474,7 +474,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'treasury',
-        prompt: 'Казна: уничтожьте карту, взамен получите «Долговую расписку»',
+        prompt: 'Сундук Бездны: уничтожьте карту, взамен получите «Долговую расписку»',
         options: [...p.played.map((c) => cardOption(c, ' (в игре)')), ...p.cooldown.map((c) => cardOption(c, ' (сброс)'))],
         min: 1,
         max: 1,
@@ -490,7 +490,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'hlaalu',
-        prompt: 'Магистр Пепла: пожертвуйте карту ради престижа (цена − 1)',
+        prompt: 'Ростовщица Вейла: пожертвуйте карту ради престижа (цена − 1)',
         options: [...p.played, ...p.cooldown]
           .filter((c) => cardDef(c.id).cost >= 1)
           .map((c) => cardOption(c, ` (+${cardDef(c.id).cost - 1})`)),
@@ -503,7 +503,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'pelin',
-        prompt: 'Святой Велиор: верните агента наверх колоды',
+        prompt: 'Гримвальд Костяной: верните агента наверх колоды',
         options: p.cooldown.filter((c) => cardDef(c.id).type === 'agent').map((c) => cardOption(c)),
         min: 1,
         max: 1,
@@ -514,7 +514,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'psijic',
-        prompt: 'Слепой Провидец: сразите агента соперника',
+        prompt: 'Иссерия Безглазая: сразите агента соперника',
         options: opp.agents.map((a) => cardOption(a)),
         min: 1,
         max: 1,
