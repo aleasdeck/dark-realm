@@ -207,7 +207,8 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       <span class="counts">${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
-    <section class="strip opp-agents">${theirAgents || (theirPlayed ? '' : '<span class="empty">агентов нет</span>')}
+    <section class="strip opp-agents" style="--na:${them.agents.length};--np:${them.played.length};--reserve:${them.played.length ? 'calc(var(--pw) + 14px)' : '0px'}">
+      ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '' : '<span class="empty">агентов нет</span>'}
       ${theirPlayed ? `<div class="part played-part">${theirPlayed}</div>` : ''}
       ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
     <section class="tavern">
@@ -215,9 +216,9 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       <div class="row">${slots(tavern)}</div>
     </section>
     <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p, p === focusPatron)).join('')}</section>
-    <section class="strip my-table">
+    <section class="strip my-table" style="--na:${you.agents.length};--np:${you.played.length};--reserve:calc(118px${you.played.length ? ' + var(--pw) + 14px' : ''})">
       <div class="part counts">${count(you.deck.length, 'колода', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile-cd')}</div>
-      <div class="part">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
+      <div class="part agents">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
       ${played ? `<div class="part played-part">${played}</div>` : ''}
     </section>
     <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
