@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botAction } from '../src/engine/bot';
-import { CARDS } from '../src/engine/cards';
-import { actingPlayer, applyAction, createGame } from '../src/engine/engine';
+import { cardDef, CARDS } from '../src/engine/cards';
+import { actingPlayer, applyAction, createGame, patronAvailable } from '../src/engine/engine';
 import type { GameState, PlayerIdx } from '../src/engine/types';
 
 function draftAll(s: GameState): GameState {
@@ -50,13 +50,14 @@ describe('engine', () => {
   it('fires combos retroactively', () => {
     let s = draftAll(createGame(4, ['A', 'B']));
     const p = s.players[0];
-    p.hand = [{ uid: 900, id: 'crows_toll_silver' }, { uid: 901, id: 'crows_peck' }];
+    p.hand = [{ uid: 900, id: 'crows_toll_flesh' }, { uid: 901, id: 'crows_scratch' }];
     s = applyAction(s, 0, { t: 'play', uid: 900 });
     expect(s.players[0].coin).toBe(2);
     s = applyAction(s, 0, { t: 'play', uid: 901 });
-    // toll silver combo 2: +1 power; peck: +1 power, combo 2: +1 coin
+    // scratch: +1 coin, combo 2: +2 coin +2 power; toll of flesh combo 2: draw 1
+    expect(s.players[0].coin).toBe(5);
     expect(s.players[0].power).toBe(2);
-    expect(s.players[0].coin).toBe(3);
+    expect(s.players[0].hand).toHaveLength(1);
   });
 
   it('patron favor moves toward the activating player', () => {
@@ -83,6 +84,84 @@ describe('engine', () => {
     s = applyAction(s, 0, { t: 'end' });
     expect(s.phase).toBe('play');
     s = applyAction(s, 1, { t: 'end' });
+    expect(s.phase).toBe('over');
+    expect(s.winner).toBe(0);
+  });
+
+  it('starts with 6 gold and one starter per drafted patron, and the treasury contracts join the tavern', () => {
+    const s = draftAll(createGame(8, ['A', 'B']));
+    for (const p of s.players) {
+      const ids = [...p.hand, ...p.deck].map((c) => c.id).sort();
+      expect(ids).toEqual(['crows_starter', 'eagle_starter', 'gold', 'gold', 'gold', 'gold', 'gold', 'gold', 'hlaalu_starter', 'pelin_starter']);
+    }
+    const all = [...s.tavern, ...s.tavernDeck].map((c) => cardDef(c.id));
+    expect(all).toHaveLength(100);
+    for (const pid of s.patrons) expect(all.filter((d) => d.patron === pid)).toHaveLength(20);
+  });
+
+  it('calls the psijic patron with coin, not power', () => {
+    let s = createGame(9, ['A', 'B']);
+    for (const patron of ['psijic', 'crows', 'hlaalu', 'eagle'] as const) s = applyAction(s, actingPlayer(s), { t: 'draft', patron });
+    s.players[1].agents.push({ uid: 950, id: 'crows_knight', dmg: 0, activated: false });
+    s.players[0].power = 10;
+    expect(patronAvailable(s, 0, 'psijic')).toBe(false);
+    s.players[0].coin = 4;
+    s = applyAction(s, 0, { t: 'patron', patron: 'psijic' });
+    s = applyAction(s, 0, { t: 'choose', picks: [950] });
+    expect(s.players[0].coin).toBe(0);
+    expect(s.players[0].power).toBe(10);
+    expect(s.players[1].agents).toHaveLength(0);
+  });
+
+  it('destroys cards in play or in hand, not in the cooldown pile', () => {
+    let s = draftAll(createGame(10, ['A', 'B']));
+    const p = s.players[0];
+    p.hand = [{ uid: 960, id: 'gold' }];
+    p.played = [{ uid: 961, id: 'gold' }];
+    p.cooldown = [{ uid: 962, id: 'gold' }];
+    s.tavern[0] = { uid: 963, id: 'eagle_bonfire' };
+    p.coin = 3;
+    s = applyAction(s, 0, { t: 'buy', uid: 963 });
+    expect(s.pending?.kind).toBe('destroy');
+    expect(s.pending!.options.map((o) => o.ref).sort()).toEqual([960, 961]);
+  });
+
+  it('a curse in hand must be played first', () => {
+    let s = draftAll(createGame(11, ['A', 'B']));
+    s.players[0].hand = [{ uid: 970, id: 'gold' }, { uid: 971, id: 'bewilderment' }];
+    expect(() => applyAction(s, 0, { t: 'play', uid: 970 })).toThrow();
+    s = applyAction(s, 0, { t: 'play', uid: 971 });
+    s = applyAction(s, 0, { t: 'play', uid: 970 });
+    expect(s.players[0].coin).toBe(1);
+  });
+
+  it('leftover power hits taunting agents before it turns into prestige', () => {
+    let s = draftAll(createGame(12, ['A', 'B']));
+    s.players[1].agents.push({ uid: 980, id: 'pelin_sentries', dmg: 0, activated: false });
+    s.players[0].power = 3;
+    s = applyAction(s, 0, { t: 'end' });
+    expect(s.players[0].prestige).toBe(0);
+    expect(s.players[1].agents[0].dmg).toBe(3);
+    s = applyAction(s, 1, { t: 'end' });
+    s.players[0].power = 5;
+    s = applyAction(s, 0, { t: 'end' });
+    expect(s.players[1].agents).toHaveLength(0);
+    expect(s.players[0].prestige).toBe(4);
+  });
+
+  it('wins at once on 80 prestige or the favor of all four patrons', () => {
+    let s = draftAll(createGame(13, ['A', 'B']));
+    s.players[0].prestige = 75;
+    s.players[0].played = [{ uid: 990, id: 'hlaalu_market' }];
+    s = applyAction(s, 0, { t: 'patron', patron: 'hlaalu' });
+    s = applyAction(s, 0, { t: 'choose', picks: [990] });
+    expect(s.players[0].prestige).toBe(82);
+    expect(s.phase).toBe('over');
+
+    s = draftAll(createGame(13, ['A', 'B']));
+    s.favor = { crows: 0, hlaalu: 0, pelin: 0, eagle: null };
+    s.players[0].power = 2;
+    s = applyAction(s, 0, { t: 'patron', patron: 'eagle' });
     expect(s.phase).toBe('over');
     expect(s.winner).toBe(0);
   });

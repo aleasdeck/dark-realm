@@ -37,6 +37,9 @@ function cardWorth(id: string): number {
   return Math.max(def.cost, effectValue(def.play));
 }
 
+/** Play order: curses must come first, then the strongest cards. */
+const sortKey = (id: string) => (cardDef(id).type === 'curse' ? 100 : cardWorth(id));
+
 const byWorth = (a: { cardId?: string }, b: { cardId?: string }) =>
   cardWorth(a.cardId ?? '') - cardWorth(b.cardId ?? '');
 
@@ -66,16 +69,25 @@ function choose(s: GameState, pend: Pending): Action {
       opts.sort((a, b) => -byWorth(a, b));
       picks = take(opts, pend.max);
       break;
-    case 'hlaalu':
-      opts.sort((a, b) => cardDef(b.cardId!).cost - cardDef(a.cardId!).cost);
+    case 'hlaalu': {
+      // Sacrifice the priciest card played this turn, an agent only when nothing else is left.
+      const agents = new Set(s.players[pend.player].agents.map((x) => x.uid));
+      const rank = (o: (typeof opts)[number]) => cardDef(o.cardId!).cost - (agents.has(o.ref) ? 100 : 0);
+      opts.sort((a, b) => rank(b) - rank(a));
       picks = take(opts, 1);
       break;
+    }
     case 'toss':
     case 'donate':
       picks = opts.filter((o) => cardWorth(o.cardId!) <= 1).map((o) => o.ref).slice(0, pend.max);
       break;
     case 'destroy':
-      picks = opts.filter((o) => cardWorth(o.cardId!) < 0).map((o) => o.ref).slice(0, pend.max);
+      // Thin the deck: curses, then starters already played this turn.
+      opts.sort(byWorth);
+      picks = opts
+        .filter((o) => cardWorth(o.cardId!) < 0 || (cardWorth(o.cardId!) <= 1 && o.label.endsWith('(в игре)')))
+        .map((o) => o.ref)
+        .slice(0, pend.max);
       break;
     case 'treasury':
     case 'discard':
@@ -118,8 +130,8 @@ export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action |
   const p = s.players[pi];
   const opp = s.players[other(pi)];
 
-  // 1. Play everything in hand.
-  const playable = [...p.hand].sort((a, b) => cardWorth(b.id) - cardWorth(a.id));
+  // 1. Play everything in hand, curses first as the rules demand.
+  const playable = [...p.hand].sort((a, b) => sortKey(b.id) - sortKey(a.id));
   if (playable.length) return { t: 'play', uid: playable[0].uid };
 
   // 2. Use agents.
@@ -138,10 +150,10 @@ export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action |
 
   // 4. Patrons.
   const can = (x: PatronId) => s.patrons.includes(x) && patronAvailable(s, pi, x);
-  const junkInPlay = [...p.played, ...p.cooldown].some((c) => cardWorth(c.id) < 0);
+  const junkInPlay = p.played.some((c) => cardWorth(c.id) <= 1);
   if (can('treasury') && junkInPlay) return { t: 'patron', patron: 'treasury' };
   if (can('psijic') && opp.agents.some((a) => cardDef(a.id).cost >= 4)) return { t: 'patron', patron: 'psijic' };
-  if (can('hlaalu') && [...p.played, ...p.cooldown].some((c) => cardDef(c.id).cost >= 4)) {
+  if (can('hlaalu') && p.played.some((c) => cardDef(c.id).cost >= 4)) {
     return { t: 'patron', patron: 'hlaalu' };
   }
   if (can('eagle') && p.deck.length + p.cooldown.length > 0 && p.power >= 4) return { t: 'patron', patron: 'eagle' };
