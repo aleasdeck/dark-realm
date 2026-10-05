@@ -1,5 +1,8 @@
 /** Preview page for the procedural art (art-preview.html). Query: ?view=check|grid|emblems, &only=a,b, &scale=1|2 */
+import { PATRONS } from '../engine/cards';
 import { artUrl, cardBackUrl, patronEmblemUrl, SUBJECTS, type ArtPalette, type Subject } from './index';
+
+const PATRON_IDS = Object.keys(PATRONS);
 
 const PALETTES: ArtPalette[] = [
   { bg1: '#140c22', bg2: '#2a1530', accent: '#8a3fc0', glow: '#c08aff' },
@@ -49,14 +52,16 @@ if (view === 'check') {
 if (view !== 'check' || q.has('extras')) {
   for (const p of PALETTES.slice(0, 2)) {
     const g = section('Patron emblems');
-    for (const id of ['crows', 'hlaalu', 'pelin', 'psijic', 'rajhin', 'eagle', 'treasury', 'unknown']) g.append(fig(patronEmblemUrl(id, p), id));
+    for (const id of [...PATRON_IDS, 'unknown']) g.append(fig(patronEmblemUrl(id, p), id));
   }
+  const own = section('Patron emblems, own palettes');
+  for (const [id, def] of Object.entries(PATRONS)) own.append(fig(patronEmblemUrl(id, def.palette), id));
   section('Card back').append(fig(cardBackUrl(), 'card back'));
 }
 const ms = performance.now() - t0;
 // startup budget check: ~80 fresh images
 const t1 = performance.now();
 for (const s of SUBJECTS) artUrl(s, { bg1: '#101010', bg2: '#202020', accent: '#a04040', glow: '#ffa060' }, 99);
-for (const id of ['crows', 'hlaalu', 'pelin', 'psijic', 'rajhin', 'eagle', 'treasury']) patronEmblemUrl(id, { bg1: '#101010', bg2: '#202020', accent: '#a04040', glow: '#ffa060' });
+for (const id of PATRON_IDS) patronEmblemUrl(id, { bg1: '#101010', bg2: '#202020', accent: '#a04040', glow: '#ffa060' });
 const ms2 = performance.now() - t1;
-document.getElementById('stats')!.textContent = `page render ${ms.toFixed(0)} ms; ${SUBJECTS.length + 7} fresh images (art + emblems, png data URLs) in ${ms2.toFixed(0)} ms`;
+document.getElementById('stats')!.textContent = `page render ${ms.toFixed(0)} ms; ${SUBJECTS.length + PATRON_IDS.length} fresh images (art + emblems, png data URLs) in ${ms2.toFixed(0)} ms`;

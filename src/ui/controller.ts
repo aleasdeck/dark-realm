@@ -2,8 +2,9 @@ import { botAction } from '../engine/bot';
 import { actingPlayer, applyAction, createGame, RuleError } from '../engine/engine';
 import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
-import type { Action, GameState, PlayerIdx } from '../engine/types';
+import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { Link, LinkHandlers, NetMessage } from '../net/room';
+import { draftPool, recordGame } from './unlocks';
 
 /** One running match as seen by the local player. */
 export abstract class Controller {
@@ -12,6 +13,11 @@ export abstract class Controller {
   state: GameState | null = null;
   notice = '';
   error = '';
+  /** Patrons the game that just ended opened. */
+  unlocked: PatronId[] = [];
+  /** Whether finished games count toward unlocking patrons. */
+  protected counts = true;
+  private wasOver = false;
   private listeners: (() => void)[] = [];
 
   subscribe(fn: () => void) {
@@ -19,6 +25,11 @@ export abstract class Controller {
   }
 
   protected emit() {
+    const over = this.state?.phase === 'over';
+    // A game counts once, when it ends after the draft.
+    if (over && !this.wasOver) this.unlocked = this.counts && this.state!.turn > 0 ? recordGame() : [];
+    else if (!over) this.unlocked = [];
+    this.wasOver = over;
     for (const fn of this.listeners) fn();
   }
 
@@ -46,13 +57,14 @@ export class BotController extends Controller {
     readonly tutorial = false,
   ) {
     super();
+    this.counts = !tutorial;
     this.restart();
   }
 
   restart() {
     this.state = this.tutorial
       ? createTutorialGame(this.playerName)
-      : createGame(randomSeed(), [this.playerName, 'Бот-некромант']);
+      : createGame(randomSeed(), [this.playerName, 'Бот-некромант'], { pool: draftPool() });
     this.emit();
     this.schedule();
   }
@@ -102,7 +114,7 @@ export class HostController extends Controller {
 
   private onMessage(m: NetMessage) {
     if (m.type === 'hello') {
-      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость']);
+      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], { pool: draftPool() });
       this.notice = '';
       this.broadcast();
     } else if (m.type === 'action' && this.state) {

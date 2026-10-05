@@ -98,6 +98,12 @@ const EMBLEMS: Record<string, (c: Ctx) => void> = {
   rajhin,
   eagle: (c) => c.d.scaled(0.9, 64, 66, () => DRAWERS.eagle(c)),
   treasury: (c) => c.d.scaled(0.78, 64, 66, () => DRAWERS.chest(c)),
+  alma: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.chalice(c)),
+  hunding: (c) => c.d.scaled(0.9, 64, 64, () => DRAWERS.sword(c)),
+  druid: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.rune(c)),
+  mora: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.tentacle(c)),
+  alessia: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.chain(c)),
+  orgnum: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.serpent(c)),
 };
 
 function genericSigil({ d, r, R }: Ctx): void {

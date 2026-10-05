@@ -906,6 +906,8 @@ input {
 .draft {
   max-width: 900px;
   min-height: 100dvh;
+  /* with unlocked patrons the tile list scrolls inside, the page itself never does */
+  height: 100dvh;
   margin: 0 auto;
   padding: 12px 10px;
   display: flex;
@@ -926,6 +928,8 @@ input {
   font-size: 13px;
 }
 .draft-tiles {
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(160px, 45vw), 1fr));
   gap: 8px;
@@ -963,6 +967,38 @@ input {
   font-size: 13px;
   line-height: 1.3;
   margin: 2px 0;
+}
+
+.draft-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+}
+.draft-locked {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+.draft-locked img {
+  width: 34px;
+  height: 34px;
+  filter: grayscale(1) brightness(0.55);
+  cursor: pointer;
+}
+
+.end-dialog .unlocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+}
+.end-dialog .unlocked img {
+  width: 40px;
+  height: 40px;
 }
 
 /* ── overlays and bottom sheets ───────────────────── */
@@ -1191,6 +1227,17 @@ input {
     font-size: 12px;
     line-height: 1.2;
   }
+  .draft-foot {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .draft-locked {
+    gap: 3px;
+  }
+  .draft-locked img {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 /* landscape phones: the compact rows go in three columns, emblem beside the name and the rule under both */
@@ -1229,7 +1276,7 @@ input {
   .draft-tile p {
     grid-column: 1 / -1;
   }
-  .draft > button {
+  .draft-foot button {
     padding-block: 6px;
   }
 }

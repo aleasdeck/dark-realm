@@ -81,9 +81,11 @@ const FX: Partial<Record<Effect['k'], (n: number) => string>> = {
   returnTop: () => `<i class="fx">возврат</i>`,
   replaceTavern: () => `<i class="fx">замена</i>`,
   heal: (n) => `<i class="fx">лечение ${n}</i>`,
-  create: () => `<i class="fx">морок</i>`,
+  create: () => `<i class="fx">+карта</i>`,
   patronCall: () => `<i class="fx">+призыв</i>`,
   donate: () => `<i class="fx">обмен</i>`,
+  confine: () => `<i class="fx">заточ.</i>`,
+  setback: () => `<i class="fx bad">расплата</i>`,
 };
 
 /** Compact summary of a card's main effect for small tiles. */
@@ -92,7 +94,8 @@ function shortFx(def: CardDef): string {
     e.k === 'choice' ? e.options.map((o) => o.map(one).join('')).join('<i class="fx or">/</i>') : (FX[e.k]?.('n' in e ? e.n : 0) ?? '');
   const main = def.play.map(one).join('');
   const combos = Object.keys(def.combo ?? {}).length ? '<i class="fx combo">К</i>' : '';
-  return main + combos || '<i class="fx">—</i>';
+  const trigger = def.trigger ? '<i class="fx">⟳</i>' : '';
+  return main + trigger + combos || '<i class="fx">—</i>';
 }
 
 /** Compact tile used everywhere on the board; tapping opens the card sheet. */
