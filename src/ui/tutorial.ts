@@ -73,7 +73,7 @@ const SCRIPT: Step[] = [
   },
   {
     id: 'play-all',
-    target: '.hand, .my-bar [data-act="play-all"]',
+    target: '.hand, .controls [data-act="play-all"]',
     text: 'Сыграйте остальные карты. Кнопка ▶▶ внизу сыграет их все разом.',
     done: (s, me) => firstTurnOver(s) || s.players[me].hand.length === 0,
   },
@@ -93,7 +93,7 @@ const SCRIPT: Step[] = [
   },
   {
     id: 'end',
-    target: '.my-bar .end',
+    target: '.controls .end',
     text: 'Нажмите «Конец хода». Сила ⚔ станет престижем ✦, и вы возьмёте 5 новых карт.',
     done: firstTurnOver,
   },
@@ -239,6 +239,8 @@ function outline(els: HTMLElement[]): DOMRect | null {
   if (!els.length) return null;
   const rects = els
     .flatMap((el) => [el, ...el.querySelectorAll<HTMLElement>(':scope > *, :scope > * > *')])
+    // Cards scrolled out of a column are clipped by it, so only the column itself counts.
+    .filter((e) => !e.parentElement?.closest('[data-clip]'))
     .map((e) => e.getBoundingClientRect())
     .filter((b) => b.width && b.height);
   if (!rects.length) return null;
