@@ -12,7 +12,7 @@ function draft(s: GameState, coach?: Coach): GameState {
   while (s.phase === 'draft') {
     const pi = actingPlayer(s);
     if (coach) seen.push(coach.hint(s, 0)!.id);
-    const a = pi === 0 ? { t: 'draft' as const, patron: TUTORIAL_PATRONS[s.draftStep] } : botAction(s, 1, true)!;
+    const a = pi === 0 ? { t: 'draft' as const, patron: TUTORIAL_PATRONS[s.draftStep] } : botAction(s, 1, 'gentle')!;
     s = applyAction(s, pi, a);
   }
   if (coach) expect([...new Set(seen)]).toEqual(['draft-0', 'draft-bot', 'draft-1']);
@@ -39,7 +39,7 @@ describe('tutorial game', () => {
     let steps = 0;
     while (s.phase !== 'over' && steps++ < 5000) {
       const pi = actingPlayer(s);
-      const a = botAction(s, pi, pi === 1)!;
+      const a = botAction(s, pi, pi === 1 ? 'gentle' : 'medium')!;
       if (pi === 1) expect(['patron', 'attack']).not.toContain(a.t);
       s = applyAction(s, pi, a);
     }

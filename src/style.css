@@ -122,6 +122,43 @@ input {
     padding-top: 12px;
     gap: 9px;
   }
+  .menu .subtitle {
+    margin-bottom: 0;
+  }
+  .menu .menu-buttons > button,
+  .menu .bot-play > button {
+    padding: 10px;
+  }
+}
+/* phones on their side: title and name on the left, buttons on the right */
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu.home {
+    max-width: 780px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: start;
+    gap: 8px 24px;
+    padding-top: 12px;
+  }
+  .menu.home > * {
+    grid-column: 1;
+  }
+  .menu.home > .menu-buttons {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+    gap: 7px;
+  }
+  .menu.home .title {
+    font-size: 48px;
+  }
+  .menu.home .subtitle {
+    margin: 0;
+  }
+  .menu.home .menu-buttons > button,
+  .menu.home .bot-play > button {
+    padding: 9px;
+    font-size: 17px;
+  }
 }
 .title {
   font-size: clamp(44px, 13vw, 68px);
@@ -151,6 +188,34 @@ input {
 .menu-buttons > button {
   padding: 14px;
   font-size: 18px;
+}
+.bot-play {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bot-play > button {
+  padding: 14px;
+  font-size: 18px;
+}
+/* bot level: three switches under the button, the chosen one lit */
+.levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.levels button {
+  padding: 6px 4px;
+  font-size: 15px;
+  background: transparent;
+  box-shadow: none;
+  border-color: var(--line);
+  color: var(--muted);
+}
+.levels button[aria-pressed='true'] {
+  background: #12301f;
+  border-color: var(--green);
+  color: var(--text);
 }
 .join {
   display: flex;
