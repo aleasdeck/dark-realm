@@ -10,11 +10,11 @@ export const TUTORIAL_INSTANT = 40;
 export const TUTORIAL_SEED = 3;
 
 /**
- * A short game against the gentle bot. The player drafts the patrons the coach points at
- * and the bot takes the rest of TUTORIAL_PATRONS, so the deal is always the same.
+ * A short game against the gentle bot. Only the tutorial patrons are offered: the player drafts
+ * the ones the coach points at and the bot takes the rest, so the deal is always the same.
  */
 export function createTutorialGame(name: string, seed = TUTORIAL_SEED): GameState {
-  return createGame(seed, [name, 'Наставник'], { goal: TUTORIAL_GOAL, instant: TUTORIAL_INSTANT });
+  return createGame(seed, [name, 'Наставник'], { goal: TUTORIAL_GOAL, instant: TUTORIAL_INSTANT, pool: TUTORIAL_PATRONS });
 }
 
 /** Coins and power the first hand gives, used to pick a friendly seed. */

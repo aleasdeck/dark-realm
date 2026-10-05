@@ -288,7 +288,9 @@ function draftHtml(s: GameState): string {
       </div>`;
   };
   // Locked patrons are listed too, greyed out, with the games left until they open.
-  const locked = LOCKED.filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid)).sort(
+  // The tutorial offers only its own four patrons.
+  const tutorial = ctrl instanceof BotController && ctrl.tutorial;
+  const locked = (tutorial ? [] : LOCKED).filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid)).sort(
     (a, b) => (UNLOCK_AT[a] ?? 0) - (UNLOCK_AT[b] ?? 0),
   );
   const tiles = s.draftPool.map((pid) => tile(pid, false)).join('') + locked.map((pid) => tile(pid, true)).join('');
