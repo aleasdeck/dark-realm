@@ -1,5 +1,6 @@
 import { cardDef } from './cards';
 import { actingPlayer, attackable, hpLeft, other, patronAvailable } from './engine';
+import { TUTORIAL_PATRONS } from './tutorial';
 import type { Action, Card, Effect, GameState, Pending, PatronId, PlayerIdx } from './types';
 
 /** Rough worth of an effect list, used to compare options. */
@@ -104,12 +105,12 @@ const DRAFT_PREF: PatronId[] = ['crows', 'eagle', 'hlaalu', 'pelin', 'psijic', '
 
 /**
  * Picks the next action for the bot playing as `pi`, or null if it is not the bot's move.
- * A gentle bot (the tutorial opponent) never calls patrons or attacks agents.
+ * A gentle bot (the tutorial opponent) drafts the tutorial patrons and never calls patrons or attacks agents.
  */
 export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action | null {
   if (s.phase === 'over' || actingPlayer(s) !== pi) return null;
   if (s.phase === 'draft') {
-    const pick = DRAFT_PREF.find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
+    const pick = (gentle ? TUTORIAL_PATRONS : DRAFT_PREF).find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
     return { t: 'draft', patron: pick };
   }
   if (s.pending) return choose(s, s.pending);

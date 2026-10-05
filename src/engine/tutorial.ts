@@ -1,20 +1,20 @@
 import { cardDef } from './cards';
-import { actingPlayer, applyAction, createGame } from './engine';
+import { createGame } from './engine';
 import type { GameState, PatronId } from './types';
 
-/** Patrons with the plainest cards: power, coins and taunting agents. */
+/** Patrons with the plainest cards: power, coins and taunting agents, in draft order. */
 export const TUTORIAL_PATRONS: PatronId[] = ['crows', 'hlaalu', 'pelin', 'eagle'];
-export const TUTORIAL_GOAL = 15;
-export const TUTORIAL_INSTANT = 30;
+export const TUTORIAL_GOAL = 20;
+export const TUTORIAL_INSTANT = 40;
 /** Fixed deal whose first hand can afford a card in the tavern. */
 export const TUTORIAL_SEED = 29;
 
-/** A short game against the gentle bot, already past the patron draft. */
+/**
+ * A short game against the gentle bot. The player drafts the patrons the coach points at
+ * and the bot takes the rest of TUTORIAL_PATRONS, so the deal is always the same.
+ */
 export function createTutorialGame(name: string, seed = TUTORIAL_SEED): GameState {
-  let s = createGame(seed, [name, 'Наставник'], { goal: TUTORIAL_GOAL, instant: TUTORIAL_INSTANT });
-  for (const patron of TUTORIAL_PATRONS) s = applyAction(s, actingPlayer(s), { t: 'draft', patron });
-  s.events = [];
-  return s;
+  return createGame(seed, [name, 'Наставник'], { goal: TUTORIAL_GOAL, instant: TUTORIAL_INSTANT });
 }
 
 /** Coins and power the first hand gives, used to pick a friendly seed. */

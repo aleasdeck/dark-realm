@@ -16,7 +16,7 @@ import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
 import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tileHtml, type Focus } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
-import { Coach, showHint } from './ui/tutorial';
+import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -31,6 +31,8 @@ let lastState: GameState | null = null;
 let lastError = '';
 /** Hints of the tutorial game; null in every other game. */
 let coach: Coach | null = null;
+/** The hint for the current state; while it is up, only what it points at responds. */
+let hint: Hint | null = null;
 
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
@@ -71,6 +73,8 @@ function leaveGame() {
   modal = null;
   focus = null;
   lastState = null;
+  coach = null;
+  hint = null;
   clearFx();
   const peer = new URLSearchParams(location.search).get('peer');
   history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
@@ -196,6 +200,7 @@ function startGame(c: Controller) {
   lastState = null;
   lastError = '';
   coach = c instanceof BotController && c.tutorial ? new Coach() : null;
+  hint = null;
   clearFx();
   c.subscribe(render);
   render();
@@ -215,8 +220,10 @@ function render() {
   lastState = s;
   if (ctrl.error && ctrl.error !== lastError) play('error');
   lastError = ctrl.error;
+  hint = coach?.hint(s, me) ?? null;
   if (s.phase === 'draft') {
     app.innerHTML = draftHtml(s);
+    if (hint) showHint(app, hint);
   } else {
     const myTurn = s.current === me && s.phase === 'play';
     const idle = myTurn && !s.pending && s.queue.length === 0;
@@ -226,8 +233,7 @@ function render() {
     app.innerHTML = boardHtml(s, me, { myTurn, idle, focus }) + overlays(s);
     if (view) showZoom(view.html, view.label, view.can);
     // The enlarged card says what to do itself, so the coach steps aside for it.
-    const hint = coach && !view && !modal ? coach.hint(s, me) : null;
-    if (hint) showHint(app, hint);
+    if (hint && !view && !modal) showHint(app, hint);
   }
   if (!focus) animatedFocus = '';
   refreshTooltip();
@@ -429,6 +435,14 @@ app.addEventListener('click', (ev) => {
     }
     return;
   }
+  if (!hintAllows(hint, el)) {
+    play('error');
+    app.querySelector('.coach')?.animate(
+      [{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }],
+      { duration: 240 },
+    );
+    return;
+  }
   const s = ctrl.state;
   const act = el.dataset.act!;
   const uid = Number(el.dataset.uid);
@@ -555,6 +569,10 @@ initTooltips((el) => {
   if (!id) return null;
   const agent = s?.players.flatMap((p) => p.agents).find((a) => a.uid === Number(el.dataset.uid));
   return cardHtml(id, { cls: 'big tip-card', agent });
+});
+// Text reflows once the bundled fonts arrive, which moves whatever the coach points at.
+document.fonts?.addEventListener('loadingdone', () => {
+  if (hint) render();
 });
 window.addEventListener('resize', () => {
   hideTooltip();

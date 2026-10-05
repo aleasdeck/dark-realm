@@ -3,11 +3,25 @@ import { botAction } from '../src/engine/bot';
 import { cardDef } from '../src/engine/cards';
 import { actingPlayer, applyAction } from '../src/engine/engine';
 import { createTutorialGame, openingValue, TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../src/engine/tutorial';
+import type { GameState } from '../src/engine/types';
 import { Coach } from '../src/ui/tutorial';
 
+/** The player takes the patrons the coach points at, the gentle bot takes its own. */
+function draft(s: GameState, coach?: Coach): GameState {
+  const seen: string[] = [];
+  while (s.phase === 'draft') {
+    const pi = actingPlayer(s);
+    if (coach) seen.push(coach.hint(s, 0)!.id);
+    const a = pi === 0 ? { t: 'draft' as const, patron: TUTORIAL_PATRONS[s.draftStep] } : botAction(s, 1, true)!;
+    s = applyAction(s, pi, a);
+  }
+  if (coach) expect([...new Set(seen)]).toEqual(['draft-0', 'draft-bot', 'draft-1']);
+  return s;
+}
+
 describe('tutorial game', () => {
-  it('starts past the draft with a hand that can buy from the tavern', () => {
-    const s = createTutorialGame('A');
+  it('drafts the tutorial patrons into a hand that can buy from the tavern', () => {
+    const s = draft(createTutorialGame('A'));
     expect(s.phase).toBe('play');
     expect(s.current).toBe(0);
     expect(s.patrons).toEqual([...TUTORIAL_PATRONS, 'treasury']);
@@ -17,7 +31,7 @@ describe('tutorial game', () => {
   });
 
   it('ends at the short prestige goal, and the gentle bot never calls patrons or attacks', () => {
-    let s = createTutorialGame('A');
+    let s = draft(createTutorialGame('A'));
     let steps = 0;
     while (s.phase !== 'over' && steps++ < 5000) {
       const pi = actingPlayer(s);
@@ -27,15 +41,15 @@ describe('tutorial game', () => {
     }
     expect(s.phase).toBe('over');
     const top = Math.max(...s.players.map((p) => p.prestige));
-    expect(top).toBeLessThan(40);
+    expect(top).toBeLessThan(80);
     expect(s.winReason === 'благосклонность всех покровителей' || top >= TUTORIAL_GOAL).toBe(true);
   });
 });
 
 describe('coach', () => {
-  it('walks through the first turn and follows the player', () => {
+  it('walks through the draft and the first turn and follows the player', () => {
     const coach = new Coach();
-    let s = createTutorialGame('A');
+    let s = draft(createTutorialGame('A'), coach);
     expect(coach.hint(s, 0)?.id).toBe('goal');
     coach.ack('goal');
     expect(coach.hint(s, 0)?.id).toBe('hand');

@@ -1,11 +1,15 @@
-import { attackable, other } from '../engine/engine';
-import { TUTORIAL_GOAL } from '../engine/tutorial';
+import { PATRONS } from '../engine/cards';
+import { actingPlayer, attackable, other } from '../engine/engine';
+import { TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../engine/tutorial';
 import type { GameState, PlayerIdx } from '../engine/types';
 
 /** One coach hint: what it points at, what it says, and when it is no longer needed. */
 export interface Hint {
   id: string;
-  /** Selector of the part of the table to light up; none for a hint about the whole screen. */
+  /**
+   * Selector (or selector list) of the part of the table to light up; none for a hint about the
+   * whole screen. While a hint is up, only its target and the coach respond to taps.
+   */
   target?: string;
   text: string;
   /** Shows an "OK" button; otherwise the hint waits for the action it asks for. */
@@ -25,8 +29,28 @@ const myTurn = (s: GameState, me: PlayerIdx) => s.phase === 'play' && s.current 
 const idle = (s: GameState, me: PlayerIdx) => myTurn(s, me) && !s.pending && s.queue.length === 0;
 const firstTurnOver = (s: GameState) => s.turn > 1;
 
-/** The first turn, walked through in order. */
+const draftPick = (n: number): Step => {
+  const pid = TUTORIAL_PATRONS[n === 0 ? 0 : 3];
+  return {
+    id: `draft-${n}`,
+    target: `.draft-tile[data-patron="${pid}"]`,
+    text:
+      n === 0
+        ? `Сначала игроки выбирают покровителей: их карты наполнят таверну. Нажмите на подсвеченного: ${PATRONS[pid].name}.`
+        : `Ваш второй покровитель: ${PATRONS[pid].name}. Нажмите на него.`,
+    done: (s) => s.phase !== 'draft' || s.draftStep > (n === 0 ? 0 : 3),
+  };
+};
+
+/** The draft and the first turn, walked through in order. */
 const SCRIPT: Step[] = [
+  draftPick(0),
+  {
+    id: 'draft-bot',
+    text: 'Теперь соперник выбирает двух покровителей.',
+    done: (s, me) => s.phase !== 'draft' || actingPlayer(s) === me,
+  },
+  draftPick(1),
   {
     id: 'goal',
     target: '.my-bar .res.pre',
@@ -49,7 +73,7 @@ const SCRIPT: Step[] = [
   },
   {
     id: 'play-all',
-    target: '.hand',
+    target: '.hand, .my-bar [data-act="play-all"]',
     text: 'Сыграйте остальные карты. Кнопка ▶▶ внизу сыграет их все разом.',
     done: (s, me) => firstTurnOver(s) || s.players[me].hand.length === 0,
   },
@@ -76,12 +100,12 @@ const SCRIPT: Step[] = [
   {
     id: 'their-turn',
     target: '.opp-bar',
-    text: 'Теперь ходит соперник. Его карты появляются на столе, а полный список ходов есть в журнале (меню ☰).',
+    text: 'Теперь ходит соперник. Его карты появляются на столе. Дождитесь своего хода.',
     done: (s, me) => s.turn > 2 && myTurn(s, me),
   },
   {
     id: 'free',
-    text: `Основы вы знаете. Наберите ${TUTORIAL_GOAL} престижа ✦ раньше соперника. Подсказки появятся, когда случится что-то новое.`,
+    text: `Основы вы знаете, дальше играйте сами. Наберите ${TUTORIAL_GOAL} престижа ✦ раньше соперника. Если случится что-то новое, я подскажу.`,
     ok: true,
     done: () => false,
   },
@@ -133,7 +157,7 @@ export class Coach {
 
   /** The hint to show for this state, or null. */
   hint(s: GameState, me: PlayerIdx): Hint | null {
-    if (this.off || s.phase !== 'play') return null;
+    if (this.off || s.phase === 'over') return null;
     if (this.active && this.active.done(s, me)) this.active = null;
     if (!this.active) {
       const ev = EVENTS.find((e) => !this.seen.has(e.id) && e.when!(s, me));
@@ -154,13 +178,21 @@ export class Coach {
   }
 }
 
+/** Taps that still work while the hint is up: its target, the coach itself and choice sheets. */
+const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'pick', 'confirm', 'close', 'leave', 'rematch'];
+
+export function hintAllows(h: Hint | null, el: HTMLElement): boolean {
+  if (!h) return true;
+  if (ALWAYS.includes(el.dataset.act ?? '')) return true;
+  return !!h.target && !!el.closest(h.target);
+}
+
 /**
  * Lights up the hint's target and puts the bubble next to it, on the side with more room.
  * Called after every render, since the board is redrawn from scratch.
  */
 export function showHint(root: HTMLElement, h: Hint) {
-  const target = h.target ? root.querySelector<HTMLElement>(h.target) : null;
-  const r = target ? outline(target) : null;
+  const r = h.target ? outline([...root.querySelectorAll<HTMLElement>(h.target)]) : null;
   const vw = innerWidth;
   const vh = innerHeight;
   if (r) {
@@ -202,9 +234,11 @@ export function showHint(root: HTMLElement, h: Hint) {
   bubble.style.top = `${Math.max(8, Math.min(vh - bubble.offsetHeight - 8, y))}px`;
 }
 
-/** Box around the element and its cards, which may stick out of it (the fanned hand). */
-function outline(el: HTMLElement): DOMRect | null {
-  const rects = [el, ...el.querySelectorAll<HTMLElement>(':scope > *, :scope > * > *')]
+/** Box around the elements and their cards, which may stick out of them (the fanned hand). */
+function outline(els: HTMLElement[]): DOMRect | null {
+  if (!els.length) return null;
+  const rects = els
+    .flatMap((el) => [el, ...el.querySelectorAll<HTMLElement>(':scope > *, :scope > * > *')])
     .map((e) => e.getBoundingClientRect())
     .filter((b) => b.width && b.height);
   if (!rects.length) return null;
@@ -212,6 +246,6 @@ function outline(el: HTMLElement): DOMRect | null {
   const top = Math.max(0, Math.min(...rects.map((b) => b.top)));
   const right = Math.min(innerWidth, Math.max(...rects.map((b) => b.right)));
   // Cards tucked under the bottom bar stay hidden, so only grow up and sideways.
-  const bottom = Math.min(innerHeight, rects[0].bottom);
+  const bottom = Math.min(innerHeight, Math.max(...els.map((e) => e.getBoundingClientRect().bottom)));
   return new DOMRect(left, top, right - left, bottom - top);
 }

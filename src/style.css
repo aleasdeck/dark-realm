@@ -1148,7 +1148,11 @@ input {
 }
 
 /* phones: draft tiles become compact rows so all six fit */
-@media (max-width: 560px) {
+@media (max-width: 560px), (max-height: 520px) {
+  .draft {
+    min-height: 0;
+    padding-block: 8px;
+  }
   .draft-tiles {
     grid-template-columns: 1fr;
     gap: 6px;
@@ -1176,6 +1180,16 @@ input {
   .draft-tile p {
     font-size: 12px;
     line-height: 1.2;
+  }
+}
+
+/* landscape phones: the compact rows go in three columns */
+@media (max-height: 520px) and (min-width: 561px) {
+  .draft-tiles {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .draft h2 {
+    font-size: 18px;
   }
 }
 
@@ -1425,7 +1439,7 @@ input {
 }
 .coach {
   position: fixed;
-  z-index: 25;
+  z-index: 35;
   width: min(420px, calc(100vw - 16px));
   background: #f3ead2;
   color: #1c1408;
