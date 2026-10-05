@@ -678,17 +678,6 @@ input {
   border-color: var(--them);
   background: radial-gradient(circle, #a83a30 0%, #5e1c18 70%);
 }
-.p-name {
-  font-family: var(--title-font);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--glow);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .patron.can .p-track {
   /* gold, so "can call now" never reads as green "on your side" */
   box-shadow: 0 0 10px #f0c860aa;
@@ -697,31 +686,29 @@ input {
 .patron.focused .p-track {
   outline: 2px solid var(--glow);
 }
-/* the treasury is no plaque but a large pixel-art chest standing between the two sides */
+/* the treasury is no plaque but a round medallion between the two sides */
 .patron.chest {
-  --disc: calc(var(--emb) * 1.4 + 16px);
+  --disc: calc(var(--emb) * 1.5);
 }
 .chest .p-track {
-  width: calc(var(--disc) * 1.15);
+  width: var(--disc);
   height: var(--disc);
   border: none;
+  border-radius: 50%;
   background: none;
 }
 .chest .p-track img {
-  width: calc(var(--disc) * 1.1);
-  height: calc(var(--disc) * 1.1);
-  border-radius: 0;
-  filter: drop-shadow(0 2px 3px #000) drop-shadow(0 0 6px #f0c86044);
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  filter: drop-shadow(0 2px 3px #000);
 }
 .patron.chest.can .p-track {
   outline: none;
-  box-shadow: none;
-}
-.patron.chest.can .p-track img {
-  filter: drop-shadow(0 2px 3px #000) drop-shadow(0 0 10px #f0c860cc);
+  box-shadow: 0 0 10px #f0c860cc;
 }
 .patron.chest.focused .p-track {
-  outline: none;
+  outline: 2px solid var(--glow);
 }
 
 .tavern {
@@ -1050,7 +1037,7 @@ input {
   }
   .patron,
   .patron.chest {
-    --emb: 26px;
+    --emb: 30px;
   }
   .controls button {
     padding-block: 6px;

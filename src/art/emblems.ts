@@ -133,15 +133,6 @@ export function renderEmblem(patronId: string, pal: Pal): Uint8ClampedArray {
   return compose(bg, d, { glow: R.GLOW, vignette: false });
 }
 
-/** The treasury on the table: a full-size chest with no medallion or backdrop, transparent around it. */
-export function renderTreasuryChest(pal: Pal): Uint8ClampedArray {
-  const seed = hashStr('table-chest');
-  const R: Ramps = buildRamps(hex(pal.accent), hex(pal.glow), new Rng(seed ^ 0x9e3779b9));
-  const d = new Draw();
-  DRAWERS.chest({ d, r: new Rng(seed), R });
-  return compose(new Int32Array(N).fill(-1), d, { glow: R.GLOW, vignette: false });
-}
-
 export function renderCardBack(): Uint8ClampedArray {
   const R = buildRamps(0x7a3aa0, 0xb070ff, new Rng(7));
   const bg = new Int32Array(N);
