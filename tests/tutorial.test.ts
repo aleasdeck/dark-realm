@@ -20,6 +20,10 @@ function draft(s: GameState, coach?: Coach): GameState {
 }
 
 describe('tutorial game', () => {
+  it('offers only the tutorial patrons in the draft', () => {
+    expect(createTutorialGame('A').draftPool).toEqual(TUTORIAL_PATRONS);
+  });
+
   it('drafts the tutorial patrons into a hand that can buy from the tavern', () => {
     const s = draft(createTutorialGame('A'));
     expect(s.phase).toBe('play');
