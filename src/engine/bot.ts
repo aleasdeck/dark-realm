@@ -1,5 +1,6 @@
 import { cardDef } from './cards';
 import { actingPlayer, attackable, hpLeft, other, patronAvailable } from './engine';
+import { TUTORIAL_PATRONS } from './tutorial';
 import type { Action, Card, Effect, GameState, Pending, PatronId, PlayerIdx } from './types';
 
 /** Rough worth of an effect list, used to compare options. */
@@ -102,11 +103,14 @@ function ownedPatronCount(s: GameState, pi: PlayerIdx, patron: string): number {
 
 const DRAFT_PREF: PatronId[] = ['crows', 'eagle', 'hlaalu', 'pelin', 'psijic', 'rajhin'];
 
-/** Picks the next action for the bot playing as `pi`, or null if it is not the bot's move. */
-export function botAction(s: GameState, pi: PlayerIdx): Action | null {
+/**
+ * Picks the next action for the bot playing as `pi`, or null if it is not the bot's move.
+ * A gentle bot (the tutorial opponent) drafts the tutorial patrons and never calls patrons or attacks agents.
+ */
+export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action | null {
   if (s.phase === 'over' || actingPlayer(s) !== pi) return null;
   if (s.phase === 'draft') {
-    const pick = DRAFT_PREF.find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
+    const pick = (gentle ? TUTORIAL_PATRONS : DRAFT_PREF).find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
     return { t: 'draft', patron: pick };
   }
   if (s.pending) return choose(s, s.pending);
@@ -129,6 +133,8 @@ export function botAction(s: GameState, pi: PlayerIdx): Action | null {
     affordable.sort((a, b) => score(b) - score(a));
     return { t: 'buy', uid: affordable[0].uid };
   }
+
+  if (gentle) return { t: 'end' };
 
   // 4. Patrons.
   const can = (x: PatronId) => s.patrons.includes(x) && patronAvailable(s, pi, x);

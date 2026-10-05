@@ -165,6 +165,9 @@ export interface GameState {
   events: GameEvent[];
   winner: PlayerIdx | null;
   winReason: string;
+  /** Prestige targets when they differ from the standard ones (the short tutorial game). */
+  goal?: number;
+  instant?: number;
 }
 
 export type Action =

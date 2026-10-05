@@ -1148,7 +1148,11 @@ input {
 }
 
 /* phones: draft tiles become compact rows so all six fit */
-@media (max-width: 560px) {
+@media (max-width: 560px), (max-height: 520px) {
+  .draft {
+    min-height: 0;
+    padding-block: 8px;
+  }
   .draft-tiles {
     grid-template-columns: 1fr;
     gap: 6px;
@@ -1176,6 +1180,16 @@ input {
   .draft-tile p {
     font-size: 12px;
     line-height: 1.2;
+  }
+}
+
+/* landscape phones: the compact rows go in three columns */
+@media (max-height: 520px) and (min-width: 561px) {
+  .draft-tiles {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .draft h2 {
+    font-size: 18px;
   }
 }
 
@@ -1406,4 +1420,59 @@ input {
 .my-bar .icon.off {
   color: var(--muted);
   text-decoration: line-through;
+}
+
+/* ── tutorial coach ─────────────────────────────────────── */
+.coach-spot {
+  position: fixed;
+  z-index: 8;
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  box-shadow: 0 0 0 200vmax #000000a0, 0 0 18px #f0c86088;
+  pointer-events: none;
+  animation: coach-pulse 1.6s ease-in-out infinite;
+}
+@keyframes coach-pulse {
+  50% {
+    border-color: #fff1c4;
+  }
+}
+.coach {
+  position: fixed;
+  z-index: 35;
+  width: min(420px, calc(100vw - 16px));
+  background: #f3ead2;
+  color: #1c1408;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px #000c;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.coach p {
+  margin: 0 0 8px;
+}
+.coach-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.coach-actions button {
+  padding: 6px 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+.coach-actions .ghost {
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: #6b5a3a;
+  font-family: var(--text-font);
+  font-weight: 400;
+  padding-left: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach-spot {
+    animation: none;
+  }
 }

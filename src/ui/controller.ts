@@ -1,6 +1,7 @@
 import { botAction } from '../engine/bot';
 import { actingPlayer, applyAction, createGame, RuleError } from '../engine/engine';
 import { randomSeed } from '../engine/rng';
+import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PlayerIdx } from '../engine/types';
 import type { Link, LinkHandlers, NetMessage } from '../net/room';
 
@@ -39,13 +40,19 @@ export class BotController extends Controller {
   readonly kind = 'bot';
   private timer = 0;
 
-  constructor(private playerName: string) {
+  /** `tutorial` plays the short scripted game against a gentle bot. */
+  constructor(
+    private playerName: string,
+    readonly tutorial = false,
+  ) {
     super();
     this.restart();
   }
 
   restart() {
-    this.state = createGame(randomSeed(), [this.playerName, 'Бот-некромант']);
+    this.state = this.tutorial
+      ? createTutorialGame(this.playerName)
+      : createGame(randomSeed(), [this.playerName, 'Бот-некромант']);
     this.emit();
     this.schedule();
   }
@@ -69,7 +76,7 @@ export class BotController extends Controller {
     if (!s || s.phase === 'over' || actingPlayer(s) !== 1) return;
     this.timer = window.setTimeout(() => {
       const cur = this.state!;
-      const a = botAction(cur, 1);
+      const a = botAction(cur, 1, this.tutorial);
       if (a) this.state = applyAction(cur, 1, a);
       this.emit();
       this.schedule();
