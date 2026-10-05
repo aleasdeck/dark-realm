@@ -3,7 +3,7 @@ import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { musicOn } from './music';
-import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, PlayerIdx } from '../engine/types';
+import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, Pending, PlayerIdx } from '../engine/types';
 
 export const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -184,7 +184,38 @@ function backsHtml(n: number): string {
 
 export type Focus = { kind: 'card'; uid: number } | { kind: 'patron'; patron: PatronId };
 
-export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; idle: boolean; focus: Focus | null }): string {
+/**
+ * Effects that take cards from the tavern are picked on the table itself: the cards that qualify
+ * light up in the tavern, and the usual tap-twice takes (or marks) one.
+ */
+export interface TavernPick {
+  pending: Pending;
+  /** Cards marked so far when several may be picked (tavern refresh). */
+  marked: Set<number>;
+}
+
+const TAVERN_KINDS: Pending['kind'][] = ['acquire', 'bargain', 'replaceTavern'];
+
+/** The tavern pick the local player has to make now, if any. */
+export function tavernPick(s: GameState, me: PlayerIdx, marked: Set<number>): TavernPick | null {
+  const p = s.pending;
+  return p && p.player === me && TAVERN_KINDS.includes(p.kind) ? { pending: p, marked } : null;
+}
+
+/** The button under the table that finishes (or skips) a tavern pick. */
+function pickButton(pick: TavernPick): string {
+  const p = pick.pending;
+  const n = pick.marked.size;
+  if (p.kind === 'replaceTavern') return `<button class="end" data-act="confirm">${n ? `Заменить (${n})` : 'Не менять'}</button>`;
+  if (p.min > 0) return '<button class="end" disabled>Выберите карту в таверне</button>';
+  return '<button class="end" data-act="confirm">Не брать</button>';
+}
+
+export function boardHtml(
+  s: GameState,
+  me: PlayerIdx,
+  opts: { myTurn: boolean; idle: boolean; focus: Focus | null; pick: TavernPick | null },
+): string {
   const you = s.players[me];
   const them = s.players[other(me)];
   const focusUid = opts.focus?.kind === 'card' ? opts.focus.uid : -1;
@@ -198,9 +229,17 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
     .join('');
   const theirPlayed = playedHtml(them.played, 'opp', focusUid);
   const played = playedHtml(you.played, 'me', focusUid);
+  const pick = opts.pick;
+  const pickable = new Set(pick?.pending.options.map((o) => o.ref));
   const tavern = s.tavern.map((c) => {
-    const can = opts.idle && cardDef(c.id).cost <= you.coin;
-    return tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: (can ? 'buyable' : 'dim') + f(c.uid), tip: true });
+    const cls = pick
+      ? pickable.has(c.uid)
+        ? 'pickable' + (pick.marked.has(c.uid) ? ' marked' : '')
+        : 'dim'
+      : opts.idle && cardDef(c.id).cost <= you.coin
+        ? 'buyable'
+        : 'dim';
+    return tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: cls + f(c.uid), tip: true });
   });
   const n = you.hand.length;
   const hand = you.hand
@@ -222,8 +261,8 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">агентов нет</span>'}
       ${theirPlayed}
       ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
-    <section class="tavern">
-      <div class="label"><span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small></div>
+    <section class="tavern${pick ? ' picking' : ''}">
+      <div class="label">${pick ? `<span class="pick">${esc(pick.pending.prompt)}</span>` : `<span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small>`}</div>
       <div class="row">${slots(tavern)}</div>
     </section>
     <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p, p === focusPatron)).join('')}</section>
@@ -241,7 +280,7 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       <button class="icon" data-act="menu" aria-label="Меню">☰</button>
       <button class="icon${musicOn() ? '' : ' off'}" data-act="music" aria-label="Музыка" aria-pressed="${musicOn()}">♪</button>
       <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">▶▶</button>
-      <button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? 'Конец хода' : 'Ход соперника'}</button>
+      ${pick ? pickButton(pick) : `<button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? 'Конец хода' : 'Ход соперника'}</button>`}
     </footer>
   </div>`;
 }
@@ -254,20 +293,23 @@ export interface FocusView {
   /** Whether a second tap performs the action. */
   can: boolean;
   action: Action | null;
+  /** During a tavern refresh a second tap marks or unmarks this card instead of an action. */
+  mark?: number;
 }
 
 /**
  * What a selected card or patron shows when it slides out enlarged, and what a second tap does.
  * Returns null once the target has left the table.
  */
-export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean): FocusView | null {
+export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, pick: TavernPick | null = null): FocusView | null {
   const you = s.players[me];
   const them = s.players[other(me)];
+  const waitPick = 'Сначала выберите карту в таверне';
   if (t.kind === 'patron') {
     const can = patronAvailable(s, me, t.patron);
     return {
       html: patronTipHtml(s, me, t.patron),
-      label: can ? 'Нажмите ещё раз: воззвать' : 'Сейчас воззвать нельзя',
+      label: pick ? waitPick : can ? 'Нажмите ещё раз: воззвать' : 'Сейчас воззвать нельзя',
       can,
       action: { t: 'patron', patron: t.patron },
     };
@@ -284,6 +326,23 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean):
     can,
     action,
   });
+  if (pick) {
+    const card = inTavern ?? inHand ?? mine ?? theirs ?? played;
+    if (!card) return null;
+    const agent = mine ?? theirs;
+    if (!inTavern) return view(card.id, waitPick, false, null, agent);
+    const kind = pick.pending.kind;
+    if (!pick.pending.options.some((o) => o.ref === uid)) {
+      return view(card.id, kind === 'acquire' ? 'Слишком дорогая' : 'Эту карту взять нельзя', false, null);
+    }
+    if (kind === 'replaceTavern') {
+      const marked = pick.marked.has(uid);
+      if (!marked && pick.marked.size >= pick.pending.max) return view(card.id, `Отмечено уже ${pick.marked.size}`, false, null);
+      return { ...view(card.id, marked ? 'Нажмите ещё раз: оставить' : 'Нажмите ещё раз: заменить', true, null), mark: uid };
+    }
+    const label = kind === 'bargain' ? 'Ещё раз: взять, соперник получит копию' : 'Нажмите ещё раз: взять бесплатно';
+    return view(card.id, label, true, { t: 'choose', picks: [uid] });
+  }
   if (inHand) {
     const curseFirst = mustPlayCurse(you, inHand.id);
     const label = !idle ? 'Сейчас не ваш ход' : curseFirst ? 'Сначала разыграйте «Морок»' : 'Нажмите ещё раз: сыграть';
