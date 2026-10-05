@@ -1,4 +1,4 @@
-import { choose, mediumAction, noise, playFirst } from './bot';
+import { choose, mediumAction, noise, playFirst, randomDraft } from './bot';
 import { cardDef, HAND_SIZE, PRESTIGE_GOAL } from './cards';
 import { actingPlayer, applyAction, attackable, hpLeft, other, patronAvailable, RuleError } from './engine';
 import { rngNext } from './rng';
@@ -28,7 +28,7 @@ let visited = 0;
 
 /** The next action of the hard bot playing as `pi`. */
 export function hardAction(s: GameState, pi: PlayerIdx): Action {
-  if (s.phase === 'draft') return hardDraft(s);
+  if (s.phase === 'draft') return randomDraft(s);
   const forced = forcedMove(s, pi);
   if (forced) return forced;
   const options = candidates(s, pi);
@@ -380,14 +380,4 @@ export function evaluate(s: GameState, pi: PlayerIdx): number {
   if (s.current === foe && me.prestige >= goal && me.prestige > op.prestige) v += T.goalBonus + (me.prestige - op.prestige);
   if (s.current === pi && op.prestige >= goal && op.prestige > me.prestige) v -= T.goalBonus + (op.prestige - me.prestige);
   return v;
-}
-
-// ── draft ────────────────────────────────────────────────
-
-/** Patrons the hard bot drafts, best first (from bot-vs-bot games), with a nudge toward pairs it already holds. */
-const HARD_DRAFT: PatronId[] = ['hlaalu', 'crows', 'pelin', 'eagle', 'orgnum', 'mora', 'hunding', 'rajhin', 'psijic', 'alessia', 'druid', 'alma'];
-
-function hardDraft(s: GameState): Action {
-  const pick = HARD_DRAFT.find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
-  return { t: 'draft', patron: pick };
 }

@@ -134,11 +134,14 @@ export function ownedPatronCount(s: GameState, pi: PlayerIdx, patron: string): n
   return all.filter((c) => cardDef(c.id).patron === patron).length;
 }
 
-const DRAFT_PREF: PatronId[] = ['crows', 'eagle', 'hlaalu', 'pelin', 'psijic', 'rajhin'];
-
 /** A number in [0, 1) that depends on the position only, so the bot needs no randomness of its own. */
 export function noise(s: GameState, salt: number): number {
   return rngNext((s.rng ^ Math.imul(salt + s.nextUid + s.turn * 131, 0x9e3779b1)) | 0)[0];
+}
+
+/** Every level but the tutorial's drafts at random among the patrons still offered (the ones the player has opened). */
+export function randomDraft(s: GameState): Action {
+  return { t: 'draft', patron: s.draftPool[Math.floor(noise(s, 1 + s.draftStep * 7) * s.draftPool.length)] };
 }
 
 /** Curses must come first, then cards that look at or draw from the deck, then the rest. */
@@ -162,11 +165,11 @@ export function botAction(s: GameState, pi: PlayerIdx, level: BotLevel = 'medium
 }
 
 /**
- * The easy bot drafts at random, buys a random card it can afford and never calls patrons or attacks
+ * The easy bot buys a random card it can afford and never calls patrons or attacks
  * agents beyond what the rules force.
  */
 function easyAction(s: GameState, pi: PlayerIdx): Action {
-  if (s.phase === 'draft') return { t: 'draft', patron: s.draftPool[Math.floor(noise(s, 1) * s.draftPool.length)] };
+  if (s.phase === 'draft') return randomDraft(s);
   if (s.pending) {
     if (s.pending.kind === 'choice') return { t: 'choose', picks: [Math.floor(noise(s, 2) * s.pending.options.length)] };
     return choose(s, s.pending);
@@ -190,8 +193,8 @@ function easyAction(s: GameState, pi: PlayerIdx): Action {
  */
 export function mediumAction(s: GameState, pi: PlayerIdx, gentle = false): Action {
   if (s.phase === 'draft') {
-    const pick = (gentle ? TUTORIAL_PATRONS : DRAFT_PREF).find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
-    return { t: 'draft', patron: pick };
+    if (!gentle) return randomDraft(s);
+    return { t: 'draft', patron: TUTORIAL_PATRONS.find((x) => s.draftPool.includes(x)) ?? s.draftPool[0] };
   }
   if (s.pending) return choose(s, s.pending);
 
