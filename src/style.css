@@ -480,27 +480,31 @@ input {
 .strip {
   position: relative;
   display: flex;
+  flex-direction: column;
+  padding: 3px 6px 4px;
+  border-radius: 10px;
+  background: #0a140e;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+/* the agents and the played column; the agents size themselves to this box */
+.s-body {
+  flex: 1 1 auto;
+  display: flex;
   align-items: center;
   gap: 6px;
-  min-height: calc(var(--tw) * 0.55 + 8px);
+  min-height: calc(var(--tw) * 0.55 + 4px);
   container-type: size;
-  padding: 3px 6px;
-  border-radius: 10px;
-  background: #0006;
-  border: 1px dashed var(--line);
-  overflow: hidden;
+  padding-top: 2px;
 }
 .strip .part {
   display: flex;
   gap: 5px;
   align-items: center;
 }
-.strip .hint {
-  position: absolute;
-  top: 2px;
-  right: 8px;
-  font-size: 12px;
+.strip .label .hint {
   color: var(--them);
+  font-family: var(--text-font);
 }
 /* agents fill the strip's height, and shrink only when there are too many to fit across */
 .strip .agents .chip {
@@ -735,7 +739,8 @@ input {
   padding: 4px 6px 6px;
 }
 .tavern .label,
-.patrons .label {
+.patrons .label,
+.strip .label {
   display: flex;
   justify-content: space-between;
   font-family: var(--title-font);
@@ -751,7 +756,8 @@ input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tavern .label small {
+.tavern .label small,
+.strip .label small {
   color: var(--muted);
   font-family: var(--text-font);
 }
