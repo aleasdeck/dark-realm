@@ -1,4 +1,4 @@
-import { artUrl, patronEmblemUrl, type Subject } from '../art';
+import { artUrl, patronEmblemUrl, treasuryChestUrl, type Subject } from '../art';
 import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
@@ -150,7 +150,7 @@ function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId, focused: boolean
 }
 
 /**
- * The patron row: the treasury as a large disc in the middle with rays to both sides,
+ * The patron row: the treasury as a large pixel-art chest in the middle,
  * the patrons you drafted on the left and the opponent's on the right.
  */
 function patronsRowHtml(s: GameState, me: PlayerIdx, focused: PatronId | null): string {
@@ -160,15 +160,14 @@ function patronsRowHtml(s: GameState, me: PlayerIdx, focused: PatronId | null): 
       .map((pid) => patronHtml(s, me, pid, pid === focused))
       .join('');
   const chest = s.patrons.includes('treasury') ? treasuryHtml(s, me, focused === 'treasury') : '';
-  return `<div class="p-rays" aria-hidden="true"></div>
-    <div class="p-side mine">${side(me)}</div>${chest}<div class="p-side theirs">${side(other(me))}</div>`;
+  return `<div class="p-side mine">${side(me)}</div>${chest}<div class="p-side theirs">${side(other(me))}</div>`;
 }
 
 function treasuryHtml(s: GameState, me: PlayerIdx, focused: boolean): string {
   const def = PATRONS.treasury;
   const can = patronAvailable(s, me, 'treasury');
   return `<div class="patron chest${can ? ' can' : ''}${focused ? ' focused' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="treasury" data-tip="patron">
-    <div class="p-track"><img src="${patronEmblem('treasury')}" alt="" draggable="false"></div>
+    <div class="p-track"><img src="${treasuryChestUrl(def.palette)}" alt="" draggable="false"></div>
   </div>`;
 }
 
