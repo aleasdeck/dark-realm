@@ -1,6 +1,6 @@
 import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { cardDef, PATRONS } from '../engine/cards';
-import { attackable, hpLeft, other, patronAvailable } from '../engine/engine';
+import { attackable, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { musicOn } from './music';
 import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, PlayerIdx } from '../engine/types';
@@ -270,7 +270,11 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean):
     can,
     action,
   });
-  if (inHand) return view(inHand.id, idle ? 'Нажмите ещё раз: сыграть' : 'Сейчас не ваш ход', idle, { t: 'play', uid });
+  if (inHand) {
+    const curseFirst = mustPlayCurse(you, inHand.id);
+    const label = !idle ? 'Сейчас не ваш ход' : curseFirst ? 'Сначала разыграйте «Морок»' : 'Нажмите ещё раз: сыграть';
+    return view(inHand.id, label, idle && !curseFirst, { t: 'play', uid });
+  }
   if (inTavern) {
     const cost = cardDef(inTavern.id).cost;
     const ok = idle && you.coin >= cost;

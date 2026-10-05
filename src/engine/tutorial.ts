@@ -2,12 +2,12 @@ import { cardDef } from './cards';
 import { createGame } from './engine';
 import type { GameState, PatronId } from './types';
 
-/** Patrons with the plainest cards: power, coins and taunting agents, in draft order. */
+/** Patrons with the plainest cards: coins, power, draws and taunting agents, in draft order. */
 export const TUTORIAL_PATRONS: PatronId[] = ['crows', 'hlaalu', 'pelin', 'eagle'];
 export const TUTORIAL_GOAL = 20;
 export const TUTORIAL_INSTANT = 40;
 /** Fixed deal whose first hand can afford a card in the tavern. */
-export const TUTORIAL_SEED = 29;
+export const TUTORIAL_SEED = 3;
 
 /**
  * A short game against the gentle bot. The player drafts the patrons the coach points at

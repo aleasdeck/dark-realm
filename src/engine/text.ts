@@ -30,7 +30,7 @@ export function effectText(e: Effect): string {
     case 'toss':
       return `Просмотреть ${e.n} верхн. карт колоды и сбросить любые`;
     case 'destroy':
-      return `Уничтожить до ${cards(e.n)} в игре или в сбросе`;
+      return `Уничтожить до ${cards(e.n)} в игре или в руке`;
     case 'knockout':
       return e.n === 1 ? 'Сразить агента соперника' : `Сразить до ${e.n} агентов соперника`;
     case 'knockoutAll':
@@ -71,7 +71,7 @@ export const TYPE_NAMES: Record<CardDef['type'], string> = {
 export function cardLines(def: CardDef): { label: string; text: string }[] {
   const lines: { label: string; text: string }[] = [];
   if (def.play.length) lines.push({ label: def.type.includes('gent') ? 'Каждый ход' : '', text: effectsText(def.play) });
-  else if (def.type === 'curse') lines.push({ label: '', text: 'Бесполезная карта.' });
+  else if (def.type === 'curse') lines.push({ label: '', text: 'Бесполезная карта. Её надо разыграть раньше остальных.' });
   for (const tier of [2, 3, 4] as const) {
     const c = def.combo?.[tier];
     if (c) lines.push({ label: `Комбо ${tier}`, text: effectsText(c) });
@@ -82,11 +82,11 @@ export function cardLines(def: CardDef): { label: string; text: string }[] {
 }
 
 export const PATRON_RULES: Record<PatronId, { cost: string; effect: string }> = {
-  treasury: { cost: '2 монеты', effect: 'Уничтожить карту в игре или в сбросе, положить в сброс «Долговую расписку» (+2 монеты).' },
+  treasury: { cost: '2 монеты', effect: 'Уничтожить карту в игре или в руке, положить в сброс «Долговую расписку» (+2 монеты).' },
   crows: { cost: 'все монеты (мин. 1)', effect: 'Получить силу = монеты − 1. Нельзя, если он уже благоволит вам.' },
-  hlaalu: { cost: 'карта ценой ≥ 1 в игре или в сбросе', effect: 'Пожертвовать её и получить престиж = цена − 1.' },
+  hlaalu: { cost: 'ваша карта ценой ≥ 1 в игре (сыгранная или агент)', effect: 'Пожертвовать её и получить престиж = цена − 1.' },
   pelin: { cost: '2 силы и агент в сбросе', effect: 'Вернуть агента из сброса наверх колоды.' },
-  psijic: { cost: '4 силы и агент у соперника', effect: 'Сразить агента соперника.' },
+  psijic: { cost: '4 монеты и агент у соперника', effect: 'Сразить агента соперника.' },
   rajhin: { cost: '3 монеты', effect: 'Подложить «Морок» в сброс соперника.' },
   eagle: { cost: '2 силы', effect: 'Взять карту.' },
 };

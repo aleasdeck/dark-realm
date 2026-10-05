@@ -196,6 +196,21 @@ function cardOption(c: Card, extra = '') {
   return { label: name(c.id) + extra, ref: c.uid, cardId: c.id };
 }
 
+/** Cards that Destroy and the Treasury may take: played this turn or still in hand. */
+function inPlayOrHand(p: PlayerState) {
+  return [...p.played.map((c) => cardOption(c, ' (в игре)')), ...p.hand.map((c) => cardOption(c, ' (в руке)'))];
+}
+
+/** Cards of yours on the table, which the Hlaalu patron may sacrifice. */
+function ownInPlay(p: PlayerState): Card[] {
+  return [...p.played, ...p.agents];
+}
+
+/** A curse in hand has to be played before any other card. */
+export function mustPlayCurse(p: PlayerState, id: string): boolean {
+  return cardDef(id).type !== 'curse' && p.hand.some((c) => cardDef(c.id).type === 'curse');
+}
+
 function execEffect(s: GameState, e: Effect, pi: PlayerIdx) {
   const p = s.players[pi];
   const opp = s.players[other(pi)];
@@ -266,8 +281,8 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx) {
       return ask(s, {
         player: pi,
         kind: 'destroy',
-        prompt: `Уничтожьте до ${e.n} карт (в игре или в сбросе)`,
-        options: [...p.played.map((c) => cardOption(c, ' (в игре)')), ...p.cooldown.map((c) => cardOption(c, ' (сброс)'))],
+        prompt: `Уничтожьте до ${e.n} карт (в игре или в руке)`,
+        options: inPlayOrHand(p),
         min: 0,
         max: e.n,
       });
@@ -389,7 +404,7 @@ function resolvePending(s: GameState, picks: number[]) {
     case 'destroy':
     case 'treasury':
       for (const uid of uniq) {
-        const c = removeByUid(p.played, uid) ?? removeByUid(p.cooldown, uid);
+        const c = removeByUid(p.played, uid) ?? removeByUid(p.hand, uid);
         if (!c) continue;
         log(s, `${p.name} уничтожает «${name(c.id)}»`);
         emit(s, { k: 'destroy', p: pi, card: c.id });
@@ -398,7 +413,7 @@ function resolvePending(s: GameState, picks: number[]) {
       break;
     case 'hlaalu':
       for (const uid of uniq) {
-        const c = removeByUid(p.played, uid) ?? removeByUid(p.cooldown, uid);
+        const c = removeByUid(p.played, uid) ?? removeByUid(p.agents, uid);
         if (!c) continue;
         const gain = Math.max(0, cardDef(c.id).cost - 1);
         p.prestige += gain;
@@ -461,18 +476,17 @@ export function patronAvailable(s: GameState, pi: PlayerIdx, pid: PatronId): boo
   if (!s.patrons.includes(pid) || s.patronCalls <= 0 || s.patronsUsed.includes(pid)) return false;
   const p = s.players[pi];
   const opp = s.players[other(pi)];
-  const inPlayOrCd = [...p.played, ...p.cooldown];
   switch (pid) {
     case 'treasury':
-      return p.coin >= 2 && inPlayOrCd.length > 0;
+      return p.coin >= 2 && p.played.length + p.hand.length > 0;
     case 'crows':
       return s.favor.crows !== pi && p.coin >= 1;
     case 'hlaalu':
-      return inPlayOrCd.some((c) => cardDef(c.id).cost >= 1);
+      return ownInPlay(p).some((c) => cardDef(c.id).cost >= 1);
     case 'pelin':
       return p.power >= 2 && p.cooldown.some((c) => cardDef(c.id).type === 'agent');
     case 'psijic':
-      return p.power >= 4 && opp.agents.length > 0;
+      return p.coin >= 4 && opp.agents.length > 0;
     case 'rajhin':
       return p.coin >= 3;
     case 'eagle':
@@ -499,7 +513,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
         player: pi,
         kind: 'treasury',
         prompt: 'Сундук Бездны: уничтожьте карту, взамен получите «Долговую расписку»',
-        options: [...p.played.map((c) => cardOption(c, ' (в игре)')), ...p.cooldown.map((c) => cardOption(c, ' (сброс)'))],
+        options: inPlayOrHand(p),
         min: 1,
         max: 1,
       });
@@ -515,7 +529,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
         player: pi,
         kind: 'hlaalu',
         prompt: 'Ростовщица Вейла: пожертвуйте карту ради престижа (цена − 1)',
-        options: [...p.played, ...p.cooldown]
+        options: ownInPlay(p)
           .filter((c) => cardDef(c.id).cost >= 1)
           .map((c) => cardOption(c, ` (+${cardDef(c.id).cost - 1})`)),
         min: 1,
@@ -534,7 +548,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       });
       break;
     case 'psijic':
-      p.power -= 4;
+      p.coin -= 4;
       ask(s, {
         player: pi,
         kind: 'psijic',
@@ -557,9 +571,45 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
 
 // ── turn flow ────────────────────────────────────────────
 
+/** Leftover power hits the opponent's taunting agents first; only what is left after them becomes prestige. */
+function tauntsAbsorbPower(s: GameState, pi: PlayerIdx) {
+  const p = s.players[pi];
+  const foe = other(pi);
+  for (const a of [...s.players[foe].agents]) {
+    if (p.power <= 0) return;
+    if (!cardDef(a.id).taunt) continue;
+    const dmg = Math.min(p.power, hpLeft(a));
+    p.power -= dmg;
+    a.dmg += dmg;
+    log(s, `${p.name}: остаток силы бьёт «${name(a.id)}»: −${dmg}`);
+    emit(s, { k: 'attack', p: pi, card: a.id, n: dmg });
+    if (hpLeft(a) <= 0) knockOut(s, foe, a.uid);
+  }
+}
+
+/** 80 prestige or the favor of every drafted patron ends the game at once. */
+function checkInstantWin(s: GameState): boolean {
+  if (s.phase !== 'play') return false;
+  const instant = s.instant ?? PRESTIGE_INSTANT;
+  for (const pi of [s.current, other(s.current)]) {
+    if (s.players[pi].prestige >= instant) {
+      finish(s, pi, `${instant} престижа`);
+      return true;
+    }
+  }
+  const drafted = s.patrons.filter((x) => x !== 'treasury');
+  const pi = s.current;
+  if (drafted.length > 0 && drafted.every((x) => s.favor[x] === pi)) {
+    finish(s, pi, 'благосклонность всех покровителей');
+    return true;
+  }
+  return false;
+}
+
 function endTurn(s: GameState) {
   const pi = s.current;
   const p = s.players[pi];
+  tauntsAbsorbPower(s, pi);
   p.prestige += p.power;
   if (p.power > 0) {
     log(s, `${p.name}: сила ${p.power} → престиж`);
@@ -573,13 +623,8 @@ function endTurn(s: GameState) {
   for (const a of p.agents) a.activated = false;
   drawCards(s, p, HAND_SIZE);
 
-  const instant = s.instant ?? PRESTIGE_INSTANT;
+  if (checkInstantWin(s)) return;
   const goal = s.goal ?? PRESTIGE_GOAL;
-  if (p.prestige >= instant) return finish(s, pi, `${instant} престижа`);
-  const drafted = s.patrons.filter((x) => x !== 'treasury');
-  if (drafted.length > 0 && drafted.every((x) => s.favor[x] === pi)) {
-    return finish(s, pi, 'благосклонность всех покровителей');
-  }
 
   const next = other(pi);
   const n = s.players[next];
@@ -653,6 +698,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
   if (s.pending) {
     if (a.t !== 'choose') throw new RuleError('Сначала сделайте выбор');
     resolvePending(s, a.picks);
+    checkInstantWin(s);
     return s;
   }
   if (!idle(s, pi)) throw new RuleError('Подождите');
@@ -660,8 +706,10 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
 
   switch (a.t) {
     case 'play': {
-      const c = removeByUid(p.hand, a.uid);
-      if (!c) throw new RuleError('Нет такой карты в руке');
+      const inHand = p.hand.find((x) => x.uid === a.uid);
+      if (!inHand) throw new RuleError('Нет такой карты в руке');
+      if (mustPlayCurse(p, inHand.id)) throw new RuleError('Сначала разыграйте «Морок»');
+      const c = removeByUid(p.hand, a.uid)!;
       const def = cardDef(c.id);
       if (def.type === 'agent') {
         p.agents.push({ ...c, dmg: 0, activated: true });
@@ -717,6 +765,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       throw new RuleError('Недопустимое действие');
   }
   runQueue(s);
+  checkInstantWin(s);
   return s;
 }
 
