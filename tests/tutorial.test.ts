@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botAction } from '../src/engine/bot';
 import { cardDef } from '../src/engine/cards';
-import { actingPlayer, applyAction } from '../src/engine/engine';
+import { actingPlayer, applyAction, patronAvailable } from '../src/engine/engine';
 import { createTutorialGame, openingValue, TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../src/engine/tutorial';
 import type { GameState } from '../src/engine/types';
 import { Coach } from '../src/ui/tutorial';
@@ -24,14 +24,14 @@ describe('tutorial game', () => {
     expect(createTutorialGame('A').draftPool).toEqual(TUTORIAL_PATRONS);
   });
 
-  it('drafts the tutorial patrons into a hand that can buy from the tavern', () => {
+  it('drafts the tutorial patrons into a hand that pays for the Chest and a card in the tavern', () => {
     const s = draft(createTutorialGame('A'));
     expect(s.phase).toBe('play');
     expect(s.current).toBe(0);
     expect(s.patrons).toEqual([...TUTORIAL_PATRONS, 'treasury']);
-    const { coin, power } = openingValue(s);
-    expect(power).toBeGreaterThan(0);
-    expect(s.tavern.some((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= coin)).toBe(true);
+    const { coin } = openingValue(s);
+    // The Chest costs 2 coins; what is left still buys something.
+    expect(s.tavern.some((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= coin - 2)).toBe(true);
   });
 
   it('ends at the short prestige goal, and the gentle bot never calls patrons or attacks', () => {
@@ -51,8 +51,9 @@ describe('tutorial game', () => {
 });
 
 describe('coach', () => {
-  it('walks through the draft and the first turn and follows the player', () => {
+  it('walks through the draft and the first two turns and follows the player', () => {
     const coach = new Coach();
+    const pickFirst = (s: GameState) => applyAction(s, 0, { t: 'choose', picks: s.pending!.options.slice(0, Math.max(1, s.pending!.min)).map((o) => o.ref) });
     let s = draft(createTutorialGame('A'), coach);
     expect(coach.hint(s, 0)?.id).toBe('goal');
     coach.ack('goal');
@@ -61,23 +62,40 @@ describe('coach', () => {
     expect(coach.hint(s, 0)?.id).toBe('resources');
     coach.ack('resources');
     expect(coach.hint(s, 0)?.id).toBe('play-all');
-    while (s.players[0].hand.length) {
-      s = applyAction(s, 0, s.pending ? { t: 'choose', picks: [s.pending.options[0].ref] } : { t: 'play', uid: s.players[0].hand[0].uid });
-    }
+    while (s.players[0].hand.length) s = s.pending ? pickFirst(s) : applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
+
+    // The Chest has no "OK": the player has to call it.
+    expect(coach.hint(s, 0)?.id).toBe('treasury');
+    coach.ack('treasury');
+    expect(coach.hint(s, 0)?.id).toBe('treasury');
+    s = applyAction(s, 0, { t: 'patron', patron: 'treasury' });
+    expect(coach.hint(s, 0)?.id).toBe('choice');
+    s = pickFirst(s);
+
+    // Neither has the tavern: it waits for a purchase.
     expect(coach.hint(s, 0)?.id).toBe('tavern');
-    // The tavern hint has no "OK": it waits for a purchase.
     coach.ack('tavern');
     expect(coach.hint(s, 0)?.id).toBe('tavern');
     const coin = s.players[0].coin;
-    const buy = s.tavern.find((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= coin)!;
+    const buy = s.tavern.find((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= coin && !cardDef(c.id).type.includes('gent'))!;
     s = applyAction(s, 0, { t: 'buy', uid: buy.uid });
-    while (s.pending) s = applyAction(s, 0, { t: 'choose', picks: s.pending.options.slice(0, s.pending.min).map((o) => o.ref) });
     expect(coach.hint(s, 0)?.id).toBe('patrons');
+    while (s.pending) s = pickFirst(s);
     coach.ack('patrons');
     expect(coach.hint(s, 0)?.id).toBe('end');
     s = applyAction(s, 0, { t: 'end' });
     expect(coach.hint(s, 0)?.id).toBe('their-turn');
-    coach.off = true;
+    while (actingPlayer(s) === 1) s = applyAction(s, 1, botAction(s, 1, 'gentle')!);
+    while (s.pending) s = pickFirst(s);
+
+    // Second turn: play the hand, then call a patron.
+    expect(coach.hint(s, 0)?.id).toBe('play-2');
+    while (s.players[0].hand.length) s = s.pending ? pickFirst(s) : applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
+    expect(coach.hint(s, 0)?.id).toBe('patron-call');
+    expect(patronAvailable(s, 0, 'eagle')).toBe(true);
+    s = applyAction(s, 0, { t: 'patron', patron: 'eagle' });
+    expect(coach.hint(s, 0)?.id).toBe('free');
+    coach.ack('free');
     expect(coach.hint(s, 0)).toBeNull();
   });
 

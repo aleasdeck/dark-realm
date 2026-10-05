@@ -1,5 +1,5 @@
 import { cardDef, PATRONS } from '../engine/cards';
-import { actingPlayer, attackable, other } from '../engine/engine';
+import { actingPlayer, attackable, other, patronAvailable } from '../engine/engine';
 import { TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../engine/tutorial';
 import type { GameState, PlayerIdx } from '../engine/types';
 import { paintIcons } from './rich';
@@ -29,6 +29,12 @@ interface Step extends Hint {
 const myTurn = (s: GameState, me: PlayerIdx) => s.phase === 'play' && s.current === me;
 const idle = (s: GameState, me: PlayerIdx) => myTurn(s, me) && !s.pending && s.queue.length === 0;
 const firstTurnOver = (s: GameState) => s.turn > 1;
+/** The player's second turn is turn 3 (the bot plays turn 2). */
+const secondTurnOver = (s: GameState) => s.turn > 3;
+const called = (s: GameState, me: PlayerIdx, which: (pid: string) => boolean) =>
+  s.events.some((e) => e.k === 'patron' && e.p === me && which(e.patron));
+/** Drafted patrons (not the Chest) the player can call right now. */
+const callablePatrons = (s: GameState, me: PlayerIdx) => TUTORIAL_PATRONS.some((pid) => patronAvailable(s, me, pid));
 /** Cards to take from the tavern are picked right in it (see tavernPick in render.ts). */
 const tavernPicking = (s: GameState, me: PlayerIdx) =>
   s.pending?.player === me && ['acquire', 'bargain', 'replaceTavern'].includes(s.pending.kind);
@@ -82,6 +88,13 @@ const SCRIPT: Step[] = [
     done: (s, me) => firstTurnOver(s) || s.players[me].hand.length === 0,
   },
   {
+    id: 'treasury',
+    target: '.patrons .patron.chest',
+    text: 'Это Сундук: к нему можно воззвать в любой партии. За 2 ● он уничтожит ненужную карту, а взамен даст «Долговую расписку» на 2 ●. Нажмите на Сундук, затем ещё раз, и выберите, например, «Золото».',
+    // No "OK": the player has to call it. It steps aside only if the Chest can't be called.
+    done: (s, me) => firstTurnOver(s) || called(s, me, (p) => p === 'treasury') || !patronAvailable(s, me, 'treasury'),
+  },
+  {
     id: 'tavern',
     target: '.tavern',
     text: 'В таверне покупают карты за монеты ●. Купите одну из ярких: нажмите на карту, затем ещё раз. Покупка ляжет в сброс и придёт в руку позже, а контракт сработает сразу.',
@@ -94,7 +107,7 @@ const SCRIPT: Step[] = [
   {
     id: 'patrons',
     target: '.patrons',
-    text: 'Покровители. Раз в ход можно воззвать к одному из них: заплатить цену и получить эффект. Он склонится к вам, а если все на вашей стороне, вы сразу победили.',
+    text: 'Рядом с Сундуком покровители: слева ваши, справа соперника. Раз в ход можно воззвать к одному из них или к Сундуку. Покровитель склонится к вам, а если все на вашей стороне, вы сразу победили. В следующий ход попробуете.',
     ok: true,
     done: firstTurnOver,
   },
@@ -109,6 +122,19 @@ const SCRIPT: Step[] = [
     target: '.opp-bar',
     text: 'Теперь ходит соперник. Его карты появляются на столе. Дождитесь своего хода.',
     done: (s, me) => s.turn > 2 && myTurn(s, me),
+  },
+  {
+    id: 'play-2',
+    target: '.hand, .controls [data-act="play-all"]',
+    text: 'Ваш ход. Сыграйте карты, чтобы набрать монеты ● и силу ⚔.',
+    done: (s, me) => secondTurnOver(s) || s.players[me].hand.length === 0,
+  },
+  {
+    id: 'patron-call',
+    target: '.patrons .patron.can:not(.chest)',
+    text: 'Теперь воззовите к покровителю. Подсвечены те, чья цена вам по силам: нажмите на покровителя, прочтите, что он даёт, и нажмите ещё раз.',
+    // No "OK": the player has to call one. It steps aside only if nobody can be called.
+    done: (s, me) => secondTurnOver(s) || called(s, me, (p) => p !== 'treasury') || !callablePatrons(s, me),
   },
   {
     id: 'free',
@@ -130,7 +156,7 @@ const EVENTS: Step[] = [
   },
   {
     id: 'choice',
-    text: 'Карта предлагает выбор. Нажмите на нужный вариант.',
+    text: 'Нужно сделать выбор. Нажмите на нужный вариант.',
     top: true,
     ok: true,
     when: (s, me) => s.pending?.player === me && !tavernPicking(s, me),
