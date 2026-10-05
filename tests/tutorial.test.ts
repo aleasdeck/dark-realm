@@ -72,6 +72,14 @@ describe('coach', () => {
     expect(coach.hint(s, 0)?.id).toBe('choice');
     s = pickFirst(s);
 
+    // Card types are explained on the tavern, which shows an agent and a contract.
+    expect(coach.hint(s, 0)?.id).toBe('card-types');
+    const types = s.tavern.map((c) => cardDef(c.id).type);
+    expect(types).toContain('action');
+    expect(types).toContain('agent');
+    expect(types).toContain('contractAction');
+    coach.ack('card-types');
+
     // Neither has the tavern: it waits for a purchase.
     expect(coach.hint(s, 0)?.id).toBe('tavern');
     coach.ack('tavern');

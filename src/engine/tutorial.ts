@@ -16,7 +16,8 @@ export const TUTORIAL_SEED = 11;
  * 3 coins left after the Chest: power, coins, coins with a combo. The bought one goes on top of
  * the deck, so it is in the next hand.
  */
-export const TUTORIAL_TAVERN = ['pelin_portcullis', 'hlaalu_exports', 'pelin_reinforce', 'eagle_raid', 'pelin_volley'];
+/** Three affordable actions, plus an agent and a contract to show the card types (both too dear for now). */
+export const TUTORIAL_TAVERN = ['pelin_portcullis', 'hlaalu_exports', 'pelin_reinforce', 'hlaalu_hireling', 'crows_law'];
 
 /**
  * A short game against the gentle bot. Only the tutorial patrons are offered: the player drafts
