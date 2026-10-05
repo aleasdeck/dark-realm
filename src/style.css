@@ -844,8 +844,9 @@ input {
   min-width: 40px;
   font-size: 15px;
 }
+/* with two-digit resources the label breaks into two lines instead of being cut */
 .my-bar .end {
-  white-space: nowrap;
+  line-height: 1.05;
 }
 
 /* phones held sideways: two columns */
@@ -867,6 +868,15 @@ input {
   }
   .patron {
     --emb: 26px;
+  }
+  /* the half-width bar holds resources and icons on one line, "Конец хода" on the next */
+  .my-bar {
+    flex-wrap: wrap;
+    row-gap: 5px;
+  }
+  .my-bar .end {
+    flex-basis: 100%;
+    padding-block: 6px;
   }
 }
 
@@ -1127,6 +1137,17 @@ input {
   .counts .count {
     min-width: 34px;
   }
+  /* room for the whole "Конец хода" label */
+  .my-bar {
+    gap: 6px;
+  }
+  .my-bar .icon {
+    min-width: 34px;
+    padding: 8px 6px;
+  }
+  .my-bar .end {
+    padding-block: 4px;
+  }
 }
 
 /* big screens: scale the whole table up instead of leaving it tiny */
@@ -1157,6 +1178,9 @@ input {
     grid-template-columns: 1fr;
     gap: 6px;
   }
+  .draft {
+    gap: 6px;
+  }
   .draft-tile {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -1164,7 +1188,7 @@ input {
     column-gap: 10px;
     align-items: center;
     text-align: left;
-    padding: 6px 8px;
+    padding: 5px 8px;
   }
   .draft-tile img {
     grid-row: span 2;
@@ -1183,13 +1207,44 @@ input {
   }
 }
 
-/* landscape phones: the compact rows go in three columns */
+/* landscape phones: the compact rows go in three columns, emblem beside the name and the rule under both */
 @media (max-height: 520px) and (min-width: 561px) {
+  .draft {
+    padding-block: 6px;
+    gap: 5px;
+  }
   .draft-tiles {
     grid-template-columns: repeat(3, 1fr);
   }
   .draft h2 {
     font-size: 18px;
+    margin: 0;
+  }
+  .draft-picks > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: 8px;
+  }
+  .draft-tile {
+    grid-template-rows: auto 1fr;
+    column-gap: 8px;
+    row-gap: 2px;
+    align-items: start;
+  }
+  .draft-tile img {
+    grid-row: auto;
+    width: 26px;
+    height: 26px;
+  }
+  .draft-tile h3 {
+    align-self: center;
+  }
+  .draft-tile p {
+    grid-column: 1 / -1;
+  }
+  .draft > button {
+    padding-block: 6px;
   }
 }
 
@@ -1375,6 +1430,43 @@ input {
   width: 150px;
   height: 150px;
 }
+/* phones held sideways: the enlarged card lies on its side, art left of the text, so long texts fit the low screen */
+@media (orientation: landscape) and (max-height: 560px) {
+  .zoom .card.big,
+  .tooltip .card.big {
+    width: min(440px, 66vw);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'art head'
+      'art type'
+      'art text';
+    column-gap: 10px;
+    align-items: start;
+  }
+  .zoom .card.big .c-art,
+  .tooltip .card.big .c-art {
+    grid-area: art;
+    width: min(130px, 34dvh);
+    height: min(130px, 34dvh);
+    margin: 2px 0 0;
+  }
+  .card.big .c-head {
+    grid-area: head;
+  }
+  .card.big .c-type {
+    grid-area: type;
+  }
+  .card.big .c-text {
+    grid-area: text;
+    font-size: 15px;
+  }
+  .card.big .c-text p:first-child {
+    margin-top: 2px;
+  }
+}
+
 .tip-patron {
   width: min(280px, 86vw);
   background: #0f2219f7;
