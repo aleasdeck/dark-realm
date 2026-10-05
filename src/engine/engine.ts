@@ -535,7 +535,7 @@ function resolvePending(s: GameState, picks: number[]) {
         if (!c) continue;
         const gain = Math.max(0, cardDef(c.id).cost - 1);
         p.prestige += gain;
-        log(s, `${p.name} жертвует «${name(c.id)}» Ростовщице: +${gain} престижа`);
+        log(s, `${p.name} жертвует «${name(c.id)}» Ростовщице: +${gain} ✦`);
         emit(s, { k: 'destroy', p: pi, card: c.id });
       }
       break;
@@ -693,7 +693,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'hlaalu',
-        prompt: 'Ростовщица Вейла: пожертвуйте карту ради престижа (цена − 1)',
+        prompt: 'Ростовщица Вейла: пожертвуйте карту ради ✦ (цена − 1)',
         options: ownInPlay(p)
           .filter((c) => cardDef(c.id).cost >= 1)
           .map((c) => cardOption(c, ` (+${cardDef(c.id).cost - 1})`)),
@@ -797,7 +797,7 @@ function checkInstantWin(s: GameState): boolean {
   const instant = s.instant ?? PRESTIGE_INSTANT;
   for (const pi of [s.current, other(s.current)]) {
     if (s.players[pi].prestige >= instant) {
-      finish(s, pi, `${instant} престижа`);
+      finish(s, pi, `${instant} ✦`);
       return true;
     }
   }
@@ -818,7 +818,7 @@ function endTurn(s: GameState) {
   s.queue = [];
   p.prestige += p.power;
   if (p.power > 0) {
-    log(s, `${p.name}: сила ${p.power} → престиж`);
+    log(s, `${p.name}: ${p.power} ⚔ → ✦`);
     emit(s, { k: 'prestige', p: pi, n: p.power });
   }
   p.power = 0;
@@ -842,7 +842,7 @@ function endTurn(s: GameState) {
   log(s, `Ход ${s.turn}: ${n.name}`);
   emit(s, { k: 'turn', p: next });
   // A player who reached the goal and stayed ahead through the opponent's turn wins.
-  if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ престижа`);
+  if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ ✦`);
   if (s.turn === 2) n.coin += 1; // second player compensation
   if (s.favor.hunding === next) n.coin += 1; // Kenjar pays whoever kept his favor through the turn
   if (n.boon) {
