@@ -280,17 +280,23 @@ export function boardHtml(
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
-      ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">агентов нет</span>'}
-      ${theirPlayed}
-      ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
+      <div class="label"><span>Агенты соперника</span>${targets.size ? '<small class="hint">нажмите, чтобы атаковать</small>' : ''}</div>
+      <div class="s-body">
+        ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">агентов нет</span>'}
+        ${theirPlayed}
+      </div>
+    </section>
     <section class="tavern${pick ? ' picking' : ''}">
       <div class="label">${pick ? `<span class="pick">${esc(pick.pending.prompt)}</span>` : `<span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small>`}</div>
       <div class="row">${slots(tavern)}</div>
     </section>
     <section class="patrons"><div class="label"><span>Покровители</span></div><div class="p-row">${patronsRowHtml(s, me, focusPatron)}</div></section>
     <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">
-      <div class="part agents">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
-      ${played}
+      <div class="label"><span>Ваши агенты</span></div>
+      <div class="s-body">
+        <div class="part agents">${myAgents || '<span class="empty">агентов нет</span>'}</div>
+        ${played}
+      </div>
     </section>
     <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
     <div class="bar my-bar${opts.myTurn ? ' active' : ''}">
