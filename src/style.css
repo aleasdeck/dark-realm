@@ -1612,3 +1612,80 @@ input {
     animation: none;
   }
 }
+
+/* ── cards in motion: stand-ins fly over the table while the real card waits hidden ── */
+.motion-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 14;
+  overflow: hidden;
+}
+.ghost {
+  position: absolute;
+  perspective: 700px;
+  will-change: transform, opacity;
+}
+.gh-card {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.gh-face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  filter: drop-shadow(0 6px 10px #000a);
+}
+.gh-face > * {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  transform: none !important;
+  translate: none !important;
+  scale: none !important;
+}
+.gh-turned {
+  transform: rotateY(180deg);
+}
+.gh-back {
+  border: 2px solid #6e3a2a;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 60%, #5a1d1d 0 22%, transparent 24%),
+    repeating-linear-gradient(45deg, #2a1414 0 4px, #170909 4px 8px);
+  display: grid;
+  place-items: center;
+  color: #c4705a;
+  font-family: var(--title-font);
+  font-size: 14px;
+}
+.float {
+  position: absolute;
+  font-family: var(--title-font);
+  font-weight: 700;
+  font-size: 17px;
+  white-space: nowrap;
+  text-shadow:
+    0 0 4px #000,
+    0 1px 2px #000;
+}
+.float.pre {
+  color: var(--prestige);
+}
+.float.pow {
+  color: var(--power);
+}
+.float.coin {
+  color: var(--gold);
+}
+.float.bad {
+  color: var(--them);
+}
+.float.heal {
+  color: var(--green-glow);
+}

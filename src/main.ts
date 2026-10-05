@@ -16,6 +16,7 @@ import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
 import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tavernPick, tileHtml, type Focus } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
+import { animateChange, clearMotion, snapshot } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
@@ -78,6 +79,7 @@ function leaveGame() {
   coach = null;
   hint = null;
   clearFx();
+  clearMotion();
   const peer = new URLSearchParams(location.search).get('peer');
   history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
   menu();
@@ -209,6 +211,7 @@ function startGame(c: Controller) {
   coach = c instanceof BotController && c.tutorial ? new Coach() : null;
   hint = null;
   clearFx();
+  clearMotion();
   c.subscribe(render);
   render();
 }
@@ -223,7 +226,10 @@ function render() {
     return;
   }
   const me = ctrl.me;
-  onStateChange(lastState, s, me);
+  const prev = lastState;
+  // Where the cards were, read before the board is redrawn, so the moved ones can fly.
+  const snap = prev !== s ? snapshot(app) : null;
+  onStateChange(prev, s, me);
   lastState = s;
   if (ctrl.error && ctrl.error !== lastError) play('error');
   lastError = ctrl.error;
@@ -243,6 +249,7 @@ function render() {
     savePlayed(app);
     app.innerHTML = boardHtml(s, me, { myTurn, idle, focus, pick }) + overlays(s);
     restorePlayed(app);
+    animateChange(app, snap, prev, s, me);
     if (view) showZoom(view.html, view.label, view.can);
     // The enlarged card says what to do itself, so the coach steps aside for it.
     if (hint && !view && !modal) showHint(app, hint);
@@ -394,6 +401,7 @@ function showZoom(html: string, label: string, can: boolean) {
   const zoom = document.createElement('div');
   zoom.className = `zoom${can ? ' can' : ''}${f.kind === 'patron' ? ' patron-zoom' : ''}`;
   zoom.dataset.act = 'confirm-focus';
+  if (f.kind === 'card') zoom.dataset.zoomUid = String(f.uid);
   zoom.innerHTML = `${html}${label ? `<div class="zoom-act">${esc(label)}</div>` : ''}`;
   app.appendChild(zoom);
   if (!src) return;

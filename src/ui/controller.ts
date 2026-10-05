@@ -43,7 +43,7 @@ export abstract class Controller {
 function botDelay(s: GameState): number {
   if (s.phase === 'draft') return 900;
   if (s.events?.some((e) => e.k === 'turn')) return 1400; // let the turn banner play first
-  return 950;
+  return 1150;
 }
 
 export class BotController extends Controller {
