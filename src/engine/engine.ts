@@ -485,7 +485,7 @@ function druidChimera(s: GameState, pi: PlayerIdx, count: number) {
   if (count < need || s.chimeraTurn === s.turn) return;
   s.chimeraTurn = s.turn;
   toCooldown(s, pi, mk(s, 'druid_chimera'));
-  log(s, `${s.players[pi].name}: Каэрнох дарует «Химеру»`);
+  log(s, `${s.players[pi].name}: Олень дарует «Химеру»`);
 }
 
 function resolvePending(s: GameState, picks: number[]) {
@@ -535,7 +535,7 @@ function resolvePending(s: GameState, picks: number[]) {
         if (!c) continue;
         const gain = Math.max(0, cardDef(c.id).cost - 1);
         p.prestige += gain;
-        log(s, `${p.name} жертвует «${name(c.id)}» Ростовщице: +${gain} ✦`);
+        log(s, `${p.name} жертвует «${name(c.id)}» Крысе: +${gain} ✦`);
         emit(s, { k: 'destroy', p: pi, card: c.id });
       }
       break;
@@ -693,7 +693,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'hlaalu',
-        prompt: 'Ростовщица Вейла: пожертвуйте карту ради ✦ (цена − 1)',
+        prompt: 'Крыса: пожертвуйте карту ради ✦ (цена − 1)',
         options: ownInPlay(p)
           .filter((c) => cardDef(c.id).cost >= 1)
           .map((c) => cardOption(c, ` (+${cardDef(c.id).cost - 1})`)),
@@ -706,7 +706,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'pelin',
-        prompt: 'Гримвальд Костяной: верните агента наверх колоды',
+        prompt: 'Волк: верните агента наверх колоды',
         options: p.cooldown.filter((c) => cardDef(c.id).type === 'agent').map((c) => cardOption(c)),
         min: 1,
         max: 1,
@@ -717,7 +717,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'psijic',
-        prompt: 'Иссерия Безглазая: сразите агента соперника',
+        prompt: 'Сова: сразите агента соперника',
         options: opp.agents.map((a) => cardOption(a)),
         min: 1,
         max: 1,

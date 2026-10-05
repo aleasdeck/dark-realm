@@ -23,40 +23,31 @@ function crowHead({ d, R }: Ctx): void {
   d.on('main');
 }
 
-function pelin({ d, r, R }: Ctx): void {
-  const S = R.steel;
-  const wing = (s: number) => {
-    const m = (x: number) => 64 + (x - 64) * s;
-    d.poly([m(56), 50, m(36), 30, m(14), 24, m(18), 34, m(10), 40, m(18), 48, m(12), 56, m(22), 62, m(18), 70, m(32), 72, m(46), 80], S, 'diag');
-    for (let k = 0; k < 4; k++) d.line(m(20 + k * 7), 40 + k * 3, m(18 + k * 6), 62 + k * 3, S[1] as number);
-  };
-  wing(1); wing(-1);
-  // sword behind shield
-  d.poly([64, 4, 68, 14, 68, 100, 60, 100, 60, 14], S, 'cylx');
-  d.rect(48, 100, 32, 5, R.gold, 'cyly');
-  d.cap(64, 106, 64, 118, 3, R.wood);
-  d.ell(64, 120, 4, 4, R.gold);
-  d.poly([42, 40, 86, 40, 86, 66, 64, 92, 42, 66], R.acc, d.sph(56, 52, 30, 40));
-  d.lines([42, 40, 86, 40, 86, 66, 64, 92, 42, 66, 42, 40], R.gold[3] as number);
-  d.rect(62, 44, 4, 40, R.gold, 'cylx');
-  d.rect(48, 56, 32, 4, R.gold, 'cyly');
-  void r;
-}
-
-function psijic({ d, r, R }: Ctx): void {
-  // closed eye: a thick downward-curved lid line with hanging lashes
-  d.path(arcPts(64, 70, 40, 18, 0.15, Math.PI - 0.15, 16), 3.2, 3.2, R.gold);
-  for (let k = 0; k < 7; k++) {
-    const a = 0.45 + (k / 6) * (Math.PI - 0.9);
-    const x = 64 + Math.cos(a) * 40, y = 70 + Math.sin(a) * 18;
-    d.cap(x, y + 2, x + Math.cos(a) * 6, y + 11, 1.6, R.gold, 'tube', 1);
-  }
-  // third eye
-  d.scaled(0.42, 64, 38, () => DRAWERS.eye({ d, r, R }));
+function owl({ d, R }: Ctx): void {
+  const F = R.fur.map((c) => mix(c, R.acc[1] as number, 0.25));
+  const L = d.sph(54, 50, 44, 56);
+  // branch and talons
+  d.cap(14, 108, 114, 104, 4, R.wood);
+  // wings folded along the body
+  d.poly([36, 56, 26, 80, 30, 100, 44, 108, 50, 70], F[0] as number);
+  d.poly([92, 56, 102, 80, 98, 100, 84, 108, 78, 70], F[0] as number);
+  d.ell(64, 80, 28, 30, F, L);
+  for (let y = 70; y < 104; y += 7) for (let x = 52 + ((y / 7) % 2) * 4; x < 78; x += 8) d.lines([x - 2, y, x, y + 2, x + 2, y], F[3] as number);
+  // head with ear tufts
+  d.poly([38, 40, 34, 14, 52, 30], F, 'diag');
+  d.poly([90, 40, 94, 14, 76, 30], F, 'diag');
+  d.ell(64, 46, 30, 22, F, L);
+  // facial discs
+  const disc = R.bone.map((c) => mix(c, R.acc[2] as number, 0.2));
+  d.ell(51, 47, 13, 12, disc, 2);
+  d.ell(77, 47, 13, 12, disc, 2);
+  d.poly([60, 54, 68, 54, 64, 64], R.gold, 1);
+  for (const x of [57, 61, 67, 71]) d.cap(x, 106, x + (x < 64 ? -2 : 2), 112, 1.6, R.bone);
   d.on('fx');
-  for (let k = 0; k < 8; k++) {
-    const a = -Math.PI / 2 + ((k - 3.5) / 8) * 2.4;
-    d.line(64 + Math.cos(a) * 28, 38 + Math.sin(a) * 20, 64 + Math.cos(a) * 34, 38 + Math.sin(a) * 25, R.GLOW);
+  for (const x of [51, 77]) {
+    d.ell(x, 47, 7, 7, R.glow);
+    d.ell(x, 47, 3, 3, R.VOID);
+    d.px(x - 2, 45, R.WHITE);
   }
   d.on('main');
 }
@@ -92,17 +83,17 @@ function rajhin({ d, R }: Ctx): void {
 
 const EMBLEMS: Record<string, (c: Ctx) => void> = {
   crows: crowHead,
-  hlaalu: (c) => c.d.scaled(0.86, 64, 68, () => DRAWERS.scales(c)),
-  pelin,
-  psijic,
+  hlaalu: (c) => c.d.scaled(0.9, 64, 64, () => DRAWERS.rat(c)),
+  pelin: (c) => c.d.scaled(0.84, 66, 70, () => DRAWERS.wolf(c)),
+  psijic: owl,
   rajhin,
   eagle: (c) => c.d.scaled(0.9, 64, 66, () => DRAWERS.eagle(c)),
   treasury: (c) => c.d.scaled(0.78, 64, 66, () => DRAWERS.chest(c)),
-  alma: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.chalice(c)),
+  alma: (c) => c.d.scaled(0.9, 64, 64, () => DRAWERS.spider(c)),
   hunding: (c) => c.d.scaled(0.9, 64, 64, () => DRAWERS.sword(c)),
   druid: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.rune(c)),
   mora: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.tentacle(c)),
-  alessia: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.chain(c)),
+  alessia: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.beast(c)),
   orgnum: (c) => c.d.scaled(0.86, 64, 66, () => DRAWERS.serpent(c)),
 };
 
@@ -136,7 +127,9 @@ export function renderEmblem(patronId: string, pal: Pal): Uint8ClampedArray {
     d.ell(64 + Math.cos(a) * 60, 64 + Math.sin(a) * 60, 1.5, 1.5, rim[3] as number);
   }
   d.on('main');
-  d.scaled(0.86, 64, 64, () => (EMBLEMS[patronId] ?? genericSigil)({ d, r, R }));
+  // keep wide subjects (the spider's web) inside the medallion
+  d.clipped((x, y) => Math.hypot(x + 0.5 - 64, y + 0.5 - 64) <= 56, () =>
+    d.scaled(0.86, 64, 64, () => (EMBLEMS[patronId] ?? genericSigil)({ d, r, R })));
   return compose(bg, d, { glow: R.GLOW, vignette: false });
 }
 
