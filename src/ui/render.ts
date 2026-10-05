@@ -215,7 +215,7 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
     <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
       <span class="who">${esc(them.name)}</span>
       <span class="res-group">${res(them)}</span>
-      <span class="counts">${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
+      <span class="counts">${count(them.deck.length, 'колода', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
