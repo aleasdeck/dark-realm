@@ -620,17 +620,23 @@ input {
 
 .patrons {
   position: relative;
-  display: grid;
-  /* your patrons | the treasury | the opponent's */
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 6px 6px;
   border-radius: 10px;
   background: #0a140e;
   border: 1px solid var(--line);
   overflow: hidden;
   isolation: isolate;
+}
+.p-row {
+  display: grid;
+  /* your patrons | the treasury | the opponent's */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding-top: 3px;
 }
 .p-side {
   display: grid;
@@ -678,6 +684,17 @@ input {
   border-color: var(--them);
   background: radial-gradient(circle, #a83a30 0%, #5e1c18 70%);
 }
+.p-name {
+  font-family: var(--title-font);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--glow);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .patron.can .p-track {
   /* gold, so "can call now" never reads as green "on your side" */
   box-shadow: 0 0 10px #f0c860aa;
@@ -717,7 +734,8 @@ input {
   border-radius: 10px;
   padding: 4px 6px 6px;
 }
-.tavern .label {
+.tavern .label,
+.patrons .label {
   display: flex;
   justify-content: space-between;
   font-family: var(--title-font);

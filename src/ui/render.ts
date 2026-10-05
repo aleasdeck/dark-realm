@@ -145,6 +145,7 @@ function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId, focused: boolean
   const can = patronAvailable(s, me, pid);
   return `<div class="patron fav-${favor}${can ? ' can' : ''}${focused ? ' focused' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="${pid}" data-tip="patron">
     <div class="p-track"><img src="${patronEmblem(pid)}" alt="" draggable="false"></div>
+    <span class="p-name">${esc(def.name.split(' ')[0])}</span>
   </div>`;
 }
 
@@ -286,7 +287,7 @@ export function boardHtml(
       <div class="label">${pick ? `<span class="pick">${esc(pick.pending.prompt)}</span>` : `<span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small>`}</div>
       <div class="row">${slots(tavern)}</div>
     </section>
-    <section class="patrons">${patronsRowHtml(s, me, focusPatron)}</section>
+    <section class="patrons"><div class="label"><span>Покровители</span></div><div class="p-row">${patronsRowHtml(s, me, focusPatron)}</div></section>
     <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">
       <div class="part agents">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
       ${played}
