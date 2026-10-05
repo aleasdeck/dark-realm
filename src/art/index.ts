@@ -5,7 +5,7 @@
  */
 import { background } from './background';
 import { hex } from './color';
-import { renderCardBack, renderEmblem, renderTreasuryChest } from './emblems';
+import { renderCardBack, renderEmblem } from './emblems';
 import { Draw, H, W } from './pixel';
 import { buildRamps } from './ramps';
 import { compose } from './render';
@@ -61,10 +61,6 @@ export function artUrl(subject: Subject, palette: ArtPalette, seed: number): str
 
 export function cardBackUrl(): string {
   return cached('cardback', renderCardBack);
-}
-
-export function treasuryChestUrl(palette: ArtPalette): string {
-  return cached(`chest|${palKey(palette)}`, () => renderTreasuryChest(palette));
 }
 
 export function patronEmblemUrl(patronId: string, palette: ArtPalette): string {
