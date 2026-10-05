@@ -96,7 +96,7 @@ function describe(e: GameEvent, me: PlayerIdx): [string | null, string] | null {
     case 'discard':
       return [null, `сбрасывает ${e.n} карт(ы)`];
     case 'prestige':
-      return [null, `получает <em class="pre">+${e.n} престижа</em>`];
+      return [null, `получает <em class="pre">+${e.n} ✦</em>`];
     default:
       return null;
   }
@@ -126,7 +126,7 @@ export function onStateChange(prev: GameState | null, next: GameState, me: Playe
     }
   }
   const lost = prev.players[me].prestige - next.players[me].prestige;
-  if (byThem && lost > 0 && next.phase === 'play') feedItem(null, `<em class="bad">Вы теряете ${lost} престижа</em>`);
+  if (byThem && lost > 0 && next.phase === 'play') feedItem(null, `<em class="bad">Вы теряете ${lost} ✦</em>`);
   if (next.pending?.player === me && prev.pending?.player !== me && next.phase === 'play') {
     sounds.add('choose');
     if (byThem || next.current !== me) feedItem(null, esc(next.pending.prompt));

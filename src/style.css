@@ -742,6 +742,11 @@ input {
   font-style: normal;
   color: var(--text);
 }
+.fx.coin,
+.fx.pow,
+.fx.pre {
+  font-weight: 700;
+}
 .fx.coin {
   color: var(--gold);
 }
@@ -771,6 +776,23 @@ input {
   background: var(--glow);
   border-radius: 3px;
   padding: 0 2px;
+}
+/* Resource amounts in rules text, "+2 ●", in the colors of the counters on the player bars. */
+.ri {
+  white-space: nowrap;
+  font-weight: 700;
+}
+.ri i {
+  font-style: normal;
+}
+.ri.coin {
+  color: var(--gold);
+}
+.ri.pow {
+  color: var(--power);
+}
+.ri.pre {
+  color: var(--prestige);
 }
 .tile.buyable {
   box-shadow: 0 0 10px #f0c860aa;

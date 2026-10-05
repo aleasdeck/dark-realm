@@ -2,6 +2,7 @@ import { cardDef, PATRONS } from '../engine/cards';
 import { actingPlayer, attackable, other } from '../engine/engine';
 import { TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../engine/tutorial';
 import type { GameState, PlayerIdx } from '../engine/types';
+import { paintIcons } from './rich';
 
 /** One coach hint: what it points at, what it says, and when it is no longer needed. */
 export interface Hint {
@@ -111,7 +112,7 @@ const SCRIPT: Step[] = [
   },
   {
     id: 'free',
-    text: `Основы вы знаете, дальше играйте сами. Наберите ${TUTORIAL_GOAL} престижа ✦ раньше соперника. Если случится что-то новое, я подскажу.`,
+    text: `Основы вы знаете, дальше играйте сами. Наберите ${TUTORIAL_GOAL} ✦ раньше соперника. Если случится что-то новое, я подскажу.`,
     ok: true,
     done: () => false,
   },
@@ -220,7 +221,7 @@ export function showHint(root: HTMLElement, h: Hint) {
   }
   const bubble = document.createElement('div');
   bubble.className = 'coach';
-  bubble.innerHTML = `<p>${h.text}</p><div class="coach-actions">
+  bubble.innerHTML = `<p>${paintIcons(h.text)}</p><div class="coach-actions">
     <button class="ghost" data-act="tut-skip">Пропустить туториал</button>
     ${h.ok ? `<button data-act="tut-ok" data-hint="${h.id}">Понятно</button>` : ''}</div>`;
   root.appendChild(bubble);

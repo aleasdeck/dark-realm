@@ -14,7 +14,20 @@ import { BotController, Controller, GuestController, HostController } from './ui
 import { clearFx, onStateChange } from './ui/feed';
 import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
-import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tavernPick, tileHtml, type Focus } from './ui/render';
+import {
+  boardHtml,
+  cardHtml,
+  esc,
+  focusView,
+  paintIcons,
+  patronEmblem,
+  patronTipHtml,
+  pileGridHtml,
+  richText,
+  tavernPick,
+  tileHtml,
+  type Focus,
+} from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
@@ -156,21 +169,21 @@ function rulesHtml() {
   const patrons = (Object.keys(PATRON_RULES) as PatronId[])
     .map((p) => {
       const lock = isUnlocked(p) ? '' : ` 🔒 (${unlockHint(p).replace(/\.$/, '').toLowerCase()})`;
-      return `<li><b>${esc(PATRONS[p].name)}</b>${lock}: ${esc(PATRON_RULES[p].cost)} → ${esc(PATRON_RULES[p].effect)}</li>`;
+      return `<li><b>${esc(PATRONS[p].name)}</b>${lock}: ${richText(PATRON_RULES[p].cost)} → ${richText(PATRON_RULES[p].effect)}</li>`;
     })
     .join('');
-  return `<ul>
+  return paintIcons(`<ul>
     <li>Игроки по очереди выбирают 4 покровителей; их колоды образуют таверну. Сундук Бездны есть всегда.</li>
     <li>Начальная колода: 6 «Золота» и по одной начальной карте каждого покровителя. В руке 5 карт.</li>
-    <li>Сыгранные карты дают <b>монеты</b> (покупка карт в таверне) и <b>силу</b> (в конце хода становится престижем или идёт на атаку агентов).</li>
+    <li>Сыгранные карты дают <b>монеты</b> ● (покупка карт в таверне) и <b>силу</b> ⚔ (в конце хода становится престижем ✦ или идёт на атаку агентов).</li>
     <li><b>Комбо N</b> срабатывает, когда за ход сыграно N карт одного покровителя, даже задним числом.</li>
     <li><b>Агенты</b> остаются на поле и действуют каждый ход. Агентов с провокацией надо сразить первыми, а в конце хода остаток силы сам бьёт по ним и только потом становится престижем.</li>
     <li><b>Контракты</b> срабатывают сразу при покупке и не попадают в колоду. Колода Сундука Бездны целиком из контрактов.</li>
     <li><b>Морок</b> (проклятие) надо разыграть раньше остальных карт в руке.</li>
     <li>Нажмите на счётчик колоды или сброса, своего или соперника, чтобы посмотреть эти карты. Порядок колоды скрыт.</li>
     <li>За ход можно один раз воззвать к покровителю. Он становится благосклонен к вам, а если благоволил сопернику, то нейтрален.</li>
-    <li>Победа: 40 престижа и перевес после хода соперника, или сразу: 80 престижа либо благосклонность всех 4 покровителей.</li>
-  </ul><ul class="patron-rules">${patrons}</ul>`;
+    <li>Победа: 40 ✦ и перевес после хода соперника, или сразу: 80 ✦ либо благосклонность всех 4 покровителей.</li>
+  </ul>`) + `<ul class="patron-rules">${patrons}</ul>`;
 }
 
 function waiting(text: string, extra = '') {
@@ -312,7 +325,7 @@ function draftHtml(s: GameState): string {
     return `<div class="draft-tile${can ? ' can' : ''}${locked ? ' locked' : ''}" ${can ? `data-act="draft" data-patron="${pid}"` : ''} style="--accent:${p.palette.accent};--glow:${p.palette.glow}">
         <img src="${patronEmblem(pid)}" alt="">
         <h3>${esc(p.name)}</h3><p class="p-title">${esc(p.title)}</p>
-        <p><b>Воззвание:</b> ${esc(r.cost)} → ${esc(r.effect)}</p>
+        <p><b>Воззвание:</b> ${richText(r.cost)} → ${richText(r.effect)}</p>
         ${locked ? `<p class="lock-left">🔒 ${esc(unlockLeft(pid))}</p>` : ''}
       </div>`;
   };
@@ -349,7 +362,7 @@ function overlays(s: GameState): string {
   if (s.phase === 'over') {
     const win = s.winner === me;
     html += `<div class="overlay"><div class="dialog end-dialog ${win ? 'win' : 'lose'}">
-      <h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${esc(s.winReason)}</p>
+      <h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${richText(s.winReason)}</p>
       <p>Престиж ${s.players[me].prestige} : ${s.players[me === 0 ? 1 : 0].prestige}</p>
       ${ctrl!.unlocked.map((pid) => `<p class="unlocked"><img src="${patronEmblem(pid)}" alt=""><span>Открыт покровитель <b>${esc(PATRONS[pid].name)}</b></span></p>`).join('')}
       <div class="buttons">${ctrl instanceof BotController ? `<button data-act="rematch">${ctrl.tutorial ? 'Пройти ещё раз' : 'Ещё партия'}</button>` : ''}
@@ -366,8 +379,8 @@ function overlays(s: GameState): string {
         .map((o) => {
           const sel = selected.has(o.ref) ? ' selected' : '';
           return o.cardId
-            ? `<div class="opt-card${sel}" data-act="pick" data-ref="${o.ref}">${tileHtml(o.cardId)}<span>${esc(o.label)}</span></div>`
-            : `<button class="opt${sel}" data-act="pick" data-ref="${o.ref}">${esc(o.label)}</button>`;
+            ? `<div class="opt-card${sel}" data-act="pick" data-ref="${o.ref}">${tileHtml(o.cardId)}<span>${richText(o.label)}</span></div>`
+            : `<button class="opt${sel}" data-act="pick" data-ref="${o.ref}">${richText(o.label)}</button>`;
         })
         .join('');
       const ok = selected.size >= p.min && selected.size <= p.max;
@@ -382,7 +395,7 @@ function overlays(s: GameState): string {
   if (modal?.kind === 'log') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
       <h2>Журнал партии</h2>
-      <div class="log">${s.log.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
+      <div class="log">${s.log.map((l) => `<div>${richText(l)}</div>`).join('')}</div>
       <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
@@ -419,7 +432,7 @@ function showZoom(html: string, label: string, can: boolean) {
   zoom.className = `zoom${can ? ' can' : ''}${f.kind === 'patron' ? ' patron-zoom' : ''}`;
   zoom.dataset.act = 'confirm-focus';
   if (f.kind === 'card') zoom.dataset.zoomUid = String(f.uid);
-  zoom.innerHTML = `${html}${label ? `<div class="zoom-act">${esc(label)}</div>` : ''}`;
+  zoom.innerHTML = `${html}${label ? `<div class="zoom-act">${richText(label)}</div>` : ''}`;
   app.appendChild(zoom);
   if (!src) return;
   const r = src.getBoundingClientRect();

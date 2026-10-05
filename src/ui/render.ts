@@ -2,11 +2,11 @@ import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
+import { esc, paintIcons, richText } from './rich';
 import { musicOn } from './music';
 import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, Pending, PlayerIdx } from '../engine/types';
 
-export const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+export { esc, paintIcons, richText };
 
 const NEUTRAL_PALETTE = { bg1: '#0b0b0d', bg2: '#25222a', accent: '#8d8577', glow: '#f1d9a0' };
 
@@ -55,7 +55,7 @@ function hpBadge(def: CardDef, agent?: AgentInPlay) {
 export function cardHtml(id: string, o: CardOpts = {}): string {
   const def = cardDef(id);
   const lines = cardLines(def)
-    .map((l) => `<p>${l.label ? `<b>${esc(l.label)}:</b> ` : ''}${esc(l.text)}</p>`)
+    .map((l) => `<p>${l.label ? `<b>${esc(l.label)}:</b> ` : ''}${richText(l.text)}</p>`)
     .join('');
   return `<div class="card ${o.cls ?? ''} t-${def.type}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
     <div class="c-head"><span class="c-cost">${def.cost}</span><span class="c-name">${esc(def.name)}</span></div>
@@ -157,7 +157,7 @@ export function patronTipHtml(s: GameState | null, me: PlayerIdx, pid: PatronId)
   const side = { fixed: 'Всегда нейтрален', neutral: 'Нейтрален', mine: 'Благоволит вам', theirs: 'Благоволит сопернику' }[favor];
   return `<div class="tip-patron fav-${favor}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}">
     <div class="tp-head"><img src="${patronEmblem(pid)}" alt=""><div><h3>${esc(def.name)}</h3><p class="p-title">${esc(def.title)}</p></div></div>
-    <p><b>Цена:</b> ${esc(rules.cost)}</p><p><b>Эффект:</b> ${esc(rules.effect)}</p>
+    <p><b>Цена:</b> ${richText(rules.cost)}</p><p><b>Эффект:</b> ${richText(rules.effect)}</p>
     <p class="tp-side">${side}</p>
   </div>`;
 }

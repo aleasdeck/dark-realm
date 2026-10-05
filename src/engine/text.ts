@@ -9,18 +9,25 @@ function plural(n: number, one: string, few: string, many: string): string {
   return many;
 }
 
+/**
+ * Resource icons, the same glyphs as on the player bars. Effect texts write amounts as "+2 ●"
+ * and the UI paints them in the resource's color (richText in src/ui/render.ts).
+ */
+export const ICON = { coin: '●', power: '⚔', prestige: '✦' } as const;
+const { coin: COIN, power: POW, prestige: PRE } = ICON;
+
 const cards = (n: number) => `${n} ${plural(n, 'карту', 'карты', 'карт')}`;
 
 export function effectText(e: Effect): string {
   switch (e.k) {
     case 'coin':
-      return `+${e.n} ${plural(e.n, 'монета', 'монеты', 'монет')}`;
+      return `+${e.n} ${COIN}`;
     case 'power':
-      return `+${e.n} силы`;
+      return `+${e.n} ${POW}`;
     case 'prestige':
-      return `+${e.n} престижа`;
+      return `+${e.n} ${PRE}`;
     case 'oppLosePrestige':
-      return `Соперник теряет ${e.n} престижа`;
+      return `Соперник теряет ${e.n} ${PRE}`;
     case 'draw':
       return `Взять ${cards(e.n)}`;
     case 'oppDiscard':
@@ -56,7 +63,7 @@ export function effectText(e: Effect): string {
     case 'confine':
       return `Заточить ${cards(e.n)} из сброса соперника под этим агентом`;
     case 'setback': {
-      const what = e.res === 'coin' ? `+${e.n} ${plural(e.n, 'монету', 'монеты', 'монет')}` : e.res === 'power' ? `+${e.n} силы` : cards(e.n);
+      const what = e.res === 'coin' ? `+${e.n} ${COIN}` : e.res === 'power' ? `+${e.n} ${POW}` : cards(e.n);
       return `Расплата: соперник в начале хода ${e.res === 'draw' ? 'берёт' : 'получает'} ${what}`;
     }
     case 'reprieve':
@@ -107,29 +114,29 @@ export function cardLines(def: CardDef): { label: string; text: string }[] {
 }
 
 export const PATRON_RULES: Record<PatronId, { cost: string; effect: string }> = {
-  treasury: { cost: '2 монеты', effect: 'Уничтожить карту в игре или в руке, положить в сброс «Долговую расписку» (+2 монеты).' },
-  crows: { cost: 'все монеты (мин. 1)', effect: 'Получить силу = монеты − 1. Нельзя, если он уже благоволит вам.' },
-  hlaalu: { cost: 'ваша карта ценой ≥ 1 в игре (сыгранная или агент)', effect: 'Пожертвовать её и получить престиж = цена − 1.' },
-  pelin: { cost: '2 силы и агент в сбросе', effect: 'Вернуть агента из сброса наверх колоды.' },
-  psijic: { cost: '4 монеты и агент у соперника', effect: 'Сразить агента соперника.' },
-  rajhin: { cost: '3 монеты', effect: 'Подложить «Морок» в сброс соперника.' },
-  eagle: { cost: '2 силы', effect: 'Взять карту.' },
+  treasury: { cost: `2 ${COIN}`, effect: `Уничтожить карту в игре или в руке, положить в сброс «Долговую расписку» (+2 ${COIN}).` },
+  crows: { cost: `все ${COIN} (мин. 1)`, effect: `Получить ${POW} на 1 меньше, чем отдано ${COIN}. Нельзя, если он уже благоволит вам.` },
+  hlaalu: { cost: 'ваша карта ценой ≥ 1 в игре (сыгранная или агент)', effect: `Пожертвовать её и получить ${PRE} на 1 меньше её цены.` },
+  pelin: { cost: `2 ${POW} и агент в сбросе`, effect: 'Вернуть агента из сброса наверх колоды.' },
+  psijic: { cost: `4 ${COIN} и агент у соперника`, effect: 'Сразить агента соперника.' },
+  rajhin: { cost: `3 ${COIN}`, effect: 'Подложить «Морок» в сброс соперника.' },
+  eagle: { cost: `2 ${POW}`, effect: 'Взять карту.' },
   alma: {
-    cost: 'благоволит: 1 монета и сброс карты; нейтральна: сброс карты; против вас: 1 монета',
+    cost: `благоволит: 1 ${COIN} и сброс карты; нейтральна: сброс карты; против вас: 1 ${COIN}`,
     effect: 'Посмотреть 5 / 4 / 3 верхние карты колоды соперника и одну отправить в его сброс.',
   },
-  hunding: { cost: '2 силы', effect: '+1 монета. Пока он благоволит вам, вы получаете +1 монету в начале каждого хода.' },
+  hunding: { cost: `2 ${POW}`, effect: `+1 ${COIN}. Пока он благоволит вам, вы получаете +1 ${COIN} в начале каждого хода.` },
   druid: {
-    cost: '2 силы',
+    cost: `2 ${POW}`,
     effect: 'Заменить до 2 карт в таверне. Пока благоволит, 4-я карта Друида за ход (5-я, пока нейтрален) приносит «Химеру».',
   },
-  mora: { cost: '3 силы (2, если благоволит сопернику)', effect: 'Взять любую карту таверны (не контракт); соперник получает такую же.' },
+  mora: { cost: `3 ${POW} (2, если благоволит сопернику)`, effect: 'Взять любую карту таверны (не контракт); соперник получает такую же.' },
   alessia: {
-    cost: '4 монеты (3, если благоволит сопернику)',
-    effect: 'Благоволит: «Сержант Разбитых Цепей» в сброс. Нейтральна: «Солдат восстания». Против вас: +2 силы.',
+    cost: `4 ${COIN} (3, если благоволит сопернику)`,
+    effect: `Благоволит: «Сержант Разбитых Цепей» в сброс. Нейтральна: «Солдат восстания». Против вас: +2 ${POW}.`,
   },
   orgnum: {
-    cost: '3 / 2 / 1 монета (благоволит / нейтрален / против вас)',
-    effect: 'Сила за размер колоды: 1 за каждые 4 карты и «Разграбление острова» в сброс / 1 за каждые 6 карт / просто +2 силы.',
+    cost: `3 / 2 / 1 ${COIN} (благоволит / нейтрален / против вас)`,
+    effect: `${POW} за размер колоды: +1 за каждые 4 карты и «Разграбление острова» в сброс / +1 за каждые 6 карт / просто +2 ${POW}.`,
   },
 };
