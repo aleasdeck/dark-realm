@@ -278,8 +278,8 @@ input {
   padding: max(6px, env(safe-area-inset-top)) 8px max(6px, env(safe-area-inset-bottom));
   display: grid;
   /* the agent strips take whatever height the fanned hands leave free */
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto auto;
-  grid-template-areas: 'oppbar' 'opphand' 'oppag' 'tavern' 'patrons' 'table' 'hand' 'mybar';
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: 'oppbar' 'opphand' 'oppag' 'tavern' 'patrons' 'table' 'hand' 'mybar' 'ctrl';
   /* hand cards are a little larger than tavern tiles; declared here so a zoomed --tw carries over */
   --hw: calc(var(--tw) * 1.12);
   --chip: calc(var(--tw) * 0.7);
@@ -315,6 +315,9 @@ input {
 }
 .my-bar {
   grid-area: mybar;
+}
+.controls {
+  grid-area: ctrl;
 }
 
 .bar {
@@ -420,11 +423,6 @@ input {
   gap: 5px;
   align-items: center;
 }
-.strip .played-part {
-  margin-left: auto;
-  padding-left: 8px;
-  border-left: 1px solid var(--line);
-}
 .strip .hint {
   position: absolute;
   top: 2px;
@@ -481,26 +479,89 @@ input {
   border-color: var(--green-glow);
   box-shadow: 0 0 10px var(--green-glow);
 }
-.chip.spent,
-.chip.played {
+.chip.spent {
   filter: brightness(0.65);
 }
-/* played cards overlap so they never take more than --pw of the strip */
+/* cards played this turn: a column on the right of the strip, five rows tall, the rest scroll */
 .strip {
-  --pc: calc(var(--tw) * 0.42);
-  --pw: calc(var(--pc) * 3.2);
+  --plw: min(46cqw, 210px);
+  /* up to five rows share the strip height, but never shrink below a readable size */
+  --plg: 2px;
+  --rh: clamp(18px, calc((100cqh - 4 * var(--plg)) / 5), 40px);
+}
+.strip.has-played {
+  --reserve: calc(var(--plw) + 14px);
 }
 .strip .played-part {
-  gap: 0;
-  max-width: calc(var(--pw) + 9px);
+  flex: 0 0 var(--plw);
+  width: var(--plw);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
 }
-.played-part .chip + .chip {
-  margin-left: min(5px, calc((var(--pw) - var(--np) * var(--pc)) / max(var(--np) - 1, 1)));
+.pl-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--plg);
+  max-height: 100%;
+  /* whole rows only, at most five; the rest scroll into view */
+  max-height: calc(min(round(down, 100cqh + var(--plg), var(--rh) + var(--plg)), 5 * (var(--rh) + var(--plg))) - var(--plg));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  --fade: calc(var(--rh) * 0.6);
 }
-.played-part .chip {
-  width: var(--pc);
-  height: var(--pc);
-  border-width: 1px;
+.pl-list::-webkit-scrollbar {
+  display: none;
+}
+.pl-list.more-down {
+  mask-image: linear-gradient(#000 calc(100% - var(--fade)), #0003);
+}
+.pl-list.more-up {
+  mask-image: linear-gradient(#0003, #000 var(--fade));
+}
+.pl-list.more-up.more-down {
+  mask-image: linear-gradient(#0003, #000 var(--fade), #000 calc(100% - var(--fade)), #0003);
+}
+.pl-row {
+  flex: 0 0 var(--rh);
+  height: var(--rh);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 6px;
+  scroll-snap-align: start;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--bg2), var(--bg1));
+  overflow: hidden;
+  cursor: pointer;
+}
+.pl-row img {
+  height: 100%;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  display: block;
+  filter: brightness(0.8);
+}
+.pl-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--narrow-font);
+  font-weight: 700;
+  font-size: clamp(13px, calc(var(--rh) * 0.5), 16px);
+  color: var(--glow);
+}
+.pl-row.focused {
+  outline: 2px solid var(--glow);
+  outline-offset: -2px;
 }
 .chip.target {
   border-color: #ff4040;
@@ -834,49 +895,57 @@ input {
   line-height: 22px;
 }
 
-.my-bar .res-group {
-  margin-right: auto;
+.my-bar .who {
+  color: var(--you);
 }
-.my-bar button {
+/* the control buttons get a row of their own under the player's bar */
+.controls {
+  display: flex;
+  gap: 6px;
+}
+.controls button {
   padding: 8px 10px;
 }
-.my-bar .icon {
-  min-width: 40px;
+.controls .icon {
+  min-width: 48px;
   font-size: 15px;
 }
-/* with two-digit resources the label breaks into two lines instead of being cut */
-.my-bar .end {
-  line-height: 1.05;
+.controls .end {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* phones held sideways: two columns */
 @media (orientation: landscape) and (max-height: 560px) {
   :root {
-    --tw: min(calc((50vw - 50px) / 5.2), 21dvh, 110px);
+    /* low enough that the opponent's strip keeps room above the tavern */
+    --tw: min(calc((50vw - 50px) / 5.2), 17dvh, 110px);
   }
   .game {
     max-width: none;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
       'oppbar table'
       'opphand table'
       'oppag table'
       'tavern hand'
-      'patrons mybar';
+      'patrons mybar'
+      'patrons ctrl';
     column-gap: 10px;
   }
   .patron {
     --emb: 26px;
   }
-  /* the half-width bar holds resources and icons on one line, "Конец хода" on the next */
-  .my-bar {
-    flex-wrap: wrap;
-    row-gap: 5px;
-  }
-  .my-bar .end {
-    flex-basis: 100%;
+  .controls button {
     padding-block: 6px;
+  }
+  /* only the tips of the opponent's card backs peek out, to leave their strip room */
+  .opp-hand {
+    height: 16px;
   }
 }
 
@@ -1100,34 +1169,6 @@ input {
   white-space: nowrap;
 }
 
-.my-table .counts {
-  flex: 0 0 auto;
-  padding-right: 6px;
-  border-right: 1px solid var(--line);
-}
-.my-bar {
-  gap: 6px;
-}
-.my-bar .end {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* the narrowest phones keep the music switch in the menu only */
-@media (max-width: 360px) {
-  .my-bar [data-act='music'] {
-    display: none;
-  }
-  .my-bar .icon {
-    min-width: 34px;
-    padding: 8px 6px;
-  }
-  .my-bar .end {
-    font-size: 14px;
-    padding: 8px 6px;
-  }
-}
 @media (max-width: 400px) {
   .res {
     min-width: 34px;
@@ -1137,16 +1178,8 @@ input {
   .counts .count {
     min-width: 34px;
   }
-  /* room for the whole "Конец хода" label */
-  .my-bar {
-    gap: 6px;
-  }
-  .my-bar .icon {
-    min-width: 34px;
-    padding: 8px 6px;
-  }
-  .my-bar .end {
-    padding-block: 4px;
+  .controls .icon {
+    min-width: 42px;
   }
 }
 
@@ -1295,7 +1328,7 @@ input {
 /* sits over the hand, which is idle while the opponent moves */
 .feed {
   position: absolute;
-  bottom: calc(max(6px, env(safe-area-inset-bottom)) + 64px);
+  bottom: calc(max(6px, env(safe-area-inset-bottom)) + 112px);
   left: 50%;
   transform: translateX(-50%);
   width: min(94vw, 440px);
@@ -1509,7 +1542,7 @@ input {
 .tip-patron.fav-theirs .tp-side {
   color: var(--them);
 }
-.my-bar .icon.off {
+.controls .icon.off {
   color: var(--muted);
   text-decoration: line-through;
 }

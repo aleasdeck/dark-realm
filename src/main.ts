@@ -16,6 +16,7 @@ import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
 import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tileHtml, type Focus } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
+import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 
 const app = document.getElementById('app')!;
@@ -231,7 +232,9 @@ function render() {
     if (s.pending?.player === me || s.phase === 'over' || autoPlay) focus = null;
     const view = focus ? focusView(s, me, focus, idle) : null;
     if (!view) focus = null;
+    savePlayed(app);
     app.innerHTML = boardHtml(s, me, { myTurn, idle, focus }) + overlays(s);
+    restorePlayed(app);
     if (view) showZoom(view.html, view.label, view.can);
     // The enlarged card says what to do itself, so the coach steps aside for it.
     if (hint && !view && !modal) showHint(app, hint);
@@ -561,6 +564,9 @@ document.addEventListener('keydown', (ev) => {
     render();
   }
 });
+
+// The played-cards columns scroll one card per wheel notch.
+initPlayed(app);
 
 // Card and patron details on hover (mouse) or long press (touch).
 initTooltips((el) => {

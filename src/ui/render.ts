@@ -115,6 +115,21 @@ export function chipHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {})
   </div>`;
 }
 
+/** One row of the played-cards column: art and name. */
+function playedRowHtml(c: Card, focused: boolean): string {
+  const def = cardDef(c.id);
+  return `<div class="pl-row${focused ? ' focused' : ''}" style="${styleVars(def)}" data-card="${def.id}" data-act="inspect" data-uid="${c.uid}" data-tip="card">
+    <img src="${cardArt(def)}" alt="" draggable="false"><span>${esc(def.name)}</span>
+  </div>`;
+}
+
+/** Cards played this turn as a vertical column, newest on top, that shows up to five and scrolls through the rest. */
+function playedHtml(cards: Card[], side: 'me' | 'opp', focusUid: number): string {
+  if (!cards.length) return '';
+  const rows = [...cards].reverse().map((c) => playedRowHtml(c, c.uid === focusUid)).join('');
+  return `<div class="part played-part" aria-label="Разыграно: ${cards.length}"><div class="pl-list" data-side="${side}" data-clip>${rows}</div></div>`;
+}
+
 export function patronEmblem(pid: PatronId) {
   return patronEmblemUrl(pid, PATRONS[pid].palette);
 }
@@ -185,8 +200,8 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
   const myAgents = you.agents
     .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: (opts.idle && !a.activated ? 'ready' : 'spent') + f(a.uid), tip: true }))
     .join('');
-  const theirPlayed = them.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' + f(c.uid), tip: true })).join('');
-  const played = you.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' + f(c.uid), tip: true })).join('');
+  const theirPlayed = playedHtml(them.played, 'opp', focusUid);
+  const played = playedHtml(you.played, 'me', focusUid);
   const tavern = s.tavern.map((c) => {
     const can = opts.idle && cardDef(c.id).cost <= you.coin;
     return tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: (can ? 'buyable' : 'dim') + f(c.uid), tip: true });
@@ -207,23 +222,26 @@ export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; 
       <span class="counts">${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
-    <section class="strip opp-agents" style="--na:${them.agents.length};--np:${them.played.length};--reserve:${them.played.length ? 'calc(var(--pw) + 14px)' : '0px'}">
-      ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '' : '<span class="empty">агентов нет</span>'}
-      ${theirPlayed ? `<div class="part played-part">${theirPlayed}</div>` : ''}
+    <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
+      ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">агентов нет</span>'}
+      ${theirPlayed}
       ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
     <section class="tavern">
       <div class="label"><span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small></div>
       <div class="row">${slots(tavern)}</div>
     </section>
     <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p, p === focusPatron)).join('')}</section>
-    <section class="strip my-table" style="--na:${you.agents.length};--np:${you.played.length};--reserve:calc(118px${you.played.length ? ' + var(--pw) + 14px' : ''})">
-      <div class="part counts">${count(you.deck.length, 'колода', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile-cd')}</div>
+    <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">
       <div class="part agents">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
-      ${played ? `<div class="part played-part">${played}</div>` : ''}
+      ${played}
     </section>
     <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
-    <footer class="bar my-bar${opts.myTurn ? ' active' : ''}">
+    <div class="bar my-bar${opts.myTurn ? ' active' : ''}">
+      <span class="who">${esc(you.name)}</span>
       <span class="res-group">${res(you)}</span>
+      <span class="counts">${count(you.deck.length, 'колода', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile-cd')}</span>
+    </div>
+    <footer class="controls">
       <button class="icon" data-act="menu" aria-label="Меню">☰</button>
       <button class="icon${musicOn() ? '' : ' off'}" data-act="music" aria-label="Музыка" aria-pressed="${musicOn()}">♪</button>
       <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">▶▶</button>
