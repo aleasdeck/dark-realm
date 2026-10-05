@@ -1,6 +1,6 @@
 import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { cardDef, PATRONS } from '../engine/cards';
-import { attackable, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
+import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { esc, paintIcons, richText } from './rich';
 import { musicOn } from './music';
@@ -149,6 +149,29 @@ function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId, focused: boolean
   </div>`;
 }
 
+/**
+ * The patron row: the treasury as a large disc in the middle with rays to both sides,
+ * the patrons you drafted on the left and the opponent's on the right.
+ */
+function patronsRowHtml(s: GameState, me: PlayerIdx, focused: PatronId | null): string {
+  const side = (p: PlayerIdx) =>
+    s.patrons
+      .filter((pid) => draftedBy(s, pid) === p)
+      .map((pid) => patronHtml(s, me, pid, pid === focused))
+      .join('');
+  const chest = s.patrons.includes('treasury') ? treasuryHtml(s, me, focused === 'treasury') : '';
+  return `<div class="p-rays" aria-hidden="true"></div>
+    <div class="p-side mine">${side(me)}</div>${chest}<div class="p-side theirs">${side(other(me))}</div>`;
+}
+
+function treasuryHtml(s: GameState, me: PlayerIdx, focused: boolean): string {
+  const def = PATRONS.treasury;
+  const can = patronAvailable(s, me, 'treasury');
+  return `<div class="patron chest${can ? ' can' : ''}${focused ? ' focused' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="treasury" data-tip="patron">
+    <div class="p-track"><img src="${patronEmblem('treasury')}" alt="" draggable="false"></div>
+  </div>`;
+}
+
 /** Tooltip body for a patron: what calling it costs and does, and whose side it is on. */
 export function patronTipHtml(s: GameState | null, me: PlayerIdx, pid: PatronId): string {
   const def = PATRONS[pid];
@@ -265,7 +288,7 @@ export function boardHtml(
       <div class="label">${pick ? `<span class="pick">${esc(pick.pending.prompt)}</span>` : `<span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small>`}</div>
       <div class="row">${slots(tavern)}</div>
     </section>
-    <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p, p === focusPatron)).join('')}</section>
+    <section class="patrons">${patronsRowHtml(s, me, focusPatron)}</section>
     <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">
       <div class="part agents">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
       ${played}
