@@ -989,6 +989,18 @@ input {
   cursor: pointer;
 }
 
+.end-dialog .unlocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+}
+.end-dialog .unlocked img {
+  width: 40px;
+  height: 40px;
+}
+
 /* ── overlays and bottom sheets ───────────────────── */
 .overlay {
   position: fixed;

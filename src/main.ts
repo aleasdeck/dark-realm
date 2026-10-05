@@ -18,7 +18,7 @@ import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileG
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
-import { isUnlocked } from './ui/unlocks';
+import { isUnlocked, unlockHint } from './ui/unlocks';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -31,6 +31,9 @@ let focus: Focus | null = null;
 let animatedFocus = '';
 let lastState: GameState | null = null;
 let lastError = '';
+/** What tapping a locked patron in the draft says; it fades after a few seconds. */
+let draftNote = '';
+let draftNoteTimer = 0;
 /** Hints of the tutorial game; null in every other game. */
 let coach: Coach | null = null;
 /** The hint for the current state; while it is up, only what it points at responds. */
@@ -135,7 +138,7 @@ function musicLabel() {
 function rulesHtml() {
   const patrons = (Object.keys(PATRON_RULES) as PatronId[])
     .map((p) => {
-      const lock = isUnlocked(p) ? '' : ' 🔒 (пока закрыт)';
+      const lock = isUnlocked(p) ? '' : ` 🔒 (${unlockHint(p).replace(/\.$/, '').toLowerCase()})`;
       return `<li><b>${esc(PATRONS[p].name)}</b>${lock}: ${esc(PATRON_RULES[p].cost)} → ${esc(PATRON_RULES[p].effect)}</li>`;
     })
     .join('');
@@ -290,7 +293,8 @@ function draftHtml(s: GameState): string {
   const locked = LOCKED.filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid))
     .map((pid) => `<img src="${patronEmblem(pid)}" alt="${esc(PATRONS[pid].name)}" data-act="locked" data-patron="${pid}">`)
     .join('');
-  return `<div class="draft">
+  const note = draftNote ? `<div class="toast">${esc(draftNote)}</div>` : '';
+  return `${note}<div class="draft">
     <h2>${mine ? 'Выберите покровителя' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
     <div class="draft-picks"><div><b>${esc(s.players[me].name)}</b>${picks(me)}</div><div><b>${esc(s.players[me === 0 ? 1 : 0].name)}</b>${picks(me === 0 ? 1 : 0)}</div></div>
     <div class="draft-tiles">${tiles}</div>
@@ -311,6 +315,7 @@ function overlays(s: GameState): string {
     html += `<div class="overlay"><div class="dialog end-dialog ${win ? 'win' : 'lose'}">
       <h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${esc(s.winReason)}</p>
       <p>Престиж ${s.players[me].prestige} : ${s.players[me === 0 ? 1 : 0].prestige}</p>
+      ${ctrl!.unlocked.map((pid) => `<p class="unlocked"><img src="${patronEmblem(pid)}" alt=""><span>Открыт покровитель <b>${esc(PATRONS[pid].name)}</b></span></p>`).join('')}
       <div class="buttons">${ctrl instanceof BotController ? `<button data-act="rematch">${ctrl.tutorial ? 'Пройти ещё раз' : 'Ещё партия'}</button>` : ''}
       <button data-act="leave">В меню</button></div></div></div>`;
     return html;
@@ -485,7 +490,12 @@ app.addEventListener('click', (ev) => {
       return ctrl.dispatch({ t: 'draft', patron: el.dataset.patron as PatronId });
     case 'locked': {
       const p = PATRONS[el.dataset.patron as PatronId];
-      ctrl.error = `${p.name} пока закрыт. Как его открыть, скоро появится.`;
+      draftNote = `${p.name}: ${unlockHint(p.id)}`;
+      clearTimeout(draftNoteTimer);
+      draftNoteTimer = window.setTimeout(() => {
+        draftNote = '';
+        render();
+      }, 3500);
       play('click');
       return render();
     }
