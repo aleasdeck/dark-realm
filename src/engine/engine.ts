@@ -34,8 +34,16 @@ function newPlayer(name: string): PlayerState {
   return { name, deck: [], hand: [], played: [], cooldown: [], agents: [], coin: 0, power: 0, prestige: 0, pendingDiscard: 0 };
 }
 
-export function createGame(seed: number, names: [string, string]): GameState {
+export interface GameOptions {
+  /** Prestige that wins once the player stays ahead through the opponent's turn. */
+  goal?: number;
+  /** Prestige that wins at once. */
+  instant?: number;
+}
+
+export function createGame(seed: number, names: [string, string], opts: GameOptions = {}): GameState {
   return {
+    ...opts,
     phase: 'draft',
     rng: seed | 0,
     nextUid: 1,
@@ -565,7 +573,9 @@ function endTurn(s: GameState) {
   for (const a of p.agents) a.activated = false;
   drawCards(s, p, HAND_SIZE);
 
-  if (p.prestige >= PRESTIGE_INSTANT) return finish(s, pi, `${PRESTIGE_INSTANT} престижа`);
+  const instant = s.instant ?? PRESTIGE_INSTANT;
+  const goal = s.goal ?? PRESTIGE_GOAL;
+  if (p.prestige >= instant) return finish(s, pi, `${instant} престижа`);
   const drafted = s.patrons.filter((x) => x !== 'treasury');
   if (drafted.length > 0 && drafted.every((x) => s.favor[x] === pi)) {
     return finish(s, pi, 'благосклонность всех покровителей');
@@ -581,7 +591,7 @@ function endTurn(s: GameState) {
   log(s, `Ход ${s.turn}: ${n.name}`);
   emit(s, { k: 'turn', p: next });
   // A player who reached the goal and stayed ahead through the opponent's turn wins.
-  if (n.prestige >= PRESTIGE_GOAL && n.prestige > p.prestige) return finish(s, next, `${PRESTIGE_GOAL}+ престижа`);
+  if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ престижа`);
   if (s.turn === 2) n.coin += 1; // second player compensation
   if (n.pendingDiscard > 0) {
     const k = n.pendingDiscard;

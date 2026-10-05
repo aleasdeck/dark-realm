@@ -16,6 +16,7 @@ import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
 import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tileHtml, type Focus } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
+import { Coach, showHint } from './ui/tutorial';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -28,6 +29,8 @@ let focus: Focus | null = null;
 let animatedFocus = '';
 let lastState: GameState | null = null;
 let lastError = '';
+/** Hints of the tutorial game; null in every other game. */
+let coach: Coach | null = null;
 
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
@@ -81,6 +84,7 @@ function menu(message = '') {
     <p class="subtitle">Карточная дуэль покровителей тёмного мира</p>
     <label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}"></label>
     <div class="menu-buttons">
+      <button data-go="tutorial">Туториал</button>
       <button data-go="bot">Играть против бота</button>
       <button data-go="host">Создать комнату</button>
       <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">Войти</button></div>
@@ -106,7 +110,8 @@ function menu(message = '') {
         b.textContent = musicLabel();
         return;
       }
-      if (go === 'bot') startGame(new BotController(n));
+      if (go === 'tutorial') startGame(new BotController(n, true));
+      else if (go === 'bot') startGame(new BotController(n));
       else if (go === 'host') host(n);
       else join(n, normalizeCode(app.querySelector<HTMLInputElement>('#code')!.value));
     }),
@@ -190,6 +195,7 @@ function startGame(c: Controller) {
   modal = null;
   lastState = null;
   lastError = '';
+  coach = c instanceof BotController && c.tutorial ? new Coach() : null;
   clearFx();
   c.subscribe(render);
   render();
@@ -219,6 +225,9 @@ function render() {
     if (!view) focus = null;
     app.innerHTML = boardHtml(s, me, { myTurn, idle, focus }) + overlays(s);
     if (view) showZoom(view.html, view.label, view.can);
+    // The enlarged card says what to do itself, so the coach steps aside for it.
+    const hint = coach && !view && !modal ? coach.hint(s, me) : null;
+    if (hint) showHint(app, hint);
   }
   if (!focus) animatedFocus = '';
   refreshTooltip();
@@ -281,7 +290,7 @@ function overlays(s: GameState): string {
     html += `<div class="overlay"><div class="dialog end-dialog ${win ? 'win' : 'lose'}">
       <h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${esc(s.winReason)}</p>
       <p>Престиж ${s.players[me].prestige} : ${s.players[me === 0 ? 1 : 0].prestige}</p>
-      <div class="buttons">${ctrl instanceof BotController ? '<button data-act="rematch">Ещё партия</button>' : ''}
+      <div class="buttons">${ctrl instanceof BotController ? `<button data-act="rematch">${ctrl.tutorial ? 'Пройти ещё раз' : 'Ещё партия'}</button>` : ''}
       <button data-act="leave">В меню</button></div></div></div>`;
     return html;
   }
@@ -424,7 +433,16 @@ app.addEventListener('click', (ev) => {
   const act = el.dataset.act!;
   const uid = Number(el.dataset.uid);
   if (act === 'leave') return leaveGame();
-  if (act === 'rematch' && ctrl instanceof BotController) return ctrl.restart();
+  if (act === 'rematch' && ctrl instanceof BotController) {
+    if (ctrl.tutorial) coach = new Coach();
+    return ctrl.restart();
+  }
+  if (act === 'tut-ok' || act === 'tut-skip') {
+    if (act === 'tut-ok') coach?.ack(el.dataset.hint ?? '');
+    else if (coach) coach.off = true;
+    play('click');
+    return render();
+  }
   if (act === 'close') {
     if (el.classList.contains('overlay') && ev.target !== el) return;
     modal = null;

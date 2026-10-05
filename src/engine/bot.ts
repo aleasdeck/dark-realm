@@ -102,8 +102,11 @@ function ownedPatronCount(s: GameState, pi: PlayerIdx, patron: string): number {
 
 const DRAFT_PREF: PatronId[] = ['crows', 'eagle', 'hlaalu', 'pelin', 'psijic', 'rajhin'];
 
-/** Picks the next action for the bot playing as `pi`, or null if it is not the bot's move. */
-export function botAction(s: GameState, pi: PlayerIdx): Action | null {
+/**
+ * Picks the next action for the bot playing as `pi`, or null if it is not the bot's move.
+ * A gentle bot (the tutorial opponent) never calls patrons or attacks agents.
+ */
+export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action | null {
   if (s.phase === 'over' || actingPlayer(s) !== pi) return null;
   if (s.phase === 'draft') {
     const pick = DRAFT_PREF.find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
@@ -129,6 +132,8 @@ export function botAction(s: GameState, pi: PlayerIdx): Action | null {
     affordable.sort((a, b) => score(b) - score(a));
     return { t: 'buy', uid: affordable[0].uid };
   }
+
+  if (gentle) return { t: 'end' };
 
   // 4. Patrons.
   const can = (x: PatronId) => s.patrons.includes(x) && patronAvailable(s, pi, x);
