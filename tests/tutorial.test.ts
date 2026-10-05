@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { botAction } from '../src/engine/bot';
 import { cardDef } from '../src/engine/cards';
 import { actingPlayer, applyAction, patronAvailable } from '../src/engine/engine';
-import { createTutorialGame, openingValue, TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../src/engine/tutorial';
+import { createTutorialGame, openingValue, TUTORIAL_GOAL, TUTORIAL_PATRONS, TUTORIAL_TAVERN } from '../src/engine/tutorial';
 import type { GameState } from '../src/engine/types';
 import { Coach } from '../src/ui/tutorial';
 
@@ -77,7 +77,10 @@ describe('coach', () => {
     coach.ack('tavern');
     expect(coach.hint(s, 0)?.id).toBe('tavern');
     const coin = s.players[0].coin;
+    // The tavern opens with the tutorial's cards; the first ones fit the coins left after the Chest.
+    expect(s.tavern.map((c) => c.id)).toEqual(TUTORIAL_TAVERN);
     const buy = s.tavern.find((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= coin && !cardDef(c.id).type.includes('gent'))!;
+    expect(buy.id).toBe('pelin_portcullis');
     s = applyAction(s, 0, { t: 'buy', uid: buy.uid });
     expect(coach.hint(s, 0)?.id).toBe('patrons');
     while (s.pending) s = pickFirst(s);
@@ -90,13 +93,32 @@ describe('coach', () => {
 
     // Second turn: play the hand, then call a patron.
     expect(coach.hint(s, 0)?.id).toBe('play-2');
+    // The card bought in the tavern comes straight into this hand.
+    expect(s.players[0].hand.map((c) => c.uid)).toContain(buy.uid);
     while (s.players[0].hand.length) s = s.pending ? pickFirst(s) : applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
+    if (coach.hint(s, 0)?.id === 'combo') coach.ack('combo');
     expect(coach.hint(s, 0)?.id).toBe('patron-call');
     expect(patronAvailable(s, 0, 'eagle')).toBe(true);
     s = applyAction(s, 0, { t: 'patron', patron: 'eagle' });
     expect(coach.hint(s, 0)?.id).toBe('free');
     coach.ack('free');
     expect(coach.hint(s, 0)).toBeNull();
+  });
+
+  it.each(['pelin_portcullis', 'hlaalu_exports', 'pelin_reinforce'])('after buying %s the card is in the next hand and a patron can be called', (id) => {
+    const pickFirst = (s: GameState) => applyAction(s, 0, { t: 'choose', picks: s.pending!.options.slice(0, Math.max(1, s.pending!.min)).map((o) => o.ref) });
+    let s = draft(createTutorialGame('A'));
+    while (s.players[0].hand.length) s = s.pending ? pickFirst(s) : applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
+    s = pickFirst(applyAction(s, 0, { t: 'patron', patron: 'treasury' }));
+    const card = s.tavern.find((c) => c.id === id)!;
+    expect(cardDef(id).cost).toBeLessThanOrEqual(s.players[0].coin);
+    s = applyAction(s, 0, { t: 'buy', uid: card.uid });
+    s = applyAction(s, 0, { t: 'end' });
+    while (actingPlayer(s) === 1) s = applyAction(s, 1, botAction(s, 1, 'gentle')!);
+    while (s.pending) s = pickFirst(s);
+    expect(s.players[0].hand.map((c) => c.uid)).toContain(card.uid);
+    while (s.players[0].hand.length) s = s.pending ? pickFirst(s) : applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
+    expect(TUTORIAL_PATRONS.some((p) => patronAvailable(s, 0, p))).toBe(true);
   });
 
   it('points at the tavern for picks made in it and keeps the choice hint for the rest', () => {

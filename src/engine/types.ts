@@ -216,6 +216,10 @@ export interface GameState {
   /** Prestige targets when they differ from the standard ones (the short tutorial game). */
   goal?: number;
   instant?: number;
+  /** Tutorial deal: these cards open the tavern, in this order. */
+  tavernTop?: string[];
+  /** Tutorial: the first player's next purchases go on top of their deck, not to the cooldown. */
+  buyOnTop?: number;
   /** Turn on which the Druid patron last handed out its Chimera. */
   chimeraTurn?: number;
 }
