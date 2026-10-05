@@ -969,26 +969,6 @@ input {
   margin: 2px 0;
 }
 
-.draft-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 14px;
-}
-.draft-locked {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-}
-.draft-locked img {
-  width: 34px;
-  height: 34px;
-  filter: grayscale(1) brightness(0.55);
-  cursor: pointer;
-}
-
 .end-dialog .unlocked {
   display: flex;
   flex-direction: column;
@@ -999,6 +979,16 @@ input {
 .end-dialog .unlocked img {
   width: 40px;
   height: 40px;
+}
+
+.draft-tile.locked {
+  border-color: #3a403c;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.draft-tile .lock-left {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 /* ── overlays and bottom sheets ───────────────────── */
@@ -1227,16 +1217,11 @@ input {
     font-size: 12px;
     line-height: 1.2;
   }
-  .draft-foot {
-    flex-wrap: nowrap;
-    gap: 10px;
+  .draft-tile.locked img {
+    grid-row: span 3;
   }
-  .draft-locked {
-    gap: 3px;
-  }
-  .draft-locked img {
-    width: 24px;
-    height: 24px;
+  .draft-tile .lock-left {
+    grid-column: 2;
   }
 }
 
@@ -1276,7 +1261,7 @@ input {
   .draft-tile p {
     grid-column: 1 / -1;
   }
-  .draft-foot button {
+  .draft > button {
     padding-block: 6px;
   }
 }

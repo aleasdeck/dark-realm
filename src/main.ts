@@ -18,7 +18,7 @@ import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileG
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
-import { isUnlocked, unlockHint } from './ui/unlocks';
+import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -31,9 +31,6 @@ let focus: Focus | null = null;
 let animatedFocus = '';
 let lastState: GameState | null = null;
 let lastError = '';
-/** What tapping a locked patron in the draft says; it fades after a few seconds. */
-let draftNote = '';
-let draftNoteTimer = 0;
 /** Hints of the tutorial game; null in every other game. */
 let coach: Coach | null = null;
 /** The hint for the current state; while it is up, only what it points at responds. */
@@ -279,29 +276,27 @@ function draftHtml(s: GameState): string {
       .filter((l) => l.startsWith(s.players[pi].name + ' выбирает'))
       .map((l) => `<div>${esc(l.replace(/^.*«(.*)»$/, '$1'))}</div>`)
       .join('');
-  const tiles = s.draftPool
-    .map((pid) => {
-      const p = PATRONS[pid];
-      const r = PATRON_RULES[pid];
-      return `<div class="draft-tile${mine ? ' can' : ''}" ${mine ? `data-act="draft" data-patron="${pid}"` : ''} style="--accent:${p.palette.accent};--glow:${p.palette.glow}">
+  const tile = (pid: PatronId, locked: boolean) => {
+    const p = PATRONS[pid];
+    const r = PATRON_RULES[pid];
+    const can = mine && !locked;
+    return `<div class="draft-tile${can ? ' can' : ''}${locked ? ' locked' : ''}" ${can ? `data-act="draft" data-patron="${pid}"` : ''} style="--accent:${p.palette.accent};--glow:${p.palette.glow}">
         <img src="${patronEmblem(pid)}" alt="">
         <h3>${esc(p.name)}</h3><p class="p-title">${esc(p.title)}</p>
         <p><b>Воззвание:</b> ${esc(r.cost)} → ${esc(r.effect)}</p>
+        ${locked ? `<p class="lock-left">🔒 ${esc(unlockLeft(pid))}</p>` : ''}
       </div>`;
-    })
-    .join('');
-  const locked = LOCKED.filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid))
-    .map((pid) => `<img src="${patronEmblem(pid)}" alt="${esc(PATRONS[pid].name)}" data-act="locked" data-patron="${pid}">`)
-    .join('');
-  const note = draftNote ? `<div class="toast">${esc(draftNote)}</div>` : '';
-  return `${note}<div class="draft">
+  };
+  // Locked patrons are listed too, greyed out, with the games left until they open.
+  const locked = LOCKED.filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid)).sort(
+    (a, b) => (UNLOCK_AT[a] ?? 0) - (UNLOCK_AT[b] ?? 0),
+  );
+  const tiles = s.draftPool.map((pid) => tile(pid, false)).join('') + locked.map((pid) => tile(pid, true)).join('');
+  return `<div class="draft">
     <h2>${mine ? 'Выберите покровителя' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
     <div class="draft-picks"><div><b>${esc(s.players[me].name)}</b>${picks(me)}</div><div><b>${esc(s.players[me === 0 ? 1 : 0].name)}</b>${picks(me === 0 ? 1 : 0)}</div></div>
     <div class="draft-tiles">${tiles}</div>
-    <div class="draft-foot">
-      ${locked ? `<div class="draft-locked" title="Закрытые покровители"><span>🔒</span>${locked}</div>` : ''}
-      <button class="ghost" data-act="leave">Выйти</button>
-    </div>
+    <button class="ghost" data-act="leave">Выйти</button>
   </div>`;
 }
 
@@ -488,17 +483,6 @@ app.addEventListener('click', (ev) => {
   switch (act) {
     case 'draft':
       return ctrl.dispatch({ t: 'draft', patron: el.dataset.patron as PatronId });
-    case 'locked': {
-      const p = PATRONS[el.dataset.patron as PatronId];
-      draftNote = `${p.name}: ${unlockHint(p.id)}`;
-      clearTimeout(draftNoteTimer);
-      draftNoteTimer = window.setTimeout(() => {
-        draftNote = '';
-        render();
-      }, 3500);
-      play('click');
-      return render();
-    }
     case 'play':
       return ctrl.dispatch({ t: 'play', uid });
     case 'activate':
