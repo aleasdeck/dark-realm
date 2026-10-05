@@ -116,6 +116,13 @@ input {
   gap: 14px;
   text-align: center;
 }
+/* small phones: the whole menu fits without scrolling */
+@media (max-height: 700px) and (orientation: portrait) {
+  .menu {
+    padding-top: 12px;
+    gap: 9px;
+  }
+}
 .title {
   font-size: clamp(44px, 13vw, 68px);
   margin: 0;
@@ -505,6 +512,8 @@ input {
 .pl-list {
   display: flex;
   flex-direction: column;
+  /* the chips' stacking order stays inside the column, under sheets and overlays */
+  isolation: isolate;
   max-height: min(100%, calc(var(--pc) + 4 * var(--pls)));
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1089,6 +1098,41 @@ input {
 .sheet-actions.column button {
   width: 100%;
 }
+/* settings: one row per switch, the state on the right */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 320px);
+}
+button.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  font-size: 17px;
+  background: transparent;
+  box-shadow: none;
+  border-color: var(--line);
+  color: var(--muted);
+}
+button.toggle b {
+  min-width: 52px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #07110b;
+  border: 1px solid var(--line);
+}
+button.toggle[aria-pressed='true'] {
+  border-color: #3f8a5c;
+  color: var(--text);
+}
+button.toggle[aria-pressed='true'] b {
+  background: var(--green);
+  border-color: var(--green-glow);
+  color: #04120a;
+}
 .options {
   display: flex;
   flex-wrap: wrap;
@@ -1621,7 +1665,7 @@ input {
   z-index: 14;
   overflow: hidden;
 }
-.ghost {
+.mv-ghost {
   position: absolute;
   perspective: 700px;
   will-change: transform, opacity;

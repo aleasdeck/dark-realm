@@ -16,7 +16,7 @@ import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
 import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tavernPick, tileHtml, type Focus } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
-import { animateChange, clearMotion, snapshot } from './ui/motion';
+import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
@@ -96,8 +96,7 @@ function menu(message = '') {
       <button data-go="bot">Играть против бота</button>
       <button data-go="host">Создать комнату</button>
       <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">Войти</button></div>
-      <button class="ghost" data-go="sound">${soundLabel()}</button>
-      <button class="ghost" data-go="music">${musicLabel()}</button>
+      <button class="ghost" data-go="settings">⚙ Настройки</button>
     </div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
     <details class="rules"><summary>Правила</summary>${rulesHtml()}</details>
@@ -108,16 +107,7 @@ function menu(message = '') {
       const n = nameInput.value.trim() || 'Странник';
       saveName(n);
       const go = b.dataset.go;
-      if (go === 'sound') {
-        setSound(!soundOn());
-        b.textContent = soundLabel();
-        return;
-      }
-      if (go === 'music') {
-        setMusic(!musicOn());
-        b.textContent = musicLabel();
-        return;
-      }
+      if (go === 'settings') return showSettings();
       if (go === 'tutorial') startGame(new BotController(n, true));
       else if (go === 'bot') startGame(new BotController(n));
       else if (go === 'host') host(n);
@@ -126,12 +116,40 @@ function menu(message = '') {
   );
 }
 
-function soundLabel() {
-  return soundOn() ? '🔊 Звуки включены' : '🔇 Звуки выключены';
+/** Music, sounds and animations, each switched on or off; the same sheet opens from the main menu and in a game. */
+const SETTINGS = [
+  { key: 'music', label: 'Музыка', on: musicOn, set: setMusic },
+  { key: 'sound', label: 'Звуки', on: soundOn, set: setSound },
+  { key: 'motion', label: 'Анимации', on: motionOn, set: setMotion },
+];
+
+function settingsRows() {
+  return SETTINGS.map(
+    (o) => `<button class="toggle" data-set="${o.key}" aria-pressed="${o.on()}"><span>${o.label}</span><b>${o.on() ? 'Вкл' : 'Выкл'}</b></button>`,
+  ).join('');
 }
 
-function musicLabel() {
-  return musicOn() ? '♪ Музыка включена' : '♪ Музыка выключена';
+function showSettings() {
+  const box = document.createElement('div');
+  box.className = 'overlay sheet-wrap';
+  box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2><div class="settings">${settingsRows()}</div>
+    <div class="sheet-actions"><button data-close>Готово</button></div></div>`;
+  box.addEventListener('click', (ev) => {
+    const t = ev.target as HTMLElement;
+    const row = t.closest<HTMLElement>('[data-set]');
+    if (row) {
+      const o = SETTINGS.find((x) => x.key === row.dataset.set)!;
+      o.set(!o.on());
+      box.querySelector('.settings')!.innerHTML = settingsRows();
+      return;
+    }
+    if (t === box || t.closest('[data-close]')) {
+      box.remove();
+      // the ♪ button on the table follows the music setting
+      if (ctrl?.state) render();
+    }
+  });
+  document.body.appendChild(box);
 }
 
 function rulesHtml() {
@@ -372,8 +390,7 @@ function overlays(s: GameState): string {
       <div class="sheet-actions column">
         <button data-act="log">Журнал партии</button>
         <button data-act="rules">Правила</button>
-        <button data-act="sound">${soundLabel()}</button>
-        <button data-act="music">${musicLabel()}</button>
+        <button data-act="settings">Настройки</button>
         <button class="danger" data-act="concede">Сдаться</button>
         <button class="ghost" data-act="close">Вернуться к игре</button>
       </div></div></div>`;
@@ -417,7 +434,7 @@ function showZoom(html: string, label: string, can: boolean) {
   zoom.style.left = `${x}px`;
   zoom.style.top = `${y}px`;
   const key = focusKey(f);
-  if (key === animatedFocus || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (key === animatedFocus || still()) return;
   animatedFocus = key;
   const dx = r.left + r.width / 2 - (x + w / 2);
   const dy = r.top + r.height / 2 - (y + h / 2);
@@ -546,9 +563,10 @@ app.addEventListener('click', (ev) => {
     case 'menu':
       modal = { kind: 'menu' };
       return render();
-    case 'sound':
-      setSound(!soundOn());
-      return render();
+    case 'settings':
+      modal = null;
+      render();
+      return showSettings();
     case 'music':
       setMusic(!musicOn());
       return render();
