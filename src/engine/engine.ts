@@ -49,6 +49,10 @@ export interface GameOptions {
   goal?: number;
   /** Prestige that wins at once. */
   instant?: number;
+  /** Cards that open the tavern, in this order (the tutorial's fixed deal). */
+  tavernTop?: string[];
+  /** How many of the first player's purchases go on top of their deck (the tutorial). */
+  buyOnTop?: number;
 }
 
 export function createGame(seed: number, names: [string, string], opts: GameOptions = {}): GameState {
@@ -236,6 +240,10 @@ function startMatch(s: GameState) {
     }
   }
   s.tavernDeck = shuffle(s, tavern);
+  for (const id of [...(s.tavernTop ?? [])].reverse()) {
+    const i = s.tavernDeck.findIndex((c) => c.id === id);
+    if (i >= 0) s.tavernDeck.unshift(...s.tavernDeck.splice(i, 1));
+  }
   refillTavern(s);
   drawCards(s, s.players[0], HAND_SIZE);
   drawCards(s, s.players[1], HAND_SIZE);
@@ -972,7 +980,11 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       removeByUid(s.tavern, c.uid);
       log(s, `${p.name} покупает «${def.name}»`);
       emit(s, { k: 'buy', p: pi, card: c.id });
-      gainCard(s, pi, c);
+      if (pi === 0 && s.buyOnTop && !def.type.startsWith('contract')) {
+        // Tutorial: the purchase comes straight into the next hand.
+        s.buyOnTop--;
+        p.deck.unshift(c);
+      } else gainCard(s, pi, c);
       refillTavern(s);
       break;
     }

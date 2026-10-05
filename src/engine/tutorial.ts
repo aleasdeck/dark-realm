@@ -11,13 +11,25 @@ export const TUTORIAL_INSTANT = 40;
  * and the second hand has the 2 power the Eagle asks for.
  */
 export const TUTORIAL_SEED = 11;
+/**
+ * The tavern opens with plain cards of the tutorial patrons. The first three cost at most the
+ * 3 coins left after the Chest: power, coins, coins with a combo. The bought one goes on top of
+ * the deck, so it is in the next hand.
+ */
+export const TUTORIAL_TAVERN = ['pelin_portcullis', 'hlaalu_exports', 'pelin_reinforce', 'eagle_raid', 'pelin_volley'];
 
 /**
  * A short game against the gentle bot. Only the tutorial patrons are offered: the player drafts
  * the ones the coach points at and the bot takes the rest, so the deal is always the same.
  */
 export function createTutorialGame(name: string, seed = TUTORIAL_SEED): GameState {
-  return createGame(seed, [name, 'Наставник'], { goal: TUTORIAL_GOAL, instant: TUTORIAL_INSTANT, pool: TUTORIAL_PATRONS });
+  return createGame(seed, [name, 'Наставник'], {
+    goal: TUTORIAL_GOAL,
+    instant: TUTORIAL_INSTANT,
+    pool: TUTORIAL_PATRONS,
+    tavernTop: TUTORIAL_TAVERN,
+    buyOnTop: 1,
+  });
 }
 
 /** Coins and power the first hand gives, used to pick a friendly seed. */
