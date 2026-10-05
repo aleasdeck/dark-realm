@@ -2,7 +2,8 @@ import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, hpLeft, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
-import type { AgentInPlay, Card, CardDef, Effect, GameState, PatronId, PlayerIdx } from '../engine/types';
+import { musicOn } from './music';
+import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, PlayerIdx } from '../engine/types';
 
 export const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -32,10 +33,12 @@ export interface CardOpts {
   ref?: number;
   cls?: string;
   agent?: AgentInPlay;
+  /** Show the full card in a tooltip on mouse hover. */
+  tip?: boolean;
 }
 
 function attrs(o: CardOpts) {
-  let a = '';
+  let a = o.tip ? ' data-tip="card"' : '';
   if (o.act) a += ` data-act="${o.act}"`;
   if (o.uid !== undefined) a += ` data-uid="${o.uid}"`;
   if (o.ref !== undefined) a += ` data-ref="${o.ref}"`;
@@ -93,17 +96,14 @@ function shortFx(def: CardDef): string {
 }
 
 /** Compact tile used everywhere on the board; tapping opens the card sheet. */
-export function tileHtml(id: string, o: CardOpts & { agent?: AgentInPlay; full?: boolean } = {}): string {
+export function tileHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {}): string {
   const def = cardDef(id);
-  const text = o.full
-    ? `<span class="t-text">${cardLines(def).map((l) => `<span>${l.label ? `<b>${esc(l.label)}:</b> ` : ''}${esc(l.text)}</span>`).join('')}</span>`
-    : '';
   return `<div class="tile ${o.cls ?? ''}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
     <img src="${cardArt(def)}" alt="" draggable="false">
     ${def.type === 'curse' ? '' : `<span class="t-cost">${def.cost}</span>`}
     ${hpBadge(def, o.agent)}
     <span class="t-name">${esc(def.name)}</span>
-    ${o.full ? text : `<span class="t-fx">${shortFx(def)}</span>`}
+    <span class="t-fx">${shortFx(def)}</span>
   </div>`;
 }
 
@@ -119,14 +119,35 @@ export function patronEmblem(pid: PatronId) {
   return patronEmblemUrl(pid, PATRONS[pid].palette);
 }
 
-function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId): string {
-  const def = PATRONS[pid];
+/** Where a patron leans: the emblem slides along a track toward that player's side of the table. */
+function favorOf(s: GameState, me: PlayerIdx, pid: PatronId): 'fixed' | 'neutral' | 'mine' | 'theirs' {
   const f = s.favor[pid];
-  const favor = pid === 'treasury' ? 'fixed' : f === undefined || f === null ? 'neutral' : f === me ? 'mine' : 'theirs';
+  return pid === 'treasury' ? 'fixed' : f === undefined || f === null ? 'neutral' : f === me ? 'mine' : 'theirs';
+}
+
+const SIDE_LABEL = { fixed: 'всегда', neutral: 'нейтр.', mine: '▼ к вам', theirs: '▲ к врагу' };
+
+function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId, focused: boolean): string {
+  const def = PATRONS[pid];
+  const favor = favorOf(s, me, pid);
   const can = patronAvailable(s, me, pid);
-  return `<div class="patron fav-${favor}${can ? ' can' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="${pid}">
-    <img src="${patronEmblem(pid)}" alt="" draggable="false">
+  return `<div class="patron fav-${favor}${can ? ' can' : ''}${focused ? ' focused' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="${pid}" data-tip="patron">
+    <div class="p-track"><img src="${patronEmblem(pid)}" alt="" draggable="false"></div>
     <span class="p-name">${esc(def.name.split(' ')[0])}</span>
+    <span class="p-side">${SIDE_LABEL[favor]}</span>
+  </div>`;
+}
+
+/** Tooltip body for a patron: what calling it costs and does, and whose side it is on. */
+export function patronTipHtml(s: GameState | null, me: PlayerIdx, pid: PatronId): string {
+  const def = PATRONS[pid];
+  const rules = PATRON_RULES[pid];
+  const favor = s ? favorOf(s, me, pid) : 'neutral';
+  const side = { fixed: 'Всегда нейтрален', neutral: 'Нейтрален', mine: 'Благоволит вам', theirs: 'Благоволит сопернику' }[favor];
+  return `<div class="tip-patron fav-${favor}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}">
+    <div class="tp-head"><img src="${patronEmblem(pid)}" alt=""><div><h3>${esc(def.name)}</h3><p class="p-title">${esc(def.title)}</p></div></div>
+    <p><b>Цена:</b> ${esc(rules.cost)}</p><p><b>Эффект:</b> ${esc(rules.effect)}</p>
+    <p class="tp-side">${side}</p>
   </div>`;
 }
 
@@ -142,106 +163,131 @@ function slots(tiles: string[]) {
   return tiles.map((t) => `<div class="slot">${t}</div>`).join('');
 }
 
-export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; idle: boolean }): string {
+/** Card backs fanned along the top edge, one per card in the opponent's hand. */
+function backsHtml(n: number): string {
+  return Array.from({ length: n }, (_, i) => {
+    const o = i - (n - 1) / 2;
+    return `<div class="back" style="--o:${o};--ao:${Math.abs(o)}"><span>✠</span></div>`;
+  }).join('');
+}
+
+export type Focus = { kind: 'card'; uid: number } | { kind: 'patron'; patron: PatronId };
+
+export function boardHtml(s: GameState, me: PlayerIdx, opts: { myTurn: boolean; idle: boolean; focus: Focus | null }): string {
   const you = s.players[me];
   const them = s.players[other(me)];
+  const focusUid = opts.focus?.kind === 'card' ? opts.focus.uid : -1;
+  const f = (uid: number) => (uid === focusUid ? ' focused' : '');
   const targets = new Set(opts.idle && you.power > 0 ? attackable(s, me).map((a) => a.uid) : []);
   const theirAgents = them.agents
-    .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: targets.has(a.uid) ? 'target' : '' }))
+    .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: (targets.has(a.uid) ? 'target' : '') + f(a.uid), tip: true }))
     .join('');
   const myAgents = you.agents
-    .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: opts.idle && !a.activated ? 'ready' : 'spent' }))
+    .map((a) => chipHtml(a.id, { agent: a, act: 'inspect', uid: a.uid, cls: (opts.idle && !a.activated ? 'ready' : 'spent') + f(a.uid), tip: true }))
     .join('');
-  const theirPlayed = them.played.map((c) => chipHtml(c.id, { cls: 'played' })).join('');
-  const played = you.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' })).join('');
+  const theirPlayed = them.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' + f(c.uid), tip: true })).join('');
+  const played = you.played.map((c) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' + f(c.uid), tip: true })).join('');
   const tavern = s.tavern.map((c) => {
     const can = opts.idle && cardDef(c.id).cost <= you.coin;
-    return tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: can ? 'buyable' : 'dim' });
+    return tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: (can ? 'buyable' : 'dim') + f(c.uid), tip: true });
   });
-  const hand = you.hand.map((c: Card) => tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: `full${opts.idle ? ' playable' : ''}`, full: true }));
+  const n = you.hand.length;
+  const hand = you.hand
+    .map((c: Card, i) => {
+      const o = i - (n - 1) / 2;
+      return `<div class="fan-slot${f(c.uid)}" style="--o:${o};--ao:${Math.abs(o)}">${tileHtml(c.id, { act: 'inspect', uid: c.uid, cls: opts.idle ? 'playable' : '' })}</div>`;
+    })
+    .join('');
+  const focusPatron = opts.focus?.kind === 'patron' ? opts.focus.patron : null;
 
   return `<div class="game ${opts.myTurn ? 'my-turn' : 'their-turn'}">
     <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
       <span class="who">${esc(them.name)}</span>
       <span class="res-group">${res(them)}</span>
-      <span class="counts">${count(them.hand.length, 'рука')}${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
+      <span class="counts">${count(them.deck.length, 'колода')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
     </header>
-    <section class="strip opp-agents">${theirAgents || (theirPlayed ? '' : '<span class="empty">агентов нет</span>')}
+    <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
+    <section class="strip opp-agents" style="--na:${them.agents.length};--np:${them.played.length};--reserve:${them.played.length ? 'calc(var(--pw) + 14px)' : '0px'}">
+      ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '' : '<span class="empty">агентов нет</span>'}
       ${theirPlayed ? `<div class="part played-part">${theirPlayed}</div>` : ''}
       ${targets.size ? '<span class="hint">нажмите на агента, чтобы атаковать</span>' : ''}</section>
-    <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p)).join('')}</section>
     <section class="tavern">
       <div class="label"><span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small></div>
       <div class="row">${slots(tavern)}</div>
     </section>
-    <section class="strip my-table">
+    <section class="patrons">${s.patrons.map((p) => patronHtml(s, me, p, p === focusPatron)).join('')}</section>
+    <section class="strip my-table" style="--na:${you.agents.length};--np:${you.played.length};--reserve:calc(118px${you.played.length ? ' + var(--pw) + 14px' : ''})">
       <div class="part counts">${count(you.deck.length, 'колода', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile-cd')}</div>
-      <div class="part">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
+      <div class="part agents">${myAgents || '<span class="empty">ваших агентов нет</span>'}</div>
       ${played ? `<div class="part played-part">${played}</div>` : ''}
     </section>
-    <section class="hand">${hand.length ? slots(hand) : '<span class="empty">рука пуста</span>'}</section>
+    <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
     <footer class="bar my-bar${opts.myTurn ? ' active' : ''}">
       <span class="res-group">${res(you)}</span>
       <button class="icon" data-act="menu" aria-label="Меню">☰</button>
+      <button class="icon${musicOn() ? '' : ' off'}" data-act="music" aria-label="Музыка" aria-pressed="${musicOn()}">♪</button>
       <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">▶▶</button>
       <button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? 'Конец хода' : 'Ход соперника'}</button>
     </footer>
   </div>`;
 }
 
-export type SheetTarget = { kind: 'card'; uid: number } | { kind: 'patron'; patron: PatronId };
+export interface FocusView {
+  /** Enlarged card or patron panel. */
+  html: string;
+  /** Text on the confirm strip under it; empty when there is nothing to do. */
+  label: string;
+  /** Whether a second tap performs the action. */
+  can: boolean;
+  action: Action | null;
+}
 
-/** Bottom sheet with the full card (or patron) and the actions available for it. */
-export function sheetHtml(s: GameState, me: PlayerIdx, t: SheetTarget, idle: boolean): string | null {
+/**
+ * What a selected card or patron shows when it slides out enlarged, and what a second tap does.
+ * Returns null once the target has left the table.
+ */
+export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean): FocusView | null {
   const you = s.players[me];
   const them = s.players[other(me)];
   if (t.kind === 'patron') {
-    const def = PATRONS[t.patron];
-    const rules = PATRON_RULES[t.patron];
-    const f = s.favor[t.patron];
-    const favor =
-      t.patron === 'treasury' ? 'Всегда нейтрален' : f === undefined || f === null ? 'Нейтрален' : f === me ? 'На вашей стороне' : 'На стороне соперника';
     const can = patronAvailable(s, me, t.patron);
-    return `<div class="sheet-body patron-sheet" style="--accent:${def.palette.accent};--glow:${def.palette.glow}">
-      <img src="${patronEmblem(t.patron)}" alt="">
-      <h2>${esc(def.name)}</h2><p class="p-title">${esc(def.title)}</p>
-      <p><b>Цена:</b> ${esc(rules.cost)}</p><p><b>Эффект:</b> ${esc(rules.effect)}</p>
-      <p class="muted">${favor}. Воззвать можно один раз за ход; после этого покровитель смещается на вашу сторону.</p>
-      </div>
-      <div class="sheet-actions"><button class="end" data-act="patron" data-patron="${t.patron}" ${can ? '' : 'disabled'}>${can ? 'Воззвать' : 'Сейчас недоступно'}</button></div>`;
+    return {
+      html: patronTipHtml(s, me, t.patron),
+      label: can ? 'Нажмите ещё раз: воззвать' : 'Сейчас воззвать нельзя',
+      can,
+      action: { t: 'patron', patron: t.patron },
+    };
   }
   const uid = t.uid;
-  let action = '';
-  let card: { id: string; agent?: AgentInPlay } | null = null;
   const inHand = you.hand.find((c) => c.uid === uid);
   const inTavern = s.tavern.find((c) => c.uid === uid);
   const mine = you.agents.find((c) => c.uid === uid);
   const theirs = them.agents.find((c) => c.uid === uid);
-  const played = you.played.find((c) => c.uid === uid);
-  if (inHand) {
-    card = inHand;
-    action = `<button class="end" data-act="play" data-uid="${uid}" ${idle ? '' : 'disabled'}>Сыграть</button>`;
-  } else if (inTavern) {
-    card = inTavern;
+  const played = you.played.find((c) => c.uid === uid) ?? them.played.find((c) => c.uid === uid);
+  const view = (id: string, label: string, can: boolean, action: Action | null, agent?: AgentInPlay): FocusView => ({
+    html: cardHtml(id, { cls: 'big', agent }),
+    label,
+    can,
+    action,
+  });
+  if (inHand) return view(inHand.id, idle ? 'Нажмите ещё раз: сыграть' : 'Сейчас не ваш ход', idle, { t: 'play', uid });
+  if (inTavern) {
     const cost = cardDef(inTavern.id).cost;
     const ok = idle && you.coin >= cost;
-    action = `<button class="end" data-act="buy" data-uid="${uid}" ${ok ? '' : 'disabled'}>${ok ? `Купить за ${cost} ●` : `Нужно ${cost} ●, у вас ${you.coin}`}</button>`;
-  } else if (mine) {
-    card = { id: mine.id, agent: mine };
-    action = `<button class="end" data-act="activate" data-uid="${uid}" ${idle && !mine.activated ? '' : 'disabled'}>${mine.activated ? 'Уже действовал в этот ход' : 'Применить'}</button>`;
-  } else if (theirs) {
-    card = { id: theirs.id, agent: theirs };
+    return view(inTavern.id, ok ? `Нажмите ещё раз: купить за ${cost} ●` : `Нужно ${cost} ●, у вас ${you.coin}`, ok, { t: 'buy', uid });
+  }
+  if (mine) {
+    const ok = idle && !mine.activated;
+    return view(mine.id, mine.activated ? 'Уже действовал в этот ход' : ok ? 'Нажмите ещё раз: применить' : 'Сейчас не ваш ход', ok, { t: 'activate', uid }, mine);
+  }
+  if (theirs) {
     const can = idle && you.power > 0 && attackable(s, me).some((a) => a.uid === uid);
     const dmg = Math.min(you.power, hpLeft(theirs));
-    action = `<button class="end danger" data-act="attack" data-uid="${uid}" ${can ? '' : 'disabled'}>${
-      can ? `Атаковать: −${dmg} силы` : you.power > 0 && idle ? 'Сначала агенты с провокацией' : 'Нужна сила для атаки'
-    }</button>`;
-  } else if (played) {
-    card = played;
+    const label = can ? `Нажмите ещё раз: атаковать, −${dmg} ⚔` : you.power > 0 && idle ? 'Сначала агенты с провокацией' : 'Нужна сила для атаки';
+    return view(theirs.id, label, can, { t: 'attack', uid }, theirs);
   }
-  if (!card) return null;
-  return `<div class="sheet-body">${cardHtml(card.id, { cls: 'big', agent: card.agent })}</div>
-    <div class="sheet-actions">${action}</div>`;
+  if (played) return view(played.id, '', false, null);
+  return null;
 }
 
 export function pileGridHtml(cards: Card[]): string {

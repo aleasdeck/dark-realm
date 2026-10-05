@@ -31,12 +31,11 @@ export function setSound(on: boolean) {
   }
 }
 
-/** Browsers only start audio after a gesture, so the context is created on the first tap. */
-export function unlock() {
-  if (!enabled) return;
+/** The shared audio context, created on first use; effects and music both play through it. */
+export function audioContext(): AudioContext | null {
   if (!ctx) {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
+    if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
     master.gain.value = 0.32;
@@ -45,7 +44,14 @@ export function unlock() {
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  return ctx;
+}
+
+/** Browsers only start audio after a gesture, so the context is created on the first tap. */
+export function unlock() {
+  if (!enabled) return;
+  const c = audioContext();
+  if (c?.state === 'suspended') void c.resume();
 }
 
 type Wave = OscillatorType;
