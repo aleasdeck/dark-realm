@@ -108,25 +108,21 @@ export function tileHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {})
 }
 
 /** Small square used for agents and played cards. */
-export function chipHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {}): string {
+export function chipHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {}, vars = ''): string {
   const def = cardDef(id);
-  return `<div class="chip ${o.cls ?? ''}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
+  return `<div class="chip ${o.cls ?? ''}" style="${styleVars(def)}${vars ? `;${vars}` : ''}" data-card="${def.id}"${attrs(o)}>
     <img src="${cardArt(def)}" alt="" draggable="false">${hpBadge(def, o.agent)}
-  </div>`;
-}
-
-/** One row of the played-cards column: art and name. */
-function playedRowHtml(c: Card, focused: boolean): string {
-  const def = cardDef(c.id);
-  return `<div class="pl-row${focused ? ' focused' : ''}" style="${styleVars(def)}" data-card="${def.id}" data-act="inspect" data-uid="${c.uid}" data-tip="card">
-    <img src="${cardArt(def)}" alt="" draggable="false"><span>${esc(def.name)}</span>
   </div>`;
 }
 
 /** Cards played this turn as a vertical column, newest on top, that shows up to five and scrolls through the rest. */
 function playedHtml(cards: Card[], side: 'me' | 'opp', focusUid: number): string {
   if (!cards.length) return '';
-  const rows = [...cards].reverse().map((c) => playedRowHtml(c, c.uid === focusUid)).join('');
+  const rows = [...cards]
+    .reverse()
+    // the stacking index keeps each card above the older one peeking out under it
+    .map((c, i) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' + (c.uid === focusUid ? ' focused' : ''), tip: true }, `--i:${i}`))
+    .join('');
   return `<div class="part played-part" aria-label="Разыграно: ${cards.length}"><div class="pl-list" data-side="${side}" data-clip>${rows}</div></div>`;
 }
 

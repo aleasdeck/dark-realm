@@ -479,22 +479,22 @@ input {
   border-color: var(--green-glow);
   box-shadow: 0 0 10px var(--green-glow);
 }
-.chip.spent {
+.chip.spent,
+.chip.played {
   filter: brightness(0.65);
 }
-/* cards played this turn: a column on the right of the strip, five rows tall, the rest scroll */
+/* cards played this turn: the small squares stack down a column on the right of the strip,
+   newest on top; up to five show (overlapping when the strip is low), the rest scroll */
 .strip {
-  --plw: min(46cqw, 210px);
-  /* up to five rows share the strip height, but never shrink below a readable size */
-  --plg: 2px;
-  --rh: clamp(18px, calc((100cqh - 4 * var(--plg)) / 5), 40px);
+  --pc: calc(var(--tw) * 0.42);
+  /* how far each card sits below the one above it */
+  --pls: clamp(5px, calc((100cqh - var(--pc)) / 4), calc(var(--pc) + 4px));
 }
 .strip.has-played {
-  --reserve: calc(var(--plw) + 14px);
+  --reserve: calc(var(--pc) + 14px);
 }
 .strip .played-part {
-  flex: 0 0 var(--plw);
-  width: var(--plw);
+  flex: 0 0 auto;
   align-self: stretch;
   display: flex;
   align-items: center;
@@ -503,64 +503,40 @@ input {
   border-left: 1px solid var(--line);
 }
 .pl-list {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--plg);
-  max-height: 100%;
-  /* whole rows only, at most five; the rest scroll into view */
-  max-height: calc(min(round(down, 100cqh + var(--plg), var(--rh) + var(--plg)), 5 * (var(--rh) + var(--plg))) - var(--plg));
+  max-height: min(100%, calc(var(--pc) + 4 * var(--pls)));
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
-  --fade: calc(var(--rh) * 0.6);
+  --fade: calc(var(--pls) * 0.8);
 }
 .pl-list::-webkit-scrollbar {
   display: none;
 }
 .pl-list.more-down {
-  mask-image: linear-gradient(#000 calc(100% - var(--fade)), #0003);
+  mask-image: linear-gradient(#000 calc(100% - var(--fade)), #0004);
 }
 .pl-list.more-up {
-  mask-image: linear-gradient(#0003, #000 var(--fade));
+  mask-image: linear-gradient(#0004, #000 var(--fade));
 }
 .pl-list.more-up.more-down {
-  mask-image: linear-gradient(#0003, #000 var(--fade), #000 calc(100% - var(--fade)), #0003);
+  mask-image: linear-gradient(#0004, #000 var(--fade), #000 calc(100% - var(--fade)), #0004);
 }
-.pl-row {
-  flex: 0 0 var(--rh);
-  height: var(--rh);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-right: 6px;
+.pl-list .chip {
+  flex: 0 0 var(--pc);
+  width: var(--pc);
+  height: var(--pc);
+  border-width: 1px;
+  margin-top: calc(var(--pls) - var(--pc));
   scroll-snap-align: start;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  background: linear-gradient(90deg, var(--bg2), var(--bg1));
-  overflow: hidden;
-  cursor: pointer;
+  z-index: calc(50 - var(--i));
 }
-.pl-row img {
-  height: 100%;
-  aspect-ratio: 1;
-  flex: 0 0 auto;
-  display: block;
-  filter: brightness(0.8);
+.pl-list .chip:first-child {
+  margin-top: 0;
 }
-.pl-row span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--narrow-font);
-  font-weight: 700;
-  font-size: clamp(13px, calc(var(--rh) * 0.5), 16px);
-  color: var(--glow);
-}
-.pl-row.focused {
-  outline: 2px solid var(--glow);
+.pl-list .chip.focused {
   outline-offset: -2px;
 }
 .chip.target {
