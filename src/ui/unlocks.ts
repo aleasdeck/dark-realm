@@ -53,3 +53,13 @@ export function unlockHint(pid: PatronId): string {
   if (need === undefined) return 'Пока закрыт.';
   return `Откроется после ${need} сыгранных партий (сыграно ${Math.min(gamesPlayed(), need)}).`;
 }
+
+/** "Opens in N games" for a locked patron's draft tile. */
+export function unlockLeft(pid: PatronId): string {
+  const need = UNLOCK_AT[pid];
+  if (need === undefined) return 'Пока закрыт';
+  const n = Math.max(1, need - gamesPlayed());
+  const m10 = n % 10, m100 = n % 100;
+  const word = m10 === 1 && m100 !== 11 ? 'партию' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'партии' : 'партий';
+  return `Откроется через ${n} ${word}`;
+}
