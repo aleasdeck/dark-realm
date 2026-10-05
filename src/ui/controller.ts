@@ -4,6 +4,7 @@ import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PlayerIdx } from '../engine/types';
 import type { Link, LinkHandlers, NetMessage } from '../net/room';
+import { draftPool } from './unlocks';
 
 /** One running match as seen by the local player. */
 export abstract class Controller {
@@ -52,7 +53,7 @@ export class BotController extends Controller {
   restart() {
     this.state = this.tutorial
       ? createTutorialGame(this.playerName)
-      : createGame(randomSeed(), [this.playerName, 'Бот-некромант']);
+      : createGame(randomSeed(), [this.playerName, 'Бот-некромант'], { pool: draftPool() });
     this.emit();
     this.schedule();
   }
@@ -102,7 +103,7 @@ export class HostController extends Controller {
 
   private onMessage(m: NetMessage) {
     if (m.type === 'hello') {
-      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость']);
+      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], { pool: draftPool() });
       this.notice = '';
       this.broadcast();
     } else if (m.type === 'action' && this.state) {

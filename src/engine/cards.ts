@@ -6,7 +6,8 @@ import type { CardDef, Effect, PatronDef, PatronId } from './types';
  * names and flavor are reworked for the Dark Realm setting. To add a custom card, append an
  * entry to CARDS with a unique id and the patron it belongs to. `copies`
  * controls how many end up in the tavern deck. The engine also supports effects the base
- * decks don't use (prestige, heal, returnTop, donate, choice, create), see Effect in types.ts.
+ * decks don't use (heal), see Effect in types.ts. The patrons marked `locked` stay out of the
+ * draft until the player unlocks them (see src/ui/unlocks.ts).
  */
 
 const coin = (n: number): Effect => ({ k: 'coin', n });
@@ -20,6 +21,14 @@ const destroy = (n: number): Effect => ({ k: 'destroy', n });
 const knockout = (n: number): Effect => ({ k: 'knockout', n });
 const replaceTavern = (n: number): Effect => ({ k: 'replaceTavern', n });
 const patronCall = (n: number): Effect => ({ k: 'patronCall', n });
+const prestige = (n: number): Effect => ({ k: 'prestige', n });
+const donate = (n: number): Effect => ({ k: 'donate', n });
+const confine = (n: number): Effect => ({ k: 'confine', n });
+const refresh = (n: number, agentsOnly = false): Effect => ({ k: 'returnTop', n, ...(agentsOnly ? { agentsOnly } : {}) });
+const setback = (res: 'coin' | 'power' | 'draw', n: number): Effect => ({ k: 'setback', res, n });
+const create = (card: string): Effect => ({ k: 'create', card, n: 1, to: 'cooldown' });
+const pick = (...options: Effect[][]): Effect => ({ k: 'choice', options });
+const knockoutAll: Effect = { k: 'knockoutAll' };
 
 export const PATRONS: Record<PatronId, PatronDef> = {
   crows: {
@@ -58,6 +67,48 @@ export const PATRONS: Record<PatronId, PatronDef> = {
     title: 'Вождь пепельных пустошей',
     palette: { bg1: '#120504', bg2: '#3a120b', accent: '#a33a20', glow: '#ff7a3d' },
   },
+  alma: {
+    id: 'alma',
+    name: 'Эльвейн Милосердная',
+    title: 'Милость тоже бывает цепью',
+    locked: true,
+    palette: { bg1: '#12070c', bg2: '#3a1426', accent: '#a84a6a', glow: '#ff9ac0' },
+  },
+  hunding: {
+    id: 'hunding',
+    name: 'Кенджар Поющий Клинок',
+    title: 'Клинок поёт лишь в верной руке',
+    locked: true,
+    palette: { bg1: '#070812', bg2: '#1a1e3e', accent: '#4a5aa8', glow: '#9ab4ff' },
+  },
+  druid: {
+    id: 'druid',
+    name: 'Каэрнох Последний Друид',
+    title: 'Пепел помнит корни',
+    locked: true,
+    palette: { bg1: '#050c05', bg2: '#163018', accent: '#3e7a2e', glow: '#9cff6a' },
+  },
+  mora: {
+    id: 'mora',
+    name: 'Ульгот Хранитель Свитков',
+    title: 'Знание всегда берёт плату',
+    locked: true,
+    palette: { bg1: '#0a0b04', bg2: '#2a2e0e', accent: '#707a1a', glow: '#e4ff4a' },
+  },
+  alessia: {
+    id: 'alessia',
+    name: 'Ирмена Разбивающая Цепи',
+    title: 'Цепи падают с первым криком',
+    locked: true,
+    palette: { bg1: '#120904', bg2: '#3a200c', accent: '#b05a1e', glow: '#ffc070' },
+  },
+  orgnum: {
+    id: 'orgnum',
+    name: 'Ваэлор Морской Колдун',
+    title: 'Прилив всегда приносит добычу',
+    locked: true,
+    palette: { bg1: '#040a12', bg2: '#0e2a42', accent: '#1e5a8a', glow: '#5ad4ff' },
+  },
   treasury: {
     id: 'treasury',
     name: 'Сундук Бездны',
@@ -67,6 +118,8 @@ export const PATRONS: Record<PatronId, PatronDef> = {
 };
 
 export const DRAFTABLE: PatronId[] = ['crows', 'hlaalu', 'pelin', 'psijic', 'rajhin', 'eagle'];
+/** Patrons that join the draft only once unlocked. */
+export const LOCKED: PatronId[] = ['alma', 'hunding', 'druid', 'mora', 'alessia', 'orgnum'];
 
 export const CARDS: CardDef[] = [
   // ── Neutral ─────────────────────────────────────────────
@@ -151,6 +204,97 @@ export const CARDS: CardDef[] = [
   { id: 'eagle_offering', name: 'Кровавое подношение', patron: 'eagle', cost: 6, type: 'contractAction', copies: 2, play: [destroy(1), power(2)], combo: { 2: [draw(1)] }, art: 'altar', seed: 117 },
   { id: 'eagle_witch', name: 'Ведьма клана', patron: 'eagle', cost: 6, type: 'contractAgent', hp: 4, copies: 3, play: [destroy(1)], art: 'cauldron', seed: 118 },
   { id: 'eagle_hagraven', name: 'Карга-ворожея', patron: 'eagle', cost: 9, type: 'agent', hp: 4, copies: 2, play: [destroy(1)], combo: { 2: [power(1)] }, art: 'beast', seed: 119 },
+
+  // ── Эльвейн Милосердная (Almalexia): сброс ради выгоды, заточение карт соперника ──
+  { id: 'alma_plate', name: 'Чаша для подаяний', patron: 'alma', cost: 0, type: 'starter', copies: 0, play: [coin(1)], combo: { 3: [donate(1)] }, art: 'chalice', seed: 151 },
+  { id: 'alma_veneration', name: 'Хвалебный плач', patron: 'alma', cost: 3, type: 'action', copies: 3, play: [coin(2), donate(1)], combo: { 2: [donate(1)] }, art: 'candle', seed: 152 },
+  { id: 'alma_gaoler', name: 'Набожный тюремщик', patron: 'alma', cost: 6, type: 'contractAgent', hp: 3, copies: 3, play: [power(1)], combo: { 2: [confine(1)], 3: [confine(1)] }, art: 'chain', seed: 153 },
+  { id: 'alma_mercy', name: 'Милость Матери', patron: 'alma', cost: 5, type: 'action', copies: 2, play: [power(1), refresh(1)], art: 'heart', seed: 154 },
+  {
+    id: 'alma_clergy', name: 'Причт скорбного храма', patron: 'alma', cost: 5, type: 'contractAgent', hp: 3, copies: 2, play: [],
+    trigger: { on: 'discard', fx: [prestige(2)] }, combo: { 2: [donate(1), confine(1)] }, art: 'priest', seed: 155,
+  },
+  {
+    id: 'alma_alms', name: 'Щедрая милостыня', patron: 'alma', cost: 3, type: 'action', copies: 3, play: [coin(1)],
+    trigger: { on: 'discard', fx: [power(1)] }, combo: { 2: [donate(1)], 3: [donate(1)] }, art: 'coins', seed: 156,
+  },
+  { id: 'alma_arbiter', name: 'Храмовый судья', patron: 'alma', cost: 6, type: 'agent', hp: 2, copies: 2, play: [coin(2)], combo: { 2: [confine(1)], 3: [confine(1)] }, art: 'hooded', seed: 157 },
+  { id: 'alma_lesson', name: 'Урок Скорбящей', patron: 'alma', cost: 4, type: 'action', copies: 3, play: [donate(1)], combo: { 2: [draw(1)], 3: [donate(1)] }, art: 'book', seed: 158 },
+  { id: 'alma_sentinel', name: 'Страж трибунала', patron: 'alma', cost: 8, type: 'agent', hp: 5, taunt: true, copies: 2, play: [], combo: { 2: [patronCall(1)] }, art: 'knight', seed: 159 },
+
+  // ── Кенджар Поющий Клинок (Ansei Frandar Hunding): каждый раз выбор ──
+  { id: 'hunding_way', name: 'Путь клинка', patron: 'hunding', cost: 0, type: 'starter', copies: 0, play: [pick([coin(1)], [power(1)])], art: 'sword', seed: 171 },
+  { id: 'hunding_assault', name: 'Натиск мастера клинка', patron: 'hunding', cost: 9, type: 'action', copies: 2, play: [pick([power(5)], [acquire(9)])], art: 'axe', seed: 172 },
+  { id: 'hunding_meditation', name: 'Боевое созерцание', patron: 'hunding', cost: 3, type: 'contractAction', copies: 3, play: [pick([power(2)], [refresh(1)])], art: 'candle', seed: 173 },
+  { id: 'hunding_conquest', name: 'Завоевание', patron: 'hunding', cost: 4, type: 'action', copies: 3, play: [pick([power(3)], [acquire(4)])], combo: { 2: [power(2)] }, art: 'banner', seed: 174 },
+  { id: 'hunding_march', name: 'Поход на крепость', patron: 'hunding', cost: 6, type: 'action', copies: 3, play: [pick([power(4)], [refresh(3)])], combo: { 2: [power(2)] }, art: 'castle', seed: 175 },
+  { id: 'hunding_poet', name: 'Певец клинков', patron: 'hunding', cost: 6, type: 'agent', hp: 3, copies: 3, play: [refresh(1)], combo: { 2: [power(1)] }, art: 'hooded', seed: 176 },
+  { id: 'hunding_summoning', name: 'Призыв духовного клинка', patron: 'hunding', cost: 5, type: 'action', copies: 3, play: [pick([refresh(2)], [acquire(5)])], combo: { 2: [refresh(1)] }, art: 'rune', seed: 177 },
+  { id: 'hunding_wave', name: 'Волна воинов', patron: 'hunding', cost: 4, type: 'action', copies: 3, play: [pick([power(3)], [coin(3)])], art: 'shield', seed: 178 },
+
+  // ── Каэрнох Последний Друид (Druid King): карты, уходящие в сброс, кормят агентов ──
+  { id: 'druid_herbs', name: 'Обрядовые травы', patron: 'druid', cost: 0, type: 'starter', copies: 0, play: [coin(1)], art: 'potion', seed: 191 },
+  { id: 'druid_ritual', name: 'Обряд глухой чащи', patron: 'druid', cost: 4, type: 'action', copies: 2, play: [power(2)], combo: { 2: [replaceTavern(1)], 3: [prestige(3)] }, art: 'altar', seed: 192 },
+  {
+    id: 'druid_fenwitch', name: 'Болотная ведьма', patron: 'druid', cost: 6, type: 'agent', hp: 3, copies: 2, play: [],
+    trigger: { on: 'toCooldown', fx: [coin(1)], self: true }, combo: { 2: [create('druid_totem')] }, art: 'cauldron', seed: 193,
+  },
+  {
+    id: 'druid_haruspex', name: 'Гадатель по огню', patron: 'druid', cost: 5, type: 'agent', hp: 1, copies: 3, play: [prestige(1), coin(1)],
+    trigger: { on: 'agentToCooldown', fx: [prestige(1)] }, art: 'flame', seed: 194,
+  },
+  {
+    id: 'druid_wraith', name: 'Лесной призрак', patron: 'druid', cost: 4, type: 'contractAgent', hp: 3, copies: 2, play: [power(1)],
+    trigger: { on: 'toCooldown', fx: [power(1)] }, art: 'ghost', seed: 195,
+  },
+  {
+    id: 'druid_runes', name: 'Руны друидов', patron: 'druid', cost: 2, type: 'action', copies: 3, play: [coin(2)],
+    trigger: { on: 'agentToCooldown', fx: [power(1)] }, art: 'rune', seed: 196,
+  },
+  {
+    id: 'druid_rockseer', name: 'Камневидец', patron: 'druid', cost: 5, type: 'agent', hp: 2, copies: 3, play: [power(1)],
+    trigger: { on: 'agentPlay', fx: [coin(1)] }, art: 'gem', seed: 197,
+  },
+  { id: 'druid_whispers', name: 'Шёпот рощи', patron: 'druid', cost: 2, type: 'contractAction', copies: 2, play: [replaceTavern(1)], combo: { 3: [coin(2)] }, art: 'feather', seed: 198 },
+  { id: 'druid_totem', name: 'Тотем блуждающих огней', patron: 'druid', cost: 3, type: 'action', copies: 3, play: [coin(1)], combo: { 2: [coin(2)], 4: [coin(2)] }, art: 'lantern', seed: 199 },
+  // Not in the tavern: the Druid patron hands it out on a long combo.
+  { id: 'druid_chimera', name: 'Химера', patron: 'druid', cost: 0, type: 'agent', hp: 5, taunt: true, copies: 0, play: [], combo: { 2: [replaceTavern(1)], 3: [power(2)], 4: [prestige(3)] }, art: 'beast', seed: 200 },
+
+  // ── Ульгот Хранитель Свитков (Hermaeus Mora): сильные карты, но сопернику тоже перепадает ──
+  { id: 'mora_glyph', name: 'Сорванная печать', patron: 'mora', cost: 0, type: 'starter', copies: 0, play: [power(1)], combo: { 3: [coin(1)] }, art: 'scroll', seed: 211 },
+  { id: 'mora_pact', name: 'Запретный договор', patron: 'mora', cost: 4, type: 'action', copies: 4, play: [power(2), coin(1), setback('coin', 2)], combo: { 2: [power(2)], 3: [power(1)] }, art: 'scroll', seed: 212 },
+  { id: 'mora_bargain', name: 'Сделка за знание', patron: 'mora', cost: 4, type: 'contractAction', copies: 3, play: [power(5), setback('draw', 1)], combo: { 2: [coin(1)], 3: [coin(2)] }, art: 'hand', seed: 213 },
+  { id: 'mora_cipher', name: 'Шифр Ока', patron: 'mora', cost: 5, type: 'contractAgent', hp: 2, copies: 2, play: [destroy(1), setback('coin', 3)], combo: { 2: [power(2)] }, art: 'eye', seed: 214 },
+  { id: 'mora_aura', name: 'Гнетущая аура', patron: 'mora', cost: 6, type: 'action', copies: 2, play: [power(4), setback('draw', 1)], combo: { 2: [power(2)], 3: [power(2)], 4: [power(3)] }, art: 'tentacle', seed: 215 },
+  { id: 'mora_ink', name: 'Чернила и кровь', patron: 'mora', cost: 2, type: 'action', copies: 3, play: [coin(2), setback('power', 1)], combo: { 2: [power(2), coin(1)] }, art: 'potion', seed: 216 },
+  { id: 'mora_threads', name: 'Нити судьбы', patron: 'mora', cost: 2, type: 'contractAction', copies: 3, play: [power(2), setback('coin', 1)], combo: { 2: [power(1)], 3: [coin(1)] }, art: 'spider', seed: 217 },
+  { id: 'mora_tome', name: 'Прожорливый фолиант', patron: 'mora', cost: 3, type: 'action', copies: 3, play: [destroy(2), setback('draw', 1)], combo: { 2: [power(3)] }, art: 'book', seed: 218 },
+
+  // ── Ирмена Разбивающая Цепи (Saint Alessia): дешёвые агенты и сражение чужих ──
+  { id: 'alessia_rebel', name: 'Мятежник', patron: 'alessia', cost: 0, type: 'agent', hp: 1, copies: 0, starter: true, play: [], combo: { 2: [coin(1)] }, art: 'assassin', seed: 231 },
+  { id: 'alessia_defector', name: 'Перебежчик из белой башни', patron: 'alessia', cost: 5, type: 'contractAgent', hp: 1, copies: 3, play: [pick([draw(1)], [knockoutAll])], combo: { 3: [prestige(1)] }, art: 'tower', seed: 232 },
+  { id: 'alessia_sergeant', name: 'Сержант Разбитых Цепей', patron: 'alessia', cost: 4, type: 'agent', hp: 1, copies: 3, play: [pick([coin(3)], [power(2)])], art: 'chain', seed: 233 },
+  {
+    id: 'alessia_archer', name: 'Рогатый лучник', patron: 'alessia', cost: 5, type: 'agent', hp: 1, copies: 3, play: [knockout(1)],
+    trigger: { on: 'knockout', fx: [coin(1)] }, combo: { 3: [prestige(2)] }, art: 'bow', seed: 234,
+  },
+  { id: 'alessia_paladin', name: 'Безумный паладин', patron: 'alessia', cost: 7, type: 'agent', hp: 2, copies: 2, play: [pick([knockout(2)], [refresh(4, true)])], combo: { 3: [prestige(3)] }, art: 'knight', seed: 235 },
+  { id: 'alessia_priestess', name: 'Жрица Восьми', patron: 'alessia', cost: 5, type: 'agent', hp: 1, copies: 3, play: [pick([replaceTavern(1)], [donate(2)])], combo: { 2: [prestige(1)] }, art: 'priest', seed: 236 },
+  { id: 'alessia_wrath', name: 'Гнев святой', patron: 'alessia', cost: 4, type: 'action', copies: 3, play: [pick([knockoutAll], [refresh(3)])], art: 'sword', seed: 237 },
+  { id: 'alessia_soldier', name: 'Солдат восстания', patron: 'alessia', cost: 3, type: 'agent', hp: 1, copies: 3, play: [pick([coin(2)], [power(1)])], art: 'shield', seed: 238 },
+
+  // ── Ваэлор Морской Колдун (Sorcerer-King Orgnum): дешёвые набеги за престиж ──
+  { id: 'orgnum_raid', name: 'Морской набег', patron: 'orgnum', cost: 0, type: 'starter', copies: 0, play: [coin(1)], combo: { 3: [power(1)] }, art: 'ship', seed: 251 },
+  { id: 'orgnum_serpent', name: 'Призрачный змей', patron: 'orgnum', cost: 2, type: 'action', copies: 3, play: [coin(1), prestige(1)], combo: { 2: [power(1)] }, art: 'serpent', seed: 252 },
+  { id: 'orgnum_command', name: 'Приказ Колдуна', patron: 'orgnum', cost: 2, type: 'contractAction', copies: 2, play: [patronCall(1)], art: 'crown', seed: 253 },
+  { id: 'orgnum_boarding', name: 'Абордажная команда', patron: 'orgnum', cost: 2, type: 'action', copies: 3, play: [prestige(1)], combo: { 2: [prestige(1)] }, art: 'dagger', seed: 254 },
+  { id: 'orgnum_cutter', name: 'Быстрый катер', patron: 'orgnum', cost: 2, type: 'contractAction', copies: 2, play: [power(1)], combo: { 2: [power(1)], 3: [power(2)] }, art: 'ship', seed: 255 },
+  { id: 'orgnum_glory', name: 'Слава налётчиков', patron: 'orgnum', cost: 2, type: 'contractAction', copies: 2, play: [prestige(1)], combo: { 3: [prestige(3)] }, art: 'chalice', seed: 256 },
+  { id: 'orgnum_schooner', name: 'Шхуна со змеиным носом', patron: 'orgnum', cost: 3, type: 'action', copies: 3, play: [power(2)], combo: { 3: [power(2)] }, art: 'ship', seed: 257 },
+  { id: 'orgnum_wavecaller', name: 'Заклинатель штормовых акул', patron: 'orgnum', cost: 5, type: 'agent', hp: 2, copies: 3, play: [power(2)], combo: { 2: [replaceTavern(1)] }, art: 'mage', seed: 258 },
+  { id: 'orgnum_freebooter', name: 'Флибустьер в змеиной коже', patron: 'orgnum', cost: 5, type: 'agent', hp: 3, copies: 2, play: [coin(1)], combo: { 2: [create('orgnum_boarding')] }, art: 'assassin', seed: 259 },
+  // Not in the tavern: the Orgnum patron hands it out when it favors you.
+  { id: 'orgnum_sacking', name: 'Разграбление острова', patron: 'orgnum', cost: 2, type: 'action', copies: 0, play: [prestige(1)], combo: { 2: [prestige(1)], 3: [coin(1)] }, art: 'castle', seed: 260 },
 ];
 
 export const CARD_MAP: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));

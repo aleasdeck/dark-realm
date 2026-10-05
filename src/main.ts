@@ -5,7 +5,7 @@ import '@fontsource/pt-sans/700.css';
 import '@fontsource/pt-sans-narrow/400.css';
 import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
-import { cardDef, PATRONS } from './engine/cards';
+import { cardDef, LOCKED, PATRONS } from './engine/cards';
 import { actingPlayer } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
@@ -18,6 +18,7 @@ import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileG
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
+import { isUnlocked } from './ui/unlocks';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -133,7 +134,10 @@ function musicLabel() {
 
 function rulesHtml() {
   const patrons = (Object.keys(PATRON_RULES) as PatronId[])
-    .map((p) => `<li><b>${esc(PATRONS[p].name)}</b>: ${esc(PATRON_RULES[p].cost)} → ${esc(PATRON_RULES[p].effect)}</li>`)
+    .map((p) => {
+      const lock = isUnlocked(p) ? '' : ' 🔒 (пока закрыт)';
+      return `<li><b>${esc(PATRONS[p].name)}</b>${lock}: ${esc(PATRON_RULES[p].cost)} → ${esc(PATRON_RULES[p].effect)}</li>`;
+    })
     .join('');
   return `<ul>
     <li>Игроки по очереди выбирают 4 покровителей; их колоды образуют таверну. Сундук Бездны есть всегда.</li>
@@ -283,11 +287,17 @@ function draftHtml(s: GameState): string {
       </div>`;
     })
     .join('');
+  const locked = LOCKED.filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid))
+    .map((pid) => `<img src="${patronEmblem(pid)}" alt="${esc(PATRONS[pid].name)}" data-act="locked" data-patron="${pid}">`)
+    .join('');
   return `<div class="draft">
     <h2>${mine ? 'Выберите покровителя' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
     <div class="draft-picks"><div><b>${esc(s.players[me].name)}</b>${picks(me)}</div><div><b>${esc(s.players[me === 0 ? 1 : 0].name)}</b>${picks(me === 0 ? 1 : 0)}</div></div>
     <div class="draft-tiles">${tiles}</div>
-    <button class="ghost" data-act="leave">Выйти</button>
+    <div class="draft-foot">
+      ${locked ? `<div class="draft-locked" title="Закрытые покровители"><span>🔒</span>${locked}</div>` : ''}
+      <button class="ghost" data-act="leave">Выйти</button>
+    </div>
   </div>`;
 }
 
@@ -473,6 +483,12 @@ app.addEventListener('click', (ev) => {
   switch (act) {
     case 'draft':
       return ctrl.dispatch({ t: 'draft', patron: el.dataset.patron as PatronId });
+    case 'locked': {
+      const p = PATRONS[el.dataset.patron as PatronId];
+      ctrl.error = `${p.name} пока закрыт. Как его открыть, скоро появится.`;
+      play('click');
+      return render();
+    }
     case 'play':
       return ctrl.dispatch({ t: 'play', uid });
     case 'activate':

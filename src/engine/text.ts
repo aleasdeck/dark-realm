@@ -1,5 +1,5 @@
 import { CARD_MAP } from './cards';
-import type { CardDef, Effect, PatronId } from './types';
+import type { CardDef, Effect, PatronId, TriggerOn } from './types';
 
 function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10;
@@ -34,9 +34,10 @@ export function effectText(e: Effect): string {
     case 'knockout':
       return e.n === 1 ? 'Сразить агента соперника' : `Сразить до ${e.n} агентов соперника`;
     case 'knockoutAll':
-      return 'Сразить всех агентов соперника';
+      return 'Сразить всех агентов на столе, и своих, и соперника';
     case 'returnTop':
-      return `Вернуть ${e.agentsOnly ? 'агента' : cards(e.n)} из сброса наверх колоды`;
+      if (e.agentsOnly) return `Вернуть ${e.n === 1 ? 'агента' : `до ${e.n} агентов`} из сброса наверх колоды`;
+      return `Вернуть ${e.n === 1 ? 'карту' : `до ${cards(e.n)}`} из сброса наверх колоды`;
     case 'replaceTavern':
       return `Заменить до ${cards(e.n)} в таверне`;
     case 'heal':
@@ -52,8 +53,28 @@ export function effectText(e: Effect): string {
       return `Сбросить до ${cards(e.n)} из руки и взять столько же`;
     case 'choice':
       return e.options.map((o) => o.map(effectText).join(', ')).join(' ИЛИ ');
+    case 'confine':
+      return `Заточить ${cards(e.n)} из сброса соперника под этим агентом`;
+    case 'setback': {
+      const what = e.res === 'coin' ? `+${e.n} ${plural(e.n, 'монету', 'монеты', 'монет')}` : e.res === 'power' ? `+${e.n} силы` : cards(e.n);
+      return `Расплата: соперник в начале хода ${e.res === 'draw' ? 'берёт' : 'получает'} ${what}`;
+    }
+    case 'reprieve':
+      return `Посмотреть ${e.n} верхн. карт колоды соперника и одну отправить в его сброс`;
+    case 'bargain':
+      return 'Взять любую карту таверны (не контракт), соперник получает такую же';
+    case 'selfDiscard':
+      return `Сбросить ${cards(e.n)} из руки`;
   }
 }
+
+const TRIGGER_TEXT: Record<TriggerOn, string> = {
+  discard: 'Когда вы сбрасываете карту',
+  toCooldown: 'Когда любая карта уходит в ваш сброс',
+  agentToCooldown: 'Когда другой ваш агент уходит в сброс',
+  agentPlay: 'Когда ваш агент разыгран или применён (и этот тоже)',
+  knockout: 'Когда сражён любой другой агент',
+};
 
 export function effectsText(list: Effect[]): string {
   return list.map(effectText).join('. ');
@@ -72,6 +93,10 @@ export function cardLines(def: CardDef): { label: string; text: string }[] {
   const lines: { label: string; text: string }[] = [];
   if (def.play.length) lines.push({ label: def.type.includes('gent') ? 'Каждый ход' : '', text: effectsText(def.play) });
   else if (def.type === 'curse') lines.push({ label: '', text: 'Бесполезная карта. Её надо разыграть раньше остальных.' });
+  if (def.trigger) {
+    const when = TRIGGER_TEXT[def.trigger.on] + (def.trigger.self ? ', и эта тоже' : '');
+    lines.push({ label: 'Пока в игре', text: `${when}: ${effectsText(def.trigger.fx).toLowerCase()}` });
+  }
   for (const tier of [2, 3, 4] as const) {
     const c = def.combo?.[tier];
     if (c) lines.push({ label: `Комбо ${tier}`, text: effectsText(c) });
@@ -89,4 +114,22 @@ export const PATRON_RULES: Record<PatronId, { cost: string; effect: string }> = 
   psijic: { cost: '4 монеты и агент у соперника', effect: 'Сразить агента соперника.' },
   rajhin: { cost: '3 монеты', effect: 'Подложить «Морок» в сброс соперника.' },
   eagle: { cost: '2 силы', effect: 'Взять карту.' },
+  alma: {
+    cost: 'благоволит: 1 монета и сброс карты; нейтральна: сброс карты; против вас: 1 монета',
+    effect: 'Посмотреть 5 / 4 / 3 верхние карты колоды соперника и одну отправить в его сброс.',
+  },
+  hunding: { cost: '2 силы', effect: '+1 монета. Пока он благоволит вам, вы получаете +1 монету в начале каждого хода.' },
+  druid: {
+    cost: '2 силы',
+    effect: 'Заменить до 2 карт в таверне. Пока благоволит, 4-я карта Друида за ход (5-я, пока нейтрален) приносит «Химеру».',
+  },
+  mora: { cost: '3 силы (2, если благоволит сопернику)', effect: 'Взять любую карту таверны (не контракт); соперник получает такую же.' },
+  alessia: {
+    cost: '4 монеты (3, если благоволит сопернику)',
+    effect: 'Благоволит: «Сержант Разбитых Цепей» в сброс. Нейтральна: «Солдат восстания». Против вас: +2 силы.',
+  },
+  orgnum: {
+    cost: '3 / 2 / 1 монета (благоволит / нейтрален / против вас)',
+    effect: 'Сила за размер колоды: 1 за каждые 4 карты и «Разграбление острова» в сброс / 1 за каждые 6 карт / просто +2 силы.',
+  },
 };

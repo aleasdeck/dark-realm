@@ -1,4 +1,17 @@
-export type PatronId = 'crows' | 'hlaalu' | 'pelin' | 'psijic' | 'rajhin' | 'eagle' | 'treasury';
+export type PatronId =
+  | 'crows'
+  | 'hlaalu'
+  | 'pelin'
+  | 'psijic'
+  | 'rajhin'
+  | 'eagle'
+  | 'alma'
+  | 'hunding'
+  | 'druid'
+  | 'mora'
+  | 'alessia'
+  | 'orgnum'
+  | 'treasury';
 export type Owner = PatronId | 'neutral';
 export type PlayerIdx = 0 | 1;
 
@@ -19,6 +32,7 @@ export type Effect =
   | { k: 'destroy'; n: number }
   /** Knock out up to n opponent agents. */
   | { k: 'knockout'; n: number }
+  /** Knock out every agent on the table, yours included. */
   | { k: 'knockoutAll' }
   /** Put up to n cards from your cooldown on top of your deck. */
   | { k: 'returnTop'; n: number; agentsOnly?: boolean }
@@ -30,7 +44,24 @@ export type Effect =
   | { k: 'patronCall'; n: number }
   /** Move up to n cards from hand to cooldown and draw as many. */
   | { k: 'donate'; n: number }
-  | { k: 'choice'; options: Effect[][] };
+  | { k: 'choice'; options: Effect[][] }
+  /** Put up to n cards from the opponent's cooldown under this agent until it leaves play. */
+  | { k: 'confine'; n: number }
+  /** The opponent gains this at the start of their next turn. */
+  | { k: 'setback'; res: 'coin' | 'power' | 'draw'; n: number }
+  /** Look at the top n cards of the opponent's deck and send one of them to their cooldown. */
+  | { k: 'reprieve'; n: number }
+  /** Take any non-contract card from the tavern; the opponent gets a copy. */
+  | { k: 'bargain' }
+  /** Discard n cards from your own hand (a patron's price). */
+  | { k: 'selfDiscard'; n: number };
+
+/**
+ * "While in play" events: a card in play (played this turn or an agent on the table)
+ * reacts when its owner discards, a card or an agent goes to their cooldown,
+ * an agent is played or activated, or any other agent is knocked out.
+ */
+export type TriggerOn = 'discard' | 'toCooldown' | 'agentToCooldown' | 'agentPlay' | 'knockout';
 
 export type CardType = 'action' | 'agent' | 'contractAction' | 'contractAgent' | 'starter' | 'curse';
 
@@ -51,12 +82,18 @@ export interface CardDef {
   art: string;
   seed?: number;
   flavor?: string;
+  /** "While in play" reaction; `self` lets the card react to its own move to the cooldown. */
+  trigger?: { on: TriggerOn; fx: Effect[]; self?: boolean };
+  /** Starts in every deck when its patron is drafted (for starters that are not of the starter type). */
+  starter?: boolean;
 }
 
 export interface PatronDef {
   id: PatronId;
   name: string;
   title: string;
+  /** Not in the draft until the player unlocks it. */
+  locked?: boolean;
   palette: { bg1: string; bg2: string; accent: string; glow: string };
 }
 
@@ -68,6 +105,8 @@ export interface Card {
 export interface AgentInPlay extends Card {
   dmg: number;
   activated: boolean;
+  /** Opponent cards held under this agent; they go back to the opponent's cooldown when it leaves. */
+  confined?: Card[];
 }
 
 export interface PlayerState {
@@ -81,6 +120,8 @@ export interface PlayerState {
   power: number;
   prestige: number;
   pendingDiscard: number;
+  /** Setbacks the opponent caused: gained at the start of this player's next turn. */
+  boon?: { coin: number; power: number; draw: number };
 }
 
 export interface PendingOption {
@@ -104,7 +145,11 @@ export type PendingKind =
   | 'hlaalu'
   | 'treasury'
   | 'pelin'
-  | 'psijic';
+  | 'psijic'
+  | 'confine'
+  | 'reprieve'
+  | 'bargain'
+  | 'selfDiscard';
 
 export interface Pending {
   player: PlayerIdx;
@@ -120,10 +165,13 @@ export interface Pending {
 export interface QueuedEffect {
   e: Effect;
   player: PlayerIdx;
+  /** uid of the card the effect came from. */
+  src?: number;
 }
 
 export interface TurnPlay {
   id: string;
+  uid?: number;
   patron: Owner;
   fired: number[];
 }
@@ -168,6 +216,8 @@ export interface GameState {
   /** Prestige targets when they differ from the standard ones (the short tutorial game). */
   goal?: number;
   instant?: number;
+  /** Turn on which the Druid patron last handed out its Chimera. */
+  chimeraTurn?: number;
 }
 
 export type Action =

@@ -22,6 +22,8 @@ import type {
   PatronId,
   PlayerIdx,
   PlayerState,
+  QueuedEffect,
+  TriggerOn,
 } from './types';
 
 export class RuleError extends Error {}
@@ -35,6 +37,8 @@ function newPlayer(name: string): PlayerState {
 }
 
 export interface GameOptions {
+  /** Patrons offered in the draft (the unlocked ones); the base six by default. */
+  pool?: PatronId[];
   /** Prestige that wins once the player stays ahead through the opponent's turn. */
   goal?: number;
   /** Prestige that wins at once. */
@@ -42,8 +46,9 @@ export interface GameOptions {
 }
 
 export function createGame(seed: number, names: [string, string], opts: GameOptions = {}): GameState {
+  const { pool, ...targets } = opts;
   return {
-    ...opts,
+    ...targets,
     phase: 'draft',
     rng: seed | 0,
     nextUid: 1,
@@ -51,7 +56,7 @@ export function createGame(seed: number, names: [string, string], opts: GameOpti
     current: 0,
     turn: 0,
     patrons: [],
-    draftPool: [...DRAFTABLE],
+    draftPool: [...(pool ?? DRAFTABLE)],
     draftStep: 0,
     favor: {},
     patronCalls: 1,
@@ -144,11 +149,64 @@ function knockOut(s: GameState, owner: PlayerIdx, uid: number) {
   const p = s.players[owner];
   const a = removeByUid(p.agents, uid);
   if (!a) return;
+  release(s, owner, a);
   const card: Card = { uid: a.uid, id: a.id };
-  if (cardDef(a.id).type === 'contractAgent') s.tavernDeck.push(card);
-  else p.cooldown.push(card);
   log(s, `${p.name}: агент «${name(a.id)}» сражён`);
   emit(s, { k: 'knockout', p: owner, card: a.id });
+  if (cardDef(a.id).type === 'contractAgent') s.tavernDeck.push(card);
+  else toCooldown(s, owner, card);
+  fire(s, s.current, 'knockout', card);
+}
+
+/** An agent leaving play lets its confined cards go back to the opponent's cooldown. */
+function release(s: GameState, owner: PlayerIdx, a: AgentInPlay) {
+  if (!a.confined?.length) return;
+  s.players[other(owner)].cooldown.push(...a.confined);
+  a.confined = [];
+}
+
+/** Cards of yours that are in play: played this turn and agents on the table. */
+function inPlay(p: PlayerState): Card[] {
+  return [...p.played, ...p.agents];
+}
+
+/**
+ * "While in play" reactions of the current player's cards. `card` is what moved;
+ * a card never reacts to itself unless its trigger says `self`.
+ */
+function fire(s: GameState, pi: PlayerIdx, on: TriggerOn, card?: Card) {
+  if (s.phase !== 'play' || s.current !== pi) return;
+  const listeners = inPlay(s.players[pi]);
+  if (card && cardDef(card.id).trigger?.self && !listeners.some((c) => c.uid === card.uid)) listeners.push(card);
+  // Reactions resolve before whatever else is still queued.
+  const now: QueuedEffect[] = [];
+  for (const c of listeners) {
+    const tr = cardDef(c.id).trigger;
+    if (!tr || tr.on !== on) continue;
+    if (card && c.uid === card.uid && !tr.self) continue;
+    for (const e of tr.fx) now.push({ e, player: pi, src: c.uid });
+  }
+  s.queue.unshift(...now);
+}
+
+const isAgent = (id: string) => {
+  const t = cardDef(id).type;
+  return t === 'agent' || t === 'contractAgent';
+};
+
+/** Puts a card in a player's cooldown and lets their cards in play react. */
+function toCooldown(s: GameState, pi: PlayerIdx, c: Card) {
+  s.players[pi].cooldown.push(c);
+  fire(s, pi, 'toCooldown', c);
+  if (isAgent(c.id)) fire(s, pi, 'agentToCooldown', c);
+}
+
+/** Hand to cooldown, as a discard. */
+function discardFromHand(s: GameState, pi: PlayerIdx, uid: number) {
+  const c = removeByUid(s.players[pi].hand, uid);
+  if (!c) return;
+  toCooldown(s, pi, c);
+  fire(s, pi, 'discard', c);
 }
 
 // ── setup ────────────────────────────────────────────────
@@ -160,7 +218,7 @@ function startMatch(s: GameState) {
     const deck: Card[] = [];
     for (let i = 0; i < STARTING_GOLD; i++) deck.push(mk(s, 'gold'));
     for (const pid of s.patrons) {
-      const starter = CARDS.find((c) => c.patron === pid && c.type === 'starter');
+      const starter = CARDS.find((c) => c.patron === pid && (c.type === 'starter' || c.starter));
       if (starter) deck.push(mk(s, starter.id));
     }
     p.deck = shuffle(s, deck);
@@ -202,8 +260,11 @@ function inPlayOrHand(p: PlayerState) {
 }
 
 /** Cards of yours on the table, which the Hlaalu patron may sacrifice. */
-function ownInPlay(p: PlayerState): Card[] {
-  return [...p.played, ...p.agents];
+const ownInPlay = inPlay;
+
+/** Every card a player owns, wherever it is. */
+function ownedCount(p: PlayerState): number {
+  return p.deck.length + p.hand.length + p.played.length + p.cooldown.length + p.agents.length;
 }
 
 /** A curse in hand has to be played before any other card. */
@@ -211,7 +272,7 @@ export function mustPlayCurse(p: PlayerState, id: string): boolean {
   return cardDef(id).type !== 'curse' && p.hand.some((c) => cardDef(c.id).type === 'curse');
 }
 
-function execEffect(s: GameState, e: Effect, pi: PlayerIdx) {
+function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
   const p = s.players[pi];
   const opp = s.players[other(pi)];
   switch (e.k) {
@@ -241,12 +302,56 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx) {
         const c = mk(s, e.card);
         if (e.to === 'oppCooldown') opp.cooldown.push(c);
         else if (e.to === 'hand') p.hand.push(c);
-        else p.cooldown.push(c);
+        else toCooldown(s, pi, c);
       }
       return;
     case 'knockoutAll':
       for (const a of [...opp.agents]) knockOut(s, other(pi), a.uid);
+      for (const a of [...p.agents]) knockOut(s, pi, a.uid);
       return;
+    case 'setback': {
+      const b = (opp.boon ??= { coin: 0, power: 0, draw: 0 });
+      b[e.res] += e.n;
+      return;
+    }
+    case 'confine':
+      return ask(s, {
+        player: pi,
+        kind: 'confine',
+        prompt: `Заточите до ${e.n} карт из сброса соперника`,
+        options: opp.cooldown.map((c) => cardOption(c)),
+        min: e.n,
+        max: e.n,
+        data: src,
+      });
+    case 'reprieve':
+      refillDeck(s, opp);
+      return ask(s, {
+        player: pi,
+        kind: 'reprieve',
+        prompt: 'Верх колоды соперника: отправьте одну карту в его сброс',
+        options: opp.deck.slice(0, e.n).map((c) => cardOption(c)),
+        min: 1,
+        max: 1,
+      });
+    case 'bargain':
+      return ask(s, {
+        player: pi,
+        kind: 'bargain',
+        prompt: 'Возьмите карту из таверны; соперник получит такую же',
+        options: s.tavern.filter((c) => !cardDef(c.id).type.startsWith('contract')).map((c) => cardOption(c)),
+        min: 1,
+        max: 1,
+      });
+    case 'selfDiscard':
+      return ask(s, {
+        player: pi,
+        kind: 'selfDiscard',
+        prompt: `Сбросьте ${e.n} карт(ы) из руки`,
+        options: p.hand.map((c) => cardOption(c)),
+        min: e.n,
+        max: e.n,
+      });
     case 'choice':
       return ask(s, {
         player: pi,
@@ -301,7 +406,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx) {
       return ask(s, {
         player: pi,
         kind: 'returnTop',
-        prompt: e.agentsOnly ? 'Верните агента из сброса наверх колоды' : `Верните до ${e.n} карт из сброса наверх колоды`,
+        prompt: `Верните до ${e.n} ${e.agentsOnly ? 'агентов' : 'карт'} из сброса наверх колоды`,
         options: pool.map((c) => cardOption(c)),
         min: 0,
         max: e.n,
@@ -343,21 +448,21 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx) {
 function runQueue(s: GameState) {
   while (!s.pending && s.queue.length > 0 && s.phase === 'play') {
     const q = s.queue.shift()!;
-    execEffect(s, q.e, q.player);
+    execEffect(s, q.e, q.player, q.src);
   }
 }
 
-function enqueue(s: GameState, pi: PlayerIdx, effects: Effect[] | undefined) {
+function enqueue(s: GameState, pi: PlayerIdx, effects: Effect[] | undefined, src?: number) {
   if (!effects) return;
-  for (const e of effects) s.queue.push({ e, player: pi });
+  for (const e of effects) s.queue.push({ e, player: pi, src });
 }
 
 /** Records a play for combo purposes and queues the card effect plus any combos it unlocks. */
-function registerPlay(s: GameState, pi: PlayerIdx, id: string) {
-  const def = cardDef(id);
-  enqueue(s, pi, def.play);
+function registerPlay(s: GameState, pi: PlayerIdx, c: Card) {
+  const def = cardDef(c.id);
+  enqueue(s, pi, def.play, c.uid);
   if (def.patron === 'neutral' || def.patron === 'treasury') return;
-  s.turnPlays.push({ id, patron: def.patron, fired: [] });
+  s.turnPlays.push({ id: c.id, uid: c.uid, patron: def.patron, fired: [] });
   const count = s.turnPlays.filter((t) => t.patron === def.patron).length;
   for (const tp of s.turnPlays) {
     if (tp.patron !== def.patron) continue;
@@ -366,10 +471,21 @@ function registerPlay(s: GameState, pi: PlayerIdx, id: string) {
     for (const tier of [2, 3, 4] as const) {
       if (combo[tier] && tier <= count && !tp.fired.includes(tier)) {
         tp.fired.push(tier);
-        enqueue(s, pi, combo[tier]);
+        enqueue(s, pi, combo[tier], tp.uid);
       }
     }
   }
+  if (def.patron === 'druid') druidChimera(s, pi, count);
+}
+
+/** The Druid patron's passive: the 4th Druid card of a turn (5th while neutral) brings a Chimera. */
+function druidChimera(s: GameState, pi: PlayerIdx, count: number) {
+  const f = s.favor.druid;
+  const need = f === pi ? 4 : f === null ? 5 : Infinity;
+  if (count < need || s.chimeraTurn === s.turn) return;
+  s.chimeraTurn = s.turn;
+  toCooldown(s, pi, mk(s, 'druid_chimera'));
+  log(s, `${s.players[pi].name}: Каэрнох дарует «Химеру»`);
 }
 
 function resolvePending(s: GameState, picks: number[]) {
@@ -399,7 +515,7 @@ function resolvePending(s: GameState, picks: number[]) {
       refillTavern(s);
       break;
     case 'toss':
-      for (const uid of uniq) p.cooldown.push(removeByUid(p.deck, uid)!);
+      for (const uid of uniq) toCooldown(s, pi, removeByUid(p.deck, uid)!);
       break;
     case 'destroy':
     case 'treasury':
@@ -409,11 +525,13 @@ function resolvePending(s: GameState, picks: number[]) {
         log(s, `${p.name} уничтожает «${name(c.id)}»`);
         emit(s, { k: 'destroy', p: pi, card: c.id });
       }
-      if (pend.kind === 'treasury') p.cooldown.push(mk(s, 'writ'));
+      if (pend.kind === 'treasury') toCooldown(s, pi, mk(s, 'writ'));
       break;
     case 'hlaalu':
       for (const uid of uniq) {
-        const c = removeByUid(p.played, uid) ?? removeByUid(p.agents, uid);
+        const agent = removeByUid(p.agents, uid);
+        if (agent) release(s, pi, agent);
+        const c = removeByUid(p.played, uid) ?? agent;
         if (!c) continue;
         const gain = Math.max(0, cardDef(c.id).cost - 1);
         p.prestige += gain;
@@ -442,11 +560,39 @@ function resolvePending(s: GameState, picks: number[]) {
       break;
     }
     case 'donate':
-      for (const uid of uniq) p.cooldown.push(removeByUid(p.hand, uid)!);
+      for (const uid of uniq) discardFromHand(s, pi, uid);
       drawCards(s, p, uniq.length);
       break;
+    case 'confine': {
+      const holder = p.agents.find((a) => a.uid === pend.data);
+      const opp = s.players[other(pi)];
+      for (const uid of uniq) {
+        const c = removeByUid(opp.cooldown, uid)!;
+        // The agent may have left play before its effect resolved: then nothing is confined.
+        if (!holder) opp.cooldown.push(c);
+        else (holder.confined ??= []).push(c);
+      }
+      if (holder && uniq.length) log(s, `${p.name} заточает ${uniq.length} карт(ы) соперника`);
+      break;
+    }
+    case 'reprieve': {
+      const opp = s.players[other(pi)];
+      for (const uid of uniq) opp.cooldown.push(removeByUid(opp.deck, uid)!);
+      break;
+    }
+    case 'bargain':
+      for (const uid of uniq) {
+        const c = removeByUid(s.tavern, uid)!;
+        gainCard(s, pi, c);
+        s.players[other(pi)].cooldown.push(mk(s, c.id));
+        log(s, `${p.name} получает «${name(c.id)}», соперник тоже`);
+        emit(s, { k: 'gain', p: pi, card: c.id });
+      }
+      refillTavern(s);
+      break;
+    case 'selfDiscard':
     case 'discard':
-      for (const uid of uniq) p.cooldown.push(removeByUid(p.hand, uid)!);
+      for (const uid of uniq) discardFromHand(s, pi, uid);
       if (uniq.length) {
         log(s, `${p.name} сбрасывает ${uniq.length} карт(ы)`);
         emit(s, { k: 'discard', p: pi, n: uniq.length });
@@ -461,11 +607,11 @@ function gainCard(s: GameState, pi: PlayerIdx, c: Card) {
   const def = cardDef(c.id);
   if (def.type === 'contractAction') {
     s.tavernDeck.push(c);
-    registerPlay(s, pi, c.id);
+    registerPlay(s, pi, c);
   } else if (def.type === 'contractAgent') {
     s.players[pi].agents.push({ ...c, dmg: 0, activated: false });
   } else {
-    s.players[pi].cooldown.push(c);
+    toCooldown(s, pi, c);
   }
 }
 
@@ -491,6 +637,24 @@ export function patronAvailable(s: GameState, pi: PlayerIdx, pid: PatronId): boo
       return p.coin >= 3;
     case 'eagle':
       return p.power >= 2;
+    case 'alma': {
+      const f = s.favor.alma;
+      if (f === pi) return p.coin >= 1 && p.hand.length > 0;
+      if (f === null) return p.hand.length > 0;
+      return p.coin >= 1;
+    }
+    case 'hunding':
+      return s.favor.hunding !== pi && p.power >= 2;
+    case 'druid':
+      return p.power >= 2;
+    case 'mora':
+      return p.power >= (s.favor.mora === other(pi) ? 2 : 3) && s.tavern.some((c) => !cardDef(c.id).type.startsWith('contract'));
+    case 'alessia':
+      return p.coin >= (s.favor.alessia === other(pi) ? 3 : 4);
+    case 'orgnum': {
+      const f = s.favor.orgnum;
+      return p.coin >= (f === pi ? 3 : f === null ? 2 : 1);
+    }
   }
 }
 
@@ -502,10 +666,11 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
   s.patronsUsed.push(pid);
   log(s, `${p.name} взывает к покровителю «${PATRONS[pid].name}»`);
   emit(s, { k: 'patron', p: pi, patron: pid });
-  if (pid !== 'treasury') {
-    const f = s.favor[pid];
-    s.favor[pid] = f === other(pi) ? null : pi;
-  }
+  // What the favor was before this call: several patrons pay out according to it.
+  const was = s.favor[pid];
+  if (pid !== 'treasury') s.favor[pid] = was === other(pi) ? null : pi;
+  const mine = was === pi;
+  const neutral = was === null;
   switch (pid) {
     case 'treasury':
       p.coin -= 2;
@@ -566,6 +731,45 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       p.power -= 2;
       drawCards(s, p, 1);
       break;
+    case 'alma':
+      if (mine || !neutral) p.coin -= 1;
+      if (mine || neutral) enqueue(s, pi, [{ k: 'selfDiscard', n: 1 }]);
+      enqueue(s, pi, [{ k: 'reprieve', n: mine ? 5 : neutral ? 4 : 3 }]);
+      break;
+    case 'hunding':
+      p.power -= 2;
+      p.coin += 1;
+      break;
+    case 'druid':
+      p.power -= 2;
+      enqueue(s, pi, [{ k: 'replaceTavern', n: 2 }]);
+      break;
+    case 'mora':
+      p.power -= mine || neutral ? 3 : 2;
+      enqueue(s, pi, [{ k: 'bargain' }]);
+      break;
+    case 'alessia':
+      if (mine || neutral) {
+        p.coin -= 4;
+        toCooldown(s, pi, mk(s, mine ? 'alessia_sergeant' : 'alessia_soldier'));
+      } else {
+        p.coin -= 3;
+        p.power += 2;
+      }
+      break;
+    case 'orgnum':
+      if (mine) {
+        p.coin -= 3;
+        p.power += Math.floor(ownedCount(p) / 4);
+        toCooldown(s, pi, mk(s, 'orgnum_sacking'));
+      } else if (neutral) {
+        p.coin -= 2;
+        p.power += Math.floor(ownedCount(p) / 6);
+      } else {
+        p.coin -= 1;
+        p.power += 2;
+      }
+      break;
   }
 }
 
@@ -610,6 +814,8 @@ function endTurn(s: GameState) {
   const pi = s.current;
   const p = s.players[pi];
   tauntsAbsorbPower(s, pi);
+  // Reactions to what the leftover power knocked out come too late to use.
+  s.queue = [];
   p.prestige += p.power;
   if (p.power > 0) {
     log(s, `${p.name}: сила ${p.power} → престиж`);
@@ -638,6 +844,13 @@ function endTurn(s: GameState) {
   // A player who reached the goal and stayed ahead through the opponent's turn wins.
   if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ престижа`);
   if (s.turn === 2) n.coin += 1; // second player compensation
+  if (s.favor.hunding === next) n.coin += 1; // Kenjar pays whoever kept his favor through the turn
+  if (n.boon) {
+    n.coin += n.boon.coin;
+    n.power += n.boon.power;
+    drawCards(s, n, n.boon.draw);
+    delete n.boon;
+  }
   if (n.pendingDiscard > 0) {
     const k = n.pendingDiscard;
     n.pendingDiscard = 0;
@@ -718,7 +931,8 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       }
       log(s, `${p.name} разыгрывает «${def.name}»`);
       emit(s, { k: 'play', p: pi, card: c.id });
-      registerPlay(s, pi, c.id);
+      registerPlay(s, pi, c);
+      if (def.type === 'agent') fire(s, pi, 'agentPlay', c);
       break;
     }
     case 'activate': {
@@ -727,7 +941,8 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       ag.activated = true;
       log(s, `${p.name} применяет агента «${name(ag.id)}»`);
       emit(s, { k: 'activate', p: pi, card: ag.id });
-      registerPlay(s, pi, ag.id);
+      registerPlay(s, pi, ag);
+      fire(s, pi, 'agentPlay', ag);
       break;
     }
     case 'attack': {

@@ -22,6 +22,13 @@ function effectValue(list: Effect[]): number {
       case 'choice':
         v += Math.max(...e.options.map(effectValue));
         break;
+      case 'setback':
+        v -= e.n * (e.res === 'draw' ? 1.5 : 1);
+        break;
+      case 'knockoutAll':
+      case 'bargain':
+        v += 2;
+        break;
       default:
         v += 'n' in e ? e.n : 2;
     }
@@ -66,6 +73,9 @@ function choose(s: GameState, pend: Pending): Action {
     case 'pelin':
     case 'knockout':
     case 'psijic':
+    case 'confine':
+    case 'reprieve':
+    case 'bargain':
       opts.sort((a, b) => -byWorth(a, b));
       picks = take(opts, pend.max);
       break;
@@ -91,6 +101,7 @@ function choose(s: GameState, pend: Pending): Action {
       break;
     case 'treasury':
     case 'discard':
+    case 'selfDiscard':
       opts.sort(byWorth);
       picks = take(opts, Math.max(pend.min, 1));
       break;
@@ -160,6 +171,14 @@ export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action |
   if (can('pelin') && p.power >= 3) return { t: 'patron', patron: 'pelin' };
   if (can('rajhin')) return { t: 'patron', patron: 'rajhin' };
   if (can('crows') && p.coin >= 2) return { t: 'patron', patron: 'crows' };
+  if (can('mora') && s.tavern.some((c) => cardDef(c.id).cost >= 5 && !cardDef(c.id).type.startsWith('contract'))) {
+    return { t: 'patron', patron: 'mora' };
+  }
+  // Coins left after shopping are lost anyway, so spend them on the patrons that take coins.
+  if (can('alessia')) return { t: 'patron', patron: 'alessia' };
+  if (can('orgnum')) return { t: 'patron', patron: 'orgnum' };
+  if (can('alma')) return { t: 'patron', patron: 'alma' };
+  if (can('hunding') && s.tavern.some((c) => cardDef(c.id).cost === p.coin + 1)) return { t: 'patron', patron: 'hunding' };
 
   // 5. Knock out agents when it is cheap enough to be worth the lost prestige.
   if (p.power > 0) {
