@@ -1,3 +1,5 @@
+import { still } from './motion';
+
 /**
  * The played-cards columns: five rows show at a time and the rest scroll by like a slider.
  * The board is redrawn from scratch on every state, so the scroll position is carried over here,
@@ -13,7 +15,6 @@ const memo = new Map<string, Memo>();
 
 const lists = (root: ParentNode) => [...root.querySelectorAll<HTMLElement>('.pl-list[data-side]')];
 const uidsOf = (list: HTMLElement) => [...list.children].map((el) => (el as HTMLElement).dataset.uid ?? '');
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Remembers where each column was scrolled to; call right before the board is replaced. */
 export function savePlayed(root: ParentNode) {
@@ -29,7 +30,7 @@ export function restorePlayed(root: ParentNode) {
     // Newest card is first, so whatever sits above the previous first card is new.
     const added = prev ? uids.indexOf(prev.uids[0]) : -1;
     if (prev && added === 0) list.scrollTop = prev.top;
-    else if (prev && added > 0 && !reduced()) {
+    else if (prev && added > 0 && !still()) {
       // Show the old view first, then slide down to the new cards.
       list.scrollTop = prev.top + added * step(list);
       requestAnimationFrame(() => list.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -69,7 +70,7 @@ export function initPlayed(root: HTMLElement) {
       const now = performance.now();
       if (now < lock) return;
       lock = now + 160;
-      list.scrollBy({ top: Math.sign(ev.deltaY) * step(list), behavior: reduced() ? 'auto' : 'smooth' });
+      list.scrollBy({ top: Math.sign(ev.deltaY) * step(list), behavior: still() ? 'auto' : 'smooth' });
     },
     { passive: false },
   );

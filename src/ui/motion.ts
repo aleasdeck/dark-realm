@@ -31,7 +31,34 @@ const layer = document.createElement('div');
 layer.className = 'motion-layer';
 document.body.appendChild(layer);
 
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MOTION_KEY = 'dark-realm-motion';
+let motion = readMotion();
+
+function readMotion(): boolean {
+  try {
+    return localStorage.getItem(MOTION_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function motionOn() {
+  return motion;
+}
+
+/** The "Анимации" setting; the system's reduced motion turns them off too. */
+export function setMotion(on: boolean) {
+  motion = on;
+  try {
+    localStorage.setItem(MOTION_KEY, on ? 'on' : 'off');
+  } catch {
+    /* storage unavailable */
+  }
+  if (!on) clearMotion();
+}
+
+/** Whether the table should stay still: switched off in the settings or by the system. */
+export const still = () => !motion || matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Cards still in flight: the real card stays hidden until then (performance.now time). */
 const hiddenCards = new Map<number, number>();
@@ -64,7 +91,7 @@ const cardEl = (root: ParentNode, uid: number) => root.querySelector<HTMLElement
 
 /** Reads where every card is on the board about to be replaced. */
 export function snapshot(root: HTMLElement): Snapshot | null {
-  if (reduced()) return null;
+  if (still()) return null;
   const cards: Snapshot['cards'] = new Map();
   const game = root.querySelector('.game');
   if (!game) return { cards, backs: [] };
@@ -195,7 +222,7 @@ function fly(f: Flight) {
   }
   const base = f.show ?? f.from;
   const g = document.createElement('div');
-  g.className = 'ghost';
+  g.className = 'mv-ghost';
   g.style.left = `${base.x - base.w / 2}px`;
   g.style.top = `${base.y - base.h / 2}px`;
   g.style.width = `${base.w}px`;
@@ -305,7 +332,7 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
   const game = root.querySelector<HTMLElement>('.game');
   if (!game) return;
   rehide(game);
-  if (!snap || !prev || prev === next || prev.phase === 'over' || reduced()) return;
+  if (!snap || !prev || prev === next || prev.phase === 'over' || still()) return;
   const now = performance.now();
   const sel = (p: PlayerIdx | null, mine: string, theirs: string) => game.querySelector<HTMLElement>(p === me ? mine : theirs);
   const tavernTile = game.querySelector<HTMLElement>('.tavern .tile');
