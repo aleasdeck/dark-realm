@@ -5,6 +5,7 @@ import '@fontsource/pt-sans/700.css';
 import '@fontsource/pt-sans-narrow/400.css';
 import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
+import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
 import { actingPlayer } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
@@ -66,6 +67,30 @@ function saveName(n: string) {
   }
 }
 
+const LEVEL_KEY = 'dr-bot-level';
+const LEVEL_NAMES: Record<BotLevel, string> = { gentle: 'Наставник', easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
+/** The level chosen for the last game against the bot. */
+function botLevel(): BotLevel {
+  try {
+    const v = localStorage.getItem(LEVEL_KEY) as BotLevel;
+    return BOT_LEVELS.includes(v as (typeof BOT_LEVELS)[number]) ? v : 'medium';
+  } catch {
+    return 'medium';
+  }
+}
+function saveLevel(v: BotLevel) {
+  try {
+    localStorage.setItem(LEVEL_KEY, v);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function levelButtons() {
+  const cur = botLevel();
+  return BOT_LEVELS.map((v) => `<button data-level="${v}" aria-pressed="${v === cur}">${LEVEL_NAMES[v]}</button>`).join('');
+}
+
 function roomFromUrl(): string {
   return normalizeCode(new URLSearchParams(location.search).get('room') ?? '');
 }
@@ -100,13 +125,16 @@ function leaveGame() {
 
 function menu(message = '') {
   const code = roomFromUrl();
-  app.innerHTML = `<div class="menu">
+  app.innerHTML = `<div class="menu home">
     <h1 class="title">Dark Realm</h1>
     <p class="subtitle">Карточная дуэль покровителей тёмного мира</p>
     <label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}"></label>
     <div class="menu-buttons">
       <button data-go="tutorial">Туториал</button>
-      <button data-go="bot">Играть против бота</button>
+      <div class="bot-play">
+        <button data-go="bot">Играть против бота</button>
+        <div class="levels" role="group" aria-label="Сложность бота">${levelButtons()}</div>
+      </div>
       <button data-go="host">Создать комнату</button>
       <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">Войти</button></div>
       <button class="ghost" data-go="settings">⚙ Настройки</button>
@@ -115,14 +143,22 @@ function menu(message = '') {
     <details class="rules"><summary>Правила</summary>${rulesHtml()}</details>
   </div>`;
   const nameInput = app.querySelector<HTMLInputElement>('#name')!;
+  const levels = app.querySelector<HTMLElement>('.levels')!;
+  levels.addEventListener('click', (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-level]');
+    if (!b) return;
+    saveLevel(b.dataset.level as BotLevel);
+    levels.innerHTML = levelButtons();
+    play('click');
+  });
   app.querySelectorAll<HTMLButtonElement>('[data-go]').forEach((b) =>
     b.addEventListener('click', () => {
       const n = nameInput.value.trim() || 'Странник';
       saveName(n);
       const go = b.dataset.go;
       if (go === 'settings') return showSettings();
-      if (go === 'tutorial') startGame(new BotController(n, true));
-      else if (go === 'bot') startGame(new BotController(n));
+      if (go === 'tutorial') startGame(new BotController(n, 'gentle'));
+      else if (go === 'bot') startGame(new BotController(n, botLevel()));
       else if (go === 'host') host(n);
       else join(n, normalizeCode(app.querySelector<HTMLInputElement>('#code')!.value));
     }),

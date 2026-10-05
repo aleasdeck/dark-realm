@@ -1,10 +1,20 @@
 import { cardDef } from './cards';
 import { actingPlayer, attackable, hpLeft, other, patronAvailable } from './engine';
+import { hardAction } from './botHard';
+import { rngNext } from './rng';
 import { TUTORIAL_PATRONS } from './tutorial';
 import type { Action, Card, Effect, GameState, Pending, PatronId, PlayerIdx } from './types';
 
+/**
+ * How well the bot plays. `gentle` is the tutorial opponent; the other three are offered before a game:
+ * `easy` shops at random and leaves patrons and agents alone, `medium` follows simple rules of thumb,
+ * `hard` looks ahead through the rest of its turn and weighs decks, agents and favor on both sides.
+ */
+export type BotLevel = 'gentle' | 'easy' | 'medium' | 'hard';
+export const BOT_LEVELS: Exclude<BotLevel, 'gentle'>[] = ['easy', 'medium', 'hard'];
+
 /** Rough worth of an effect list, used to compare options. */
-function effectValue(list: Effect[]): number {
+export function effectValue(list: Effect[]): number {
   let v = 0;
   for (const e of list) {
     switch (e.k) {
@@ -37,7 +47,7 @@ function effectValue(list: Effect[]): number {
 }
 
 /** How much the bot wants a card in its deck (low = junk). */
-function cardWorth(id: string): number {
+export function cardWorth(id: string): number {
   const def = cardDef(id);
   if (def.type === 'curse') return -1;
   if (id === 'gold') return 1;
@@ -50,7 +60,7 @@ const sortKey = (id: string) => (cardDef(id).type === 'curse' ? 100 : cardWorth(
 const byWorth = (a: { cardId?: string }, b: { cardId?: string }) =>
   cardWorth(a.cardId ?? '') - cardWorth(b.cardId ?? '');
 
-function choose(s: GameState, pend: Pending): Action {
+export function choose(s: GameState, pend: Pending): Action {
   const opts = [...pend.options];
   const take = (list: typeof opts, n: number) => list.slice(0, n).map((o) => o.ref);
   let picks: number[] = [];
@@ -118,7 +128,7 @@ function choose(s: GameState, pend: Pending): Action {
   return { t: 'choose', picks: picks.slice(0, pend.max) };
 }
 
-function ownedPatronCount(s: GameState, pi: PlayerIdx, patron: string): number {
+export function ownedPatronCount(s: GameState, pi: PlayerIdx, patron: string): number {
   const p = s.players[pi];
   const all: Card[] = [...p.deck, ...p.hand, ...p.played, ...p.cooldown, ...p.agents];
   return all.filter((c) => cardDef(c.id).patron === patron).length;
@@ -126,12 +136,59 @@ function ownedPatronCount(s: GameState, pi: PlayerIdx, patron: string): number {
 
 const DRAFT_PREF: PatronId[] = ['crows', 'eagle', 'hlaalu', 'pelin', 'psijic', 'rajhin'];
 
-/**
- * Picks the next action for the bot playing as `pi`, or null if it is not the bot's move.
- * A gentle bot (the tutorial opponent) drafts the tutorial patrons and never calls patrons or attacks agents.
- */
-export function botAction(s: GameState, pi: PlayerIdx, gentle = false): Action | null {
+/** A number in [0, 1) that depends on the position only, so the bot needs no randomness of its own. */
+export function noise(s: GameState, salt: number): number {
+  return rngNext((s.rng ^ Math.imul(salt + s.nextUid + s.turn * 131, 0x9e3779b1)) | 0)[0];
+}
+
+/** Curses must come first, then cards that look at or draw from the deck, then the rest. */
+export function playFirst(hand: Card[]): Card | undefined {
+  const rank = (c: Card) => {
+    const def = cardDef(c.id);
+    if (def.type === 'curse') return 3;
+    if (def.play.some((e) => e.k === 'toss')) return 2;
+    if (def.play.some((e) => e.k === 'draw')) return 1;
+    return 0;
+  };
+  return [...hand].sort((a, b) => rank(b) - rank(a) || sortKey(b.id) - sortKey(a.id))[0];
+}
+
+/** Picks the next action for the bot playing as `pi`, or null if it is not the bot's move. */
+export function botAction(s: GameState, pi: PlayerIdx, level: BotLevel = 'medium'): Action | null {
   if (s.phase === 'over' || actingPlayer(s) !== pi) return null;
+  if (level === 'hard') return hardAction(s, pi);
+  if (level === 'easy') return easyAction(s, pi);
+  return mediumAction(s, pi, level === 'gentle');
+}
+
+/**
+ * The easy bot drafts at random, buys a random card it can afford and never calls patrons or attacks
+ * agents beyond what the rules force.
+ */
+function easyAction(s: GameState, pi: PlayerIdx): Action {
+  if (s.phase === 'draft') return { t: 'draft', patron: s.draftPool[Math.floor(noise(s, 1) * s.draftPool.length)] };
+  if (s.pending) {
+    if (s.pending.kind === 'choice') return { t: 'choose', picks: [Math.floor(noise(s, 2) * s.pending.options.length)] };
+    return choose(s, s.pending);
+  }
+  const p = s.players[pi];
+  const card = [...p.hand].sort((a, b) => sortKey(b.id) - sortKey(a.id))[0];
+  if (card) return { t: 'play', uid: card.uid };
+  const ready = p.agents.find((a) => !a.activated);
+  if (ready) return { t: 'activate', uid: ready.uid };
+  const affordable = s.tavern.filter((c) => cardDef(c.id).cost <= p.coin && cardDef(c.id).cost > 0);
+  // Now and then it keeps its coins, as a beginner would.
+  if (affordable.length && noise(s, 3) < 0.8) {
+    return { t: 'buy', uid: affordable[Math.floor(noise(s, 4) * affordable.length)].uid };
+  }
+  return { t: 'end' };
+}
+
+/**
+ * The medium bot, and with `gentle` the tutorial opponent, which drafts the tutorial patrons and never
+ * calls patrons or attacks agents.
+ */
+export function mediumAction(s: GameState, pi: PlayerIdx, gentle = false): Action {
   if (s.phase === 'draft') {
     const pick = (gentle ? TUTORIAL_PATRONS : DRAFT_PREF).find((x) => s.draftPool.includes(x)) ?? s.draftPool[0];
     return { t: 'draft', patron: pick };

@@ -1,4 +1,4 @@
-import { botAction } from '../engine/bot';
+import { botAction, type BotLevel } from '../engine/bot';
 import { actingPlayer, applyAction, createGame, RuleError } from '../engine/engine';
 import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
@@ -46,25 +46,81 @@ function botDelay(s: GameState): number {
   return 1150;
 }
 
+interface Thought {
+  resolve: (a: Action | null) => void;
+  state: GameState;
+  level: BotLevel;
+}
+let worker: Worker | null | undefined;
+let seq = 0;
+const thinking = new Map<number, Thought>();
+
+/** The bot's worker, started on first use; null where workers are unavailable. */
+function botWorker(): Worker | null {
+  if (worker !== undefined) return worker;
+  try {
+    worker = new Worker(new URL('./botWorker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e: MessageEvent<{ id: number; action: Action | null }>) => {
+      thinking.get(e.data.id)?.resolve(e.data.action);
+      thinking.delete(e.data.id);
+    };
+    // If the worker fails, the moves it owed are worked out here and later ones too.
+    worker.onerror = () => {
+      worker?.terminate();
+      worker = null;
+      for (const t of thinking.values()) t.resolve(botAction(t.state, 1, t.level));
+      thinking.clear();
+    };
+  } catch {
+    worker = null;
+  }
+  return worker;
+}
+
+/** The bot's next move; the hard bot thinks in the worker. */
+function think(state: GameState, level: BotLevel): Promise<Action | null> {
+  const w = level === 'hard' ? botWorker() : null;
+  if (!w) return Promise.resolve(botAction(state, 1, level));
+  return new Promise((resolve) => {
+    const id = ++seq;
+    thinking.set(id, { resolve, state, level });
+    w.postMessage({ id, state, pi: 1, level });
+  });
+}
+
+/** The bot's name in the game tells which level it plays at. */
+const BOT_NAMES: Record<BotLevel, string> = {
+  gentle: 'Наставник',
+  easy: 'Бот-послушник',
+  medium: 'Бот-некромант',
+  hard: 'Бот-архилич',
+};
+
 export class BotController extends Controller {
   readonly me: PlayerIdx = 0;
   readonly kind = 'bot';
   private timer = 0;
+  /** Bumped by every new position, so a move thought out for an old one is dropped. */
+  private ticket = 0;
 
-  /** `tutorial` plays the short scripted game against a gentle bot. */
+  /** The `gentle` level plays the short scripted tutorial game. */
   constructor(
     private playerName: string,
-    readonly tutorial = false,
+    readonly level: BotLevel = 'medium',
   ) {
     super();
-    this.counts = !tutorial;
+    this.counts = !this.tutorial;
     this.restart();
+  }
+
+  get tutorial() {
+    return this.level === 'gentle';
   }
 
   restart() {
     this.state = this.tutorial
       ? createTutorialGame(this.playerName)
-      : createGame(randomSeed(), [this.playerName, 'Бот-некромант'], { pool: draftPool() });
+      : createGame(randomSeed(), [this.playerName, BOT_NAMES[this.level]], { pool: draftPool() });
     this.emit();
     this.schedule();
   }
@@ -84,19 +140,26 @@ export class BotController extends Controller {
 
   private schedule() {
     clearTimeout(this.timer);
+    const ticket = ++this.ticket;
     const s = this.state;
     if (!s || s.phase === 'over' || actingPlayer(s) !== 1) return;
-    this.timer = window.setTimeout(() => {
-      const cur = this.state!;
-      const a = botAction(cur, 1, this.tutorial);
-      if (a) this.state = applyAction(cur, 1, a);
-      this.emit();
-      this.schedule();
-    }, botDelay(s));
+    const started = performance.now();
+    think(s, this.level).then((a) => {
+      if (ticket !== this.ticket) return;
+      // The pause is counted from when the bot started thinking.
+      const wait = Math.max(0, botDelay(s) - (performance.now() - started));
+      this.timer = window.setTimeout(() => {
+        if (ticket !== this.ticket) return;
+        if (a) this.state = applyAction(s, 1, a);
+        this.emit();
+        this.schedule();
+      }, wait);
+    });
   }
 
   dispose() {
     clearTimeout(this.timer);
+    this.ticket++;
     super.dispose();
   }
 }
