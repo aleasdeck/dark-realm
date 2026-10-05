@@ -147,6 +147,7 @@ function rulesHtml() {
     <li><b>Агенты</b> остаются на поле и действуют каждый ход. Агентов с провокацией надо сразить первыми, а в конце хода остаток силы сам бьёт по ним и только потом становится престижем.</li>
     <li><b>Контракты</b> срабатывают сразу при покупке и не попадают в колоду. Колода Сундука Бездны целиком из контрактов.</li>
     <li><b>Морок</b> (проклятие) надо разыграть раньше остальных карт в руке.</li>
+    <li>Нажмите на счётчик колоды или сброса, своего или соперника, чтобы посмотреть эти карты. Порядок колоды скрыт.</li>
     <li>За ход можно один раз воззвать к покровителю. Он становится благосклонен к вам, а если благоволил сопернику, то нейтрален.</li>
     <li>Победа: 40 престижа и перевес после хода соперника, или сразу: 80 престижа либо благосклонность всех 4 покровителей.</li>
   </ul><ul class="patron-rules">${patrons}</ul>`;
@@ -480,7 +481,7 @@ app.addEventListener('click', (ev) => {
     return render();
   }
   if (!s) return;
-  if (['end', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-cd'].includes(act)) focus = null;
+  if (['end', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':
@@ -542,6 +543,9 @@ app.addEventListener('click', (ev) => {
       return render();
     case 'pile-cd':
       modal = { kind: 'pile', title: 'Ваш сброс', cards: s.players[me].cooldown };
+      return render();
+    case 'pile-opp-deck':
+      modal = { kind: 'pile', title: 'Колода соперника (порядок скрыт)', cards: s.players[me === 0 ? 1 : 0].deck };
       return render();
     case 'pile-opp-cd':
       modal = { kind: 'pile', title: 'Сброс соперника', cards: s.players[me === 0 ? 1 : 0].cooldown };
