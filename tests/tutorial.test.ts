@@ -61,7 +61,13 @@ describe('coach', () => {
       s = applyAction(s, 0, s.pending ? { t: 'choose', picks: [s.pending.options[0].ref] } : { t: 'play', uid: s.players[0].hand[0].uid });
     }
     expect(coach.hint(s, 0)?.id).toBe('tavern');
+    // The tavern hint has no "OK": it waits for a purchase.
     coach.ack('tavern');
+    expect(coach.hint(s, 0)?.id).toBe('tavern');
+    const coin = s.players[0].coin;
+    const buy = s.tavern.find((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= coin)!;
+    s = applyAction(s, 0, { t: 'buy', uid: buy.uid });
+    while (s.pending) s = applyAction(s, 0, { t: 'choose', picks: s.pending.options.slice(0, s.pending.min).map((o) => o.ref) });
     expect(coach.hint(s, 0)?.id).toBe('patrons');
     coach.ack('patrons');
     expect(coach.hint(s, 0)?.id).toBe('end');

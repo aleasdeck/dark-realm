@@ -1,4 +1,4 @@
-import { PATRONS } from '../engine/cards';
+import { cardDef, PATRONS } from '../engine/cards';
 import { actingPlayer, attackable, other } from '../engine/engine';
 import { TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../engine/tutorial';
 import type { GameState, PlayerIdx } from '../engine/types';
@@ -80,9 +80,12 @@ const SCRIPT: Step[] = [
   {
     id: 'tavern',
     target: '.tavern',
-    text: 'В таверне покупают карты за монеты ●. Яркие вам по карману: нажмите на карту дважды, чтобы купить. Покупка ляжет в сброс и придёт в руку позже, а контракт сработает сразу.',
-    ok: true,
-    done: (s, me) => firstTurnOver(s) || s.players[me].cooldown.length > 0 || s.players[me].agents.length > 0,
+    text: 'В таверне покупают карты за монеты ●. Купите одну из ярких: нажмите на карту, затем ещё раз. Покупка ляжет в сброс и придёт в руку позже, а контракт сработает сразу.',
+    // No "OK" here: the player has to buy something. Only if nothing is affordable does it step aside.
+    done: (s, me) =>
+      firstTurnOver(s) ||
+      s.events.some((e) => e.k === 'buy' && e.p === me) ||
+      !s.tavern.some((c) => cardDef(c.id).cost > 0 && cardDef(c.id).cost <= s.players[me].coin),
   },
   {
     id: 'patrons',
@@ -174,7 +177,7 @@ export class Coach {
   /** The player tapped "OK" on the hint on screen. */
   ack(id: string) {
     if (this.active?.id === id) this.active = null;
-    else if (SCRIPT[this.step]?.id === id) this.step++;
+    else if (SCRIPT[this.step]?.id === id && SCRIPT[this.step].ok) this.step++;
   }
 }
 
