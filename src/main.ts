@@ -14,7 +14,7 @@ import { BotController, Controller, GuestController, HostController } from './ui
 import { clearFx, onStateChange } from './ui/feed';
 import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
-import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tileHtml, type Focus } from './ui/render';
+import { boardHtml, cardHtml, esc, focusView, patronEmblem, patronTipHtml, pileGridHtml, tavernPick, tileHtml, type Focus } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
@@ -234,11 +234,14 @@ function render() {
   } else {
     const myTurn = s.current === me && s.phase === 'play';
     const idle = myTurn && !s.pending && s.queue.length === 0;
-    if (s.pending?.player === me || s.phase === 'over' || autoPlay) focus = null;
-    const view = focus ? focusView(s, me, focus, idle) : null;
+    syncPending(s);
+    // Tavern picks happen on the table itself, with the usual tap-twice; other choices use the sheet.
+    const pick = tavernPick(s, me, selected);
+    if ((!pick && (s.pending?.player === me || autoPlay)) || s.phase === 'over') focus = null;
+    const view = focus ? focusView(s, me, focus, idle, pick) : null;
     if (!view) focus = null;
     savePlayed(app);
-    app.innerHTML = boardHtml(s, me, { myTurn, idle, focus }) + overlays(s);
+    app.innerHTML = boardHtml(s, me, { myTurn, idle, focus, pick }) + overlays(s);
     restorePlayed(app);
     if (view) showZoom(view.html, view.label, view.can);
     // The enlarged card says what to do itself, so the coach steps aside for it.
@@ -303,6 +306,16 @@ function draftHtml(s: GameState): string {
   </div>`;
 }
 
+/** A new choice starts with nothing selected. */
+function syncPending(s: GameState) {
+  const p = s.pending;
+  const key = p ? `${s.turn}:${p.kind}:${p.options.map((o) => o.ref).join(',')}` : '';
+  if (key !== pendingKey) {
+    pendingKey = key;
+    selected = new Set();
+  }
+}
+
 function overlays(s: GameState): string {
   const me = ctrl!.me;
   let html = '';
@@ -320,14 +333,9 @@ function overlays(s: GameState): string {
   }
   if (s.pending) {
     const p = s.pending;
-    const key = `${s.turn}:${p.kind}:${p.options.map((o) => o.ref).join(',')}`;
-    if (key !== pendingKey) {
-      pendingKey = key;
-      selected = new Set();
-    }
     if (p.player !== me) {
       html += `<div class="toast">Соперник делает выбор…</div>`;
-    } else {
+    } else if (!tavernPick(s, me, selected)) {
       const single = p.min === 1 && p.max === 1;
       const opts = p.options
         .map((o) => {
@@ -420,14 +428,19 @@ function tapFocus(next: Focus) {
   const me = ctrl!.me;
   if (focus && focusKey(focus) === focusKey(next)) return confirmFocus();
   focus = next;
-  const view = focusView(s, me, next, idleNow(s));
+  const view = focusView(s, me, next, idleNow(s), tavernPick(s, me, selected));
   if (view) play('click');
   render();
 }
 
 function confirmFocus() {
   const s = ctrl!.state!;
-  const view = focus ? focusView(s, ctrl!.me, focus, idleNow(s)) : null;
+  const view = focus ? focusView(s, ctrl!.me, focus, idleNow(s), tavernPick(s, ctrl!.me, selected)) : null;
+  if (view?.can && view.mark !== undefined) {
+    if (selected.has(view.mark)) selected.delete(view.mark);
+    else selected.add(view.mark);
+    play('click');
+  }
   if (!view?.can || !view.action) {
     focus = null;
     return render();
@@ -481,7 +494,7 @@ app.addEventListener('click', (ev) => {
     return render();
   }
   if (!s) return;
-  if (['end', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
+  if (['end', 'confirm', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':

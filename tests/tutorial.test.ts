@@ -80,4 +80,16 @@ describe('coach', () => {
     coach.off = true;
     expect(coach.hint(s, 0)).toBeNull();
   });
+
+  it('points at the tavern for picks made in it and keeps the choice hint for the rest', () => {
+    const coach = new Coach();
+    let s = draft(createTutorialGame('A'));
+    coach.hint(s, 0);
+    const card = s.tavern[0];
+    const acquire = { ...s, pending: { player: 0 as const, kind: 'acquire' as const, prompt: '', options: [{ label: '', ref: card.uid }], min: 0, max: 1 } };
+    expect(coach.hint(acquire, 0)?.id).toBe('tavern-pick');
+    expect(coach.hint(acquire, 0)?.target).toContain('.tavern');
+    s = { ...s, pending: { player: 0, kind: 'choice', prompt: '', options: [{ label: 'a', ref: 0 }, { label: 'b', ref: 1 }], min: 1, max: 1 } };
+    expect(coach.hint(s, 0)?.id).toBe('choice');
+  });
 });

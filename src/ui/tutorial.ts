@@ -28,6 +28,9 @@ interface Step extends Hint {
 const myTurn = (s: GameState, me: PlayerIdx) => s.phase === 'play' && s.current === me;
 const idle = (s: GameState, me: PlayerIdx) => myTurn(s, me) && !s.pending && s.queue.length === 0;
 const firstTurnOver = (s: GameState) => s.turn > 1;
+/** Cards to take from the tavern are picked right in it (see tavernPick in render.ts). */
+const tavernPicking = (s: GameState, me: PlayerIdx) =>
+  s.pending?.player === me && ['acquire', 'bargain', 'replaceTavern'].includes(s.pending.kind);
 
 const draftPick = (n: number): Step => {
   const pid = TUTORIAL_PATRONS[n === 0 ? 0 : 3];
@@ -117,11 +120,19 @@ const SCRIPT: Step[] = [
 /** Hints for situations that come up on their own, shown the first time only. */
 const EVENTS: Step[] = [
   {
+    id: 'tavern-pick',
+    target: '.tavern, .controls .end',
+    text: 'Карта даёт выбрать карту в таверне. Подходящие подсвечены: нажмите на карту, затем ещё раз, чтобы выбрать её. Кнопка внизу закончит выбор.',
+    ok: true,
+    when: (s, me) => tavernPicking(s, me),
+    done: (s, me) => !tavernPicking(s, me),
+  },
+  {
     id: 'choice',
     text: 'Карта предлагает выбор. Нажмите на нужный вариант.',
     top: true,
     ok: true,
-    when: (s, me) => s.pending?.player === me,
+    when: (s, me) => s.pending?.player === me && !tavernPicking(s, me),
     done: (s, me) => s.pending?.player !== me,
   },
   {
