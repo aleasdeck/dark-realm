@@ -434,7 +434,13 @@ input {
 }
 /* agents fill the strip's height, and shrink only when there are too many to fit across */
 .strip .agents .chip {
-  --chip: min(calc(100cqh - 4px), calc((100cqw - var(--reserve, 0px) - 12px) / max(var(--na), 1) - 6px), calc(var(--tw) * 1.6));
+  /* upright like a card: full strip height, 0.72 as wide */
+  --ch: min(calc(100cqh - 4px), calc(((100cqw - var(--reserve, 0px) - 12px) / max(var(--na), 1) - 6px) / 0.72), calc(var(--tw) * 1.5));
+  height: var(--ch);
+  width: calc(var(--ch) * 0.72);
+}
+.strip .agents .chip img {
+  object-fit: cover;
 }
 .strip .agents .c-hp {
   width: 26px;
@@ -776,7 +782,7 @@ input {
   width: var(--hw);
   margin-left: calc(var(--hw) / -2);
   transform-origin: 50% 100%;
-  transform: translateX(calc(var(--o) * var(--step))) translateY(calc(var(--ao) * var(--ao) * 2.5px)) rotate(calc(var(--o) * 4deg));
+  transform: translateX(calc(var(--o) * var(--step))) translateY(calc(var(--ao) * var(--ao) * 1px)) rotate(calc(var(--o) * 2deg));
   transition:
     transform 0.2s ease-out,
     translate 0.15s ease-out,
@@ -799,7 +805,7 @@ input {
 }
 .opp-hand {
   position: relative;
-  height: 24px;
+  height: 30px;
   margin: -6px 0 -2px;
 }
 .back {
@@ -807,18 +813,18 @@ input {
   left: 50%;
   bottom: 0;
   z-index: 1;
-  width: 34px;
-  height: 48px;
-  margin-left: -17px;
+  width: 38px;
+  height: 54px;
+  margin-left: -19px;
   border: 2px solid #6e3a2a;
   border-radius: 5px;
   background:
     radial-gradient(circle at 50% 70%, #5a1d1d 0 9px, transparent 10px),
     repeating-linear-gradient(45deg, #2a1414 0 4px, #170909 4px 8px);
   box-shadow: 0 2px 4px #000c;
-  /* the mirror of your fan: centre lowest, edges curving up under the bar */
+  /* your fan turned upside down: it opens toward you, centre card lowest */
   transform-origin: 50% 0;
-  transform: translateX(calc(var(--o) * 20px)) translateY(calc(var(--ao) * var(--ao) * -2px)) rotate(calc(var(--o) * 5deg));
+  transform: translateX(calc(var(--o) * 22px)) translateY(calc(var(--ao) * var(--ao) * -2px)) rotate(calc(var(--o) * -6deg));
   display: flex;
   align-items: flex-end;
   justify-content: center;
