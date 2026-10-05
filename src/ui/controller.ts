@@ -26,8 +26,8 @@ export abstract class Controller {
 
   protected emit() {
     const over = this.state?.phase === 'over';
-    // A game counts once, when it ends after the draft.
-    if (over && !this.wasOver) this.unlocked = this.counts && this.state!.turn > 0 ? recordGame() : [];
+    // A game counts once, when it ends after the draft; only a win moves the unlocks.
+    if (over && !this.wasOver) this.unlocked = this.counts && this.state!.turn > 0 ? recordGame(this.state!.winner === this.me) : [];
     else if (!over) this.unlocked = [];
     this.wasOver = over;
     for (const fn of this.listeners) fn();
