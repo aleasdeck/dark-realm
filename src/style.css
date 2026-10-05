@@ -553,7 +553,7 @@ input {
   background: #0a140e;
   border: 1px solid var(--line);
 }
-/* each patron sits on a track: the opponent's end on top, yours at the bottom, toward your table */
+/* the emblem stays centred; the tile's colour says whose side the patron is on */
 .patron {
   display: flex;
   flex-direction: column;
@@ -569,10 +569,13 @@ input {
 .p-track {
   position: relative;
   width: 100%;
-  height: calc(var(--emb) * 1.75);
+  height: calc(var(--emb) * 1.4);
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, #3a161640 0%, transparent 35%, transparent 65%, #12382140 100%);
+  background: #07110b;
+  transition:
+    background 0.35s,
+    border-color 0.35s;
 }
 .p-track img {
   position: absolute;
@@ -582,23 +585,14 @@ input {
   height: var(--emb);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  transition: top 0.35s ease-out;
 }
 .patron.fav-mine .p-track {
   border-color: var(--you);
-  background: linear-gradient(180deg, transparent 30%, #1f6a3a 100%);
-}
-.patron.fav-mine img {
-  top: calc(100% - var(--emb) / 2 - 1px);
-  filter: drop-shadow(0 0 5px var(--you));
+  background: radial-gradient(circle, #2f9a55 0%, #1a5a32 70%);
 }
 .patron.fav-theirs .p-track {
   border-color: var(--them);
-  background: linear-gradient(0deg, transparent 30%, #6a1f1f 100%);
-}
-.patron.fav-theirs img {
-  top: calc(var(--emb) / 2 + 1px);
-  filter: drop-shadow(0 0 5px var(--them));
+  background: radial-gradient(circle, #a83a30 0%, #5e1c18 70%);
 }
 .p-name {
   font-family: var(--title-font);
@@ -611,27 +605,10 @@ input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.p-side {
-  font-family: var(--narrow-font);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  padding: 0 5px;
-  border-radius: 4px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.fav-mine .p-side {
-  background: var(--you);
-  color: #04120a;
-}
-.fav-theirs .p-side {
-  background: var(--them);
-  color: #1a0505;
-}
 .patron.can .p-track {
-  box-shadow: 0 0 10px var(--green-glow);
-  border-color: var(--green-glow);
+  /* gold, so "can call now" never reads as green "on your side" */
+  box-shadow: 0 0 10px #f0c860aa;
+  outline: 1px solid var(--gold);
 }
 .patron.focused .p-track {
   outline: 2px solid var(--glow);

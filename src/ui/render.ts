@@ -136,8 +136,6 @@ function favorOf(s: GameState, me: PlayerIdx, pid: PatronId): 'fixed' | 'neutral
   return pid === 'treasury' ? 'fixed' : f === undefined || f === null ? 'neutral' : f === me ? 'mine' : 'theirs';
 }
 
-const SIDE_LABEL = { fixed: 'всегда', neutral: 'нейтр.', mine: '▼ к вам', theirs: '▲ к врагу' };
-
 function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId, focused: boolean): string {
   const def = PATRONS[pid];
   const favor = favorOf(s, me, pid);
@@ -145,7 +143,6 @@ function patronHtml(s: GameState, me: PlayerIdx, pid: PatronId, focused: boolean
   return `<div class="patron fav-${favor}${can ? ' can' : ''}${focused ? ' focused' : ''}" style="--accent:${def.palette.accent};--glow:${def.palette.glow}" data-act="inspect-patron" data-patron="${pid}" data-tip="patron">
     <div class="p-track"><img src="${patronEmblem(pid)}" alt="" draggable="false"></div>
     <span class="p-name">${esc(def.name.split(' ')[0])}</span>
-    <span class="p-side">${SIDE_LABEL[favor]}</span>
   </div>`;
 }
 
