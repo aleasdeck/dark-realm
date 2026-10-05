@@ -32,6 +32,21 @@ describe('bot levels', () => {
     }
   });
 
+  it('every level drafts at random among the offered patrons', () => {
+    const pool = [...DRAFTABLE, 'hunding' as const];
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      const firstPicks = new Set<string>();
+      for (let seed = 1; seed <= 30; seed++) {
+        let s = createGame(seed, ['A', 'B'], { pool });
+        s = applyAction(s, 0, { t: 'draft', patron: s.draftPool[0] });
+        const a = botAction(s, 1, level)!;
+        expect(a.t === 'draft' && pool.includes(a.patron)).toBe(true);
+        if (a.t === 'draft') firstPicks.add(a.patron);
+      }
+      expect(firstPicks.size).toBeGreaterThanOrEqual(4);
+    }
+  });
+
   it('the hard bot does not change the game it looks at', () => {
     let s = createGame(4, ['A', 'B']);
     for (let i = 0; i < 30; i++) {
