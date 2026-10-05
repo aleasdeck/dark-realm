@@ -30,6 +30,12 @@ export class RuleError extends Error {}
 
 const DRAFT_ORDER: PlayerIdx[] = [0, 1, 1, 0];
 
+/** Who drafted a patron, from its place in the pick order; null for the treasury, which nobody picks. */
+export function draftedBy(s: GameState, pid: PatronId): PlayerIdx | null {
+  const i = s.patrons.indexOf(pid);
+  return i >= 0 && i < DRAFT_ORDER.length && pid !== 'treasury' ? DRAFT_ORDER[i] : null;
+}
+
 const other = (p: PlayerIdx): PlayerIdx => (p === 0 ? 1 : 0);
 
 function newPlayer(name: string): PlayerState {

@@ -619,13 +619,56 @@ input {
 }
 
 .patrons {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 5px;
+  /* your patrons | the treasury | the opponent's */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   padding: 4px;
   border-radius: 10px;
   background: #0a140e;
   border: 1px solid var(--line);
+  overflow: hidden;
+  isolation: isolate;
+}
+.p-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+/* thin golden rays fan out from the treasury toward both players' patrons */
+.p-rays {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0 74deg,
+    #f0c86055 75deg 75.6deg,
+    transparent 76deg 82deg,
+    #f0c86088 83deg 83.8deg,
+    transparent 84deg 89.4deg,
+    #f0c860cc 89.4deg 90.6deg,
+    transparent 90.6deg 96deg,
+    #f0c86088 96.2deg 97deg,
+    transparent 97deg 104deg,
+    #f0c86055 104.4deg 105deg,
+    transparent 105deg 254deg,
+    #f0c86055 255deg 255.6deg,
+    transparent 256deg 262deg,
+    #f0c86088 263deg 263.8deg,
+    transparent 264deg 269.4deg,
+    #f0c860cc 269.4deg 270.6deg,
+    transparent 270.6deg 276deg,
+    #f0c86088 276.2deg 277deg,
+    transparent 277deg 284deg,
+    #f0c86055 284.4deg 285deg,
+    transparent 285deg
+  );
+  -webkit-mask-image: radial-gradient(ellipse 50% 140% at 50% 50%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 140% at 50% 50%, #000 30%, transparent 100%);
 }
 /* the emblem stays centred; the tile's colour says whose side the patron is on */
 .patron {
@@ -686,6 +729,30 @@ input {
 }
 .patron.focused .p-track {
   outline: 2px solid var(--glow);
+}
+/* the treasury is no plaque but a large golden disc, as tall as a patron with its name */
+.patron.chest {
+  --disc: calc(var(--emb) * 1.4 + 16px);
+}
+.chest .p-track {
+  width: var(--disc);
+  height: var(--disc);
+  border-radius: 50%;
+  border: 2px solid #c9a24a;
+  background: radial-gradient(circle, #5a4418 0%, #2a1f0a 60%, #120d04 100%);
+  box-shadow:
+    0 0 14px #f0c86066,
+    inset 0 0 10px #000c;
+}
+.chest .p-track img {
+  width: calc(var(--disc) * 0.72);
+  height: calc(var(--disc) * 0.72);
+}
+.patron.chest.can .p-track {
+  outline: none;
+  box-shadow:
+    0 0 20px #f0c860cc,
+    inset 0 0 10px #000c;
 }
 
 .tavern {
@@ -1012,7 +1079,8 @@ input {
       'patrons ctrl';
     column-gap: 10px;
   }
-  .patron {
+  .patron,
+  .patron.chest {
     --emb: 26px;
   }
   .controls button {
