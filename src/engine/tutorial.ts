@@ -6,8 +6,11 @@ import type { GameState, PatronId } from './types';
 export const TUTORIAL_PATRONS: PatronId[] = ['crows', 'hlaalu', 'pelin', 'eagle'];
 export const TUTORIAL_GOAL = 20;
 export const TUTORIAL_INSTANT = 40;
-/** Fixed deal whose first hand can afford a card in the tavern. */
-export const TUTORIAL_SEED = 3;
+/**
+ * Fixed deal: the first hand pays for the Chest (2 coins) and still buys a card in the tavern,
+ * and the second hand has the 2 power the Eagle asks for.
+ */
+export const TUTORIAL_SEED = 11;
 
 /**
  * A short game against the gentle bot. Only the tutorial patrons are offered: the player drafts
