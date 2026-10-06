@@ -1580,6 +1580,19 @@ button.toggle[aria-pressed='true'] b {
   flex-wrap: wrap;
   justify-content: center;
 }
+.toast.away {
+  border-color: #c9a227;
+  background: #2a2410;
+  animation: away-pulse 1.6s ease-in-out infinite;
+}
+@keyframes away-pulse {
+  50% {
+    border-color: #6b5715;
+  }
+}
+.dialog.reconnect .wait {
+  margin: 8px 0 14px;
+}
 .toast {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));

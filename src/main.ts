@@ -11,6 +11,7 @@ import { actingPlayer, canCancel } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
+import { forgetMatch, savedMatch } from './net/saved';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
 import { closeCoin, showCoin } from './ui/coin';
 import { clearFx, onStateChange } from './ui/feed';
@@ -38,7 +39,6 @@ import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
-let cancelHost: (() => void) | null = null;
 let selected = new Set<number>();
 let pendingKey = '';
 let autoPlay = false;
@@ -108,11 +108,9 @@ function roomLink(code: string) {
 
 // ── screens ──────────────────────────────────────────────
 
-function leaveGame() {
+function leaveGame(message = '') {
   ctrl?.dispose();
   ctrl = null;
-  cancelHost?.();
-  cancelHost = null;
   autoPlay = false;
   modal = null;
   focus = null;
@@ -124,7 +122,7 @@ function leaveGame() {
   clearMotion();
   const peer = new URLSearchParams(location.search).get('peer');
   history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
-  menu();
+  menu(message);
 }
 
 function menu(message = '') {
@@ -230,45 +228,46 @@ function rulesHtml() {
 function waiting(text: string, extra = '') {
   app.innerHTML = `<div class="menu"><h1 class="title small">Dark Realm</h1><p class="wait">${text}</p>${extra}
     <button data-go="back">Назад</button></div>`;
-  app.querySelector('[data-go="back"]')!.addEventListener('click', leaveGame);
+  app.querySelector('[data-go="back"]')!.addEventListener('click', () => leaveGame());
 }
 
-async function host(name: string) {
-  const code = newRoomCode();
-  waiting('Открываем комнату…');
-  try {
-    const room = await hostRoom(code, (connect) => {
-      startGame(new HostController(name, connect));
-    });
-    cancelHost = room.cancel;
-    if (ctrl) return;
-    const link = roomLink(code);
-    waiting(
-      'Ждём соперника. Отправьте ему код или ссылку.',
-      `<div class="room-code">${code}</div>
-       <div class="join"><input readonly value="${esc(link)}" id="link"><button id="copy">Копировать</button></div>`,
-    );
-    app.querySelector('#copy')?.addEventListener('click', () => {
-      const input = app.querySelector<HTMLInputElement>('#link')!;
-      input.select();
-      navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
-    });
-  } catch (e) {
-    menu(e instanceof Error ? e.message : String(e));
-  }
+function host(name: string) {
+  startGame(new HostController(name, newRoomCode(), hostRoom));
 }
 
-async function join(name: string, code: string) {
+/** The open room, waiting for the opponent: its code and a link to send. */
+function roomScreen(code: string) {
+  const link = roomLink(code);
+  waiting(
+    'Ждём соперника. Отправьте ему код или ссылку.',
+    `<div class="room-code">${code}</div>
+     <div class="join"><input readonly value="${esc(link)}" id="link"><button id="copy">Копировать</button></div>`,
+  );
+  app.querySelector('#copy')?.addEventListener('click', () => {
+    const input = app.querySelector<HTMLInputElement>('#link')!;
+    input.select();
+    navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
+  });
+}
+
+function join(name: string, code: string) {
   if (!code) return menu('Введите код комнаты.');
-  waiting(`Подключаемся к комнате ${esc(code)}…`);
-  const guest = new GuestController();
-  try {
-    const link = await joinRoom(code, guest.handlers());
-    startGame(guest);
-    guest.attach(link, name);
-  } catch (e) {
-    menu(e instanceof Error ? e.message : String(e));
+  startGame(new GuestController(code, name, joinRoom));
+}
+
+/** A network match this page was playing before a reload or a crash picks up where it was. */
+function resume(): boolean {
+  const m = savedMatch();
+  if (!m) return false;
+  // A link to another room means the player is off to a new game.
+  const linked = roomFromUrl();
+  if (linked && linked !== m.code) {
+    forgetMatch(m.role);
+    return false;
   }
+  if (m.role === 'host') startGame(new HostController(m.name, m.code, hostRoom, m));
+  else startGame(new GuestController(m.code, m.name, joinRoom, true));
+  return true;
 }
 
 function startGame(c: Controller) {
@@ -294,9 +293,11 @@ function startGame(c: Controller) {
 
 function render() {
   if (!ctrl) return;
+  if (ctrl.gone) return leaveGame(ctrl.gone);
   const s = ctrl.state;
   if (!s) {
-    waiting(ctrl.notice || 'Ждём…');
+    if (ctrl instanceof HostController && ctrl.ready && !ctrl.notice) roomScreen(ctrl.code);
+    else waiting(esc(ctrl.notice || 'Ждём…'));
     return;
   }
   const me = ctrl.me;
@@ -309,9 +310,10 @@ function render() {
   lastError = ctrl.error;
   hint = coach?.hint(s, me) ?? null;
   if (s.phase === 'draft') {
-    app.innerHTML = draftHtml(s);
+    app.innerHTML = draftHtml(s) + netOverlay(s);
     if (hint) showHint(app, hint);
-    if (s.first !== undefined && !tossed) {
+    // A match picked up after a reload doesn't toss again once the draft is under way.
+    if (s.first !== undefined && !tossed && s.draftStep === 0) {
       tossed = true;
       const c = ctrl;
       showCoin(s.first === me, () => c.tossShown());
@@ -404,10 +406,28 @@ function syncPending(s: GameState) {
   }
 }
 
+/**
+ * A network match with the other side gone: the guest can't move at all, so the table waits
+ * under a dialog until the host is back; the host plays on with a notice up until the guest returns.
+ */
+function netOverlay(s: GameState): string {
+  if (s.phase === 'over') return '';
+  if (ctrl instanceof GuestController && ctrl.offline) {
+    return `<div class="overlay"><div class="dialog reconnect"><h2>Нет связи</h2>
+      <p class="wait">${esc(ctrl.notice)}</p>
+      <div class="buttons"><button class="ghost" data-act="leave">В меню</button></div></div></div>`;
+  }
+  if (ctrl instanceof HostController && !ctrl.online) return `<div class="toast away">${esc(ctrl.notice)}</div>`;
+  return '';
+}
+
 function overlays(s: GameState): string {
   const me = ctrl!.me;
-  let html = '';
-  const banner = ctrl!.notice || ctrl!.error;
+  const net = netOverlay(s);
+  if (net && ctrl instanceof GuestController) return net;
+  let html = net;
+  // While the guest is away, the host's notice says so in place of the usual banner.
+  const banner = net ? '' : ctrl!.notice || ctrl!.error;
   if (banner) html += `<div class="toast">${esc(banner)}</div>`;
   if (s.phase === 'over') {
     const win = s.winner === me;
@@ -422,7 +442,7 @@ function overlays(s: GameState): string {
   if (s.pending) {
     const p = s.pending;
     if (p.player !== me) {
-      html += `<div class="toast">Соперник делает выбор…</div>`;
+      if (!banner && !net) html += `<div class="toast">Соперник делает выбор…</div>`;
     } else if (!tavernPick(s, me, selected)) {
       // One card at most: a tap picks it at once, and an optional pick can be skipped.
       const single = p.max === 1;
@@ -716,4 +736,4 @@ window.addEventListener('resize', () => {
   if (focus) render();
 });
 
-menu();
+if (!resume()) menu();
