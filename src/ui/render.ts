@@ -145,13 +145,16 @@ export function chipHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {},
   </div>`;
 }
 
-/** Cards played this turn as a vertical column, newest on top, that shows up to five and scrolls through the rest. */
+/**
+ * Cards played this turn as a vertical column, newest on top, that shows up to five and scrolls through the rest.
+ * A tap on any of them opens them all in a sheet.
+ */
 function playedHtml(cards: Card[], side: 'me' | 'opp', focusUid: number): string {
   if (!cards.length) return '';
   const rows = [...cards]
     .reverse()
     // the stacking index keeps each card above the older one peeking out under it
-    .map((c, i) => chipHtml(c.id, { act: 'inspect', uid: c.uid, cls: 'played' + (c.uid === focusUid ? ' focused' : ''), tip: true }, `--i:${i}`))
+    .map((c, i) => chipHtml(c.id, { act: 'played', uid: c.uid, cls: 'played' + (c.uid === focusUid ? ' focused' : ''), tip: true }, `--i:${i}`))
     .join('');
   return `<div class="part played-part" aria-label="Разыграно: ${cards.length}"><div class="pl-list" data-side="${side}" data-clip>${rows}</div></div>`;
 }

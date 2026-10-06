@@ -1565,6 +1565,10 @@ button.toggle[aria-pressed='true'] b {
 .opt-card .tile {
   cursor: pointer;
 }
+/* keeps the cost and type badges on their card instead of the corner of the screen */
+.options .tile {
+  position: relative;
+}
 .opt-card.selected .tile {
   outline: 3px solid var(--green-glow);
   box-shadow: 0 0 14px var(--green-glow);

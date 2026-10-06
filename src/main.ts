@@ -43,7 +43,8 @@ let ctrl: Controller | null = null;
 let selected = new Set<number>();
 let pendingKey = '';
 let autoPlay = false;
-let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'log' } | { kind: 'menu' } | null = null;
+/** Open sheet; the played cards one follows the table live, so a play while it is open shows up in it. */
+let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'played'; side: 'me' | 'opp' } | { kind: 'log' } | { kind: 'menu' } | null = null;
 let focus: Focus | null = null;
 /**
  * A card opened from a sheet (a pile or a choice) to read its text; ref is set when the card
@@ -496,14 +497,23 @@ function overlays(s: GameState): string {
       </div></div></div>`;
   } else if (modal?.kind === 'pile') {
     const cards = [...modal.cards].sort((a, b) => cardDef(a.id).name.localeCompare(cardDef(b.id).name));
-    html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet pile-view">
-      <h2>${esc(modal.title)} (${cards.length})</h2>
-      <div class="options">${pileGridHtml(cards) || '<p>Пусто</p>'}</div>
-      <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
+    html += pileSheet(`${modal.title} (${cards.length})`, cards);
+  } else if (modal?.kind === 'played') {
+    // In the order they were played; the turn passing sends them to the discard and shuts the sheet.
+    const cards = s.players[modal.side === 'me' ? me : me === 0 ? 1 : 0].played;
+    if (cards.length) html += pileSheet(`${modal.side === 'me' ? 'Вы разыграли' : 'Соперник разыграл'} за ход (${cards.length})`, cards);
+    else modal = null;
   }
-  if (peek && (modal?.kind === 'pile' || (peek.ref !== undefined && s.pending?.player === me))) html += peekHtml(s.pending, peek);
+  if (peek && (modal?.kind === 'pile' || modal?.kind === 'played' || (peek.ref !== undefined && s.pending?.player === me))) html += peekHtml(s.pending, peek);
   else peek = null;
   return html;
+}
+
+function pileSheet(title: string, cards: Card[]): string {
+  return `<div class="overlay sheet-wrap" data-act="close"><div class="sheet pile-view">
+      <h2>${esc(title)}</h2>
+      <div class="options">${pileGridHtml(cards) || '<p>Пусто</p>'}</div>
+      <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
 }
 
 /**
@@ -642,7 +652,7 @@ app.addEventListener('click', (ev) => {
     return render();
   }
   if (!s) return;
-  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
+  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'played', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':
@@ -691,6 +701,10 @@ app.addEventListener('click', (ev) => {
       return ctrl.dispatch({ t: 'cancel' });
     case 'inspect':
       return tapFocus({ kind: 'card', uid });
+    case 'played':
+      play('click');
+      modal = { kind: 'played', side: el.closest<HTMLElement>('.pl-list')?.dataset.side === 'opp' ? 'opp' : 'me' };
+      return render();
     case 'inspect-patron':
       return tapFocus({ kind: 'patron', patron: el.dataset.patron as PatronId });
     case 'confirm-focus':
