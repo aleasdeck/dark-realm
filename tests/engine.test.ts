@@ -144,6 +144,30 @@ describe('engine', () => {
     expect(s.pending!.options.map((o) => o.ref).sort()).toEqual([960, 961]);
   });
 
+  it('knocks out up to two agents: none, one or two, as the player picks', () => {
+    const setup = () => {
+      const s = draftAll(createGame(14, ['A', 'B']));
+      s.players[0].hand = [{ uid: 1000, id: 'rajhin_lullaby' }];
+      s.players[1].agents = [1001, 1002, 1003].map((uid) => ({ uid, id: 'pelin_sentries', dmg: 0, activated: false }));
+      return applyAction(s, 0, { t: 'play', uid: 1000 });
+    };
+    let s = setup();
+    expect(s.pending?.kind).toBe('knockout');
+    expect(s.pending!.min).toBe(0);
+    expect(s.pending!.max).toBe(2);
+    expect(() => applyAction(s, 0, { t: 'choose', picks: [1001, 1002, 1003] })).toThrow();
+    for (const picks of [[], [1002], [1001, 1003]]) {
+      s = applyAction(setup(), 0, { t: 'choose', picks });
+      expect(s.pending).toBeNull();
+      expect(s.players[1].agents.map((a) => a.uid).sort()).toEqual([1001, 1002, 1003].filter((u) => !picks.includes(u)));
+      expect(s.players[0].coin).toBe(2);
+    }
+    // The bot still takes as many as it may.
+    s = setup();
+    const a = botAction(s, 0)!;
+    expect(a.t === 'choose' && a.picks.length).toBe(2);
+  });
+
   it('a curse in hand must be played first', () => {
     let s = draftAll(createGame(11, ['A', 'B']));
     s.players[0].hand = [{ uid: 970, id: 'gold' }, { uid: 971, id: 'bewilderment' }];

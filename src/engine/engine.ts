@@ -340,7 +340,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return ask(s, {
         player: pi,
         kind: 'confine',
-        prompt: `Заточите до ${e.n} карт из сброса соперника`,
+        prompt: e.n === 1 ? 'Заточите карту из сброса соперника' : `Заточите ${e.n} карт(ы) из сброса соперника`,
         options: opp.cooldown.map((c) => cardOption(c)),
         min: e.n,
         max: e.n,
@@ -417,9 +417,10 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return ask(s, {
         player: pi,
         kind: 'knockout',
-        prompt: 'Сразите агента соперника',
+        prompt: e.n === 1 ? 'Сразите агента соперника' : `Сразите до ${e.n} агентов соперника`,
         options: opp.agents.map((a) => cardOption(a)),
-        min: Math.min(e.n, opp.agents.length),
+        // "Up to": the player may knock out fewer agents, or none.
+        min: 0,
         max: e.n,
       });
     }

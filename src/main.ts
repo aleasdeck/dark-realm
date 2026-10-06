@@ -424,7 +424,8 @@ function overlays(s: GameState): string {
     if (p.player !== me) {
       html += `<div class="toast">Соперник делает выбор…</div>`;
     } else if (!tavernPick(s, me, selected)) {
-      const single = p.min === 1 && p.max === 1;
+      // One card at most: a tap picks it at once, and an optional pick can be skipped.
+      const single = p.max === 1;
       const opts = p.options
         .map((o) => {
           const sel = selected.has(o.ref) ? ' selected' : '';
@@ -434,11 +435,11 @@ function overlays(s: GameState): string {
         })
         .join('');
       const ok = selected.size >= p.min && selected.size <= p.max;
-      const range = p.min === p.max ? `${p.min}` : `${p.min}–${p.max}`;
+      const range = p.min === p.max ? `${p.min}` : p.min === 0 ? `до ${p.max}` : `${p.min}–${p.max}`;
       html += `<div class="overlay sheet-wrap"><div class="sheet choice">
         <h2>${esc(p.prompt)}</h2><p class="hint">Выберите ${range}</p>
         <div class="options">${opts}</div>
-        ${single ? '' : `<div class="buttons"><button data-act="confirm" ${ok ? '' : 'disabled'}>Готово (${selected.size})</button></div>`}
+        ${single && p.min > 0 ? '' : `<div class="buttons"><button data-act="confirm" ${ok ? '' : 'disabled'}>${single || (selected.size === 0 && p.min === 0) ? 'Пропустить' : `Готово (${selected.size})`}</button></div>`}
       </div></div>`;
     }
   }
@@ -611,7 +612,7 @@ app.addEventListener('click', (ev) => {
       const p = s.pending;
       if (!p) return;
       const ref = Number(el.dataset.ref);
-      if (p.min === 1 && p.max === 1) return ctrl.dispatch({ t: 'choose', picks: [ref] });
+      if (p.max === 1) return ctrl.dispatch({ t: 'choose', picks: [ref] });
       if (selected.has(ref)) selected.delete(ref);
       else if (selected.size < p.max) selected.add(ref);
       return render();
