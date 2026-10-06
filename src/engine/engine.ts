@@ -28,15 +28,20 @@ import type {
 
 export class RuleError extends Error {}
 
-const DRAFT_ORDER: PlayerIdx[] = [0, 1, 1, 0];
+const other = (p: PlayerIdx): PlayerIdx => (p === 0 ? 1 : 0);
+
+/** Pick order of the draft: the first player, the second twice, the first again. */
+const DRAFT_PICKS = 4;
+function drafter(s: GameState, step: number): PlayerIdx {
+  const first = s.first ?? 0;
+  return step === 0 || step === 3 ? first : other(first);
+}
 
 /** Who drafted a patron, from its place in the pick order; null for the treasury, which nobody picks. */
 export function draftedBy(s: GameState, pid: PatronId): PlayerIdx | null {
   const i = s.patrons.indexOf(pid);
-  return i >= 0 && i < DRAFT_ORDER.length && pid !== 'treasury' ? DRAFT_ORDER[i] : null;
+  return i >= 0 && i < DRAFT_PICKS && pid !== 'treasury' ? drafter(s, i) : null;
 }
-
-const other = (p: PlayerIdx): PlayerIdx => (p === 0 ? 1 : 0);
 
 function newPlayer(name: string): PlayerState {
   return { name, deck: [], hand: [], played: [], cooldown: [], agents: [], coin: 0, power: 0, prestige: 0, pendingDiscard: 0 };
@@ -53,6 +58,8 @@ export interface GameOptions {
   tavernTop?: string[];
   /** How many of the first player's purchases go on top of their deck (the tutorial). */
   buyOnTop?: number;
+  /** Who moves first, as the coin fell; player 0 when no coin was tossed (the tutorial). */
+  first?: PlayerIdx;
 }
 
 export function createGame(seed: number, names: [string, string], opts: GameOptions = {}): GameState {
@@ -63,7 +70,7 @@ export function createGame(seed: number, names: [string, string], opts: GameOpti
     rng: seed | 0,
     nextUid: 1,
     players: [newPlayer(names[0]), newPlayer(names[1])],
-    current: 0,
+    current: opts.first ?? 0,
     turn: 0,
     patrons: [],
     draftPool: [...(pool ?? DRAFTABLE)],
@@ -85,7 +92,7 @@ export function createGame(seed: number, names: [string, string], opts: GameOpti
 
 /** Whose input the game is waiting for. */
 export function actingPlayer(s: GameState): PlayerIdx {
-  if (s.phase === 'draft') return DRAFT_ORDER[s.draftStep];
+  if (s.phase === 'draft') return drafter(s, s.draftStep);
   if (s.pending) return s.pending.player;
   return s.current;
 }
@@ -247,12 +254,13 @@ function startMatch(s: GameState) {
   refillTavern(s);
   drawCards(s, s.players[0], HAND_SIZE);
   drawCards(s, s.players[1], HAND_SIZE);
+  const first = s.first ?? 0;
   s.phase = 'play';
-  s.current = 0;
+  s.current = first;
   s.turn = 1;
   log(s, `Покровители: ${s.patrons.map((p) => PATRONS[p].name).join(', ')}`);
-  log(s, `Ход ${s.turn}: ${s.players[0].name}`);
-  emit(s, { k: 'turn', p: 0 });
+  log(s, `Ход ${s.turn}: ${s.players[first].name}`);
+  emit(s, { k: 'turn', p: first });
 }
 
 // ── effect resolution ────────────────────────────────────
@@ -918,7 +926,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
     log(s, `${s.players[pi].name} выбирает покровителя «${PATRONS[a.patron].name}»`);
     emit(s, { k: 'draft', p: pi, patron: a.patron });
     s.draftStep++;
-    if (s.draftStep >= DRAFT_ORDER.length) startMatch(s);
+    if (s.draftStep >= DRAFT_PICKS) startMatch(s);
     return s;
   }
 

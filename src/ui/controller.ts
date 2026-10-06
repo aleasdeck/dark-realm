@@ -34,10 +34,20 @@ export abstract class Controller {
   }
 
   abstract dispatch(a: Action): void;
+  /** The coin toss has been shown; the game may go on. */
+  tossShown() {}
   dispose() {
     this.listeners = [];
   }
 }
+
+/** The coin toss: who moves first and opens the draft. */
+export function tossCoin(): PlayerIdx {
+  return Math.random() < 0.5 ? 0 : 1;
+}
+
+/** Longest the bot waits for the coin toss to be shown before it plays on anyway. */
+const TOSS_WAIT_MS = 8000;
 
 /** Pause before the bot's next move, long enough to follow what it does. */
 function botDelay(s: GameState): number {
@@ -102,6 +112,9 @@ export class BotController extends Controller {
   private timer = 0;
   /** Bumped by every new position, so a move thought out for an old one is dropped. */
   private ticket = 0;
+  /** While the coin is in the air the bot doesn't pick, even when it won the toss. */
+  private tossing = false;
+  private tossTimer = 0;
 
   /** The `gentle` level plays the short scripted tutorial game. */
   constructor(
@@ -120,8 +133,19 @@ export class BotController extends Controller {
   restart() {
     this.state = this.tutorial
       ? createTutorialGame(this.playerName)
-      : createGame(randomSeed(), [this.playerName, BOT_NAMES[this.level]], { pool: draftPool() });
+      : createGame(randomSeed(), [this.playerName, BOT_NAMES[this.level]], { pool: draftPool(), first: tossCoin() });
+    // The tutorial is dealt the same every time and tosses no coin.
+    this.tossing = this.state.first !== undefined;
+    clearTimeout(this.tossTimer);
+    if (this.tossing) this.tossTimer = window.setTimeout(() => this.tossShown(), TOSS_WAIT_MS);
     this.emit();
+    this.schedule();
+  }
+
+  tossShown() {
+    if (!this.tossing) return;
+    this.tossing = false;
+    clearTimeout(this.tossTimer);
     this.schedule();
   }
 
@@ -142,7 +166,7 @@ export class BotController extends Controller {
     clearTimeout(this.timer);
     const ticket = ++this.ticket;
     const s = this.state;
-    if (!s || s.phase === 'over' || actingPlayer(s) !== 1) return;
+    if (!s || s.phase === 'over' || this.tossing || actingPlayer(s) !== 1) return;
     const started = performance.now();
     think(s, this.level).then((a) => {
       if (ticket !== this.ticket) return;
@@ -159,6 +183,7 @@ export class BotController extends Controller {
 
   dispose() {
     clearTimeout(this.timer);
+    clearTimeout(this.tossTimer);
     this.ticket++;
     super.dispose();
   }
@@ -177,7 +202,11 @@ export class HostController extends Controller {
 
   private onMessage(m: NetMessage) {
     if (m.type === 'hello') {
-      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], { pool: draftPool() });
+      // The host tosses the coin; the guest gets the result with the state, so both see the same.
+      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], {
+        pool: draftPool(),
+        first: tossCoin(),
+      });
       this.notice = '';
       this.broadcast();
     } else if (m.type === 'action' && this.state) {

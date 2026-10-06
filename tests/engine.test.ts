@@ -33,6 +33,24 @@ describe('engine', () => {
     expect(s.tavern).toHaveLength(5);
   });
 
+  it('lets the winner of the coin toss open the draft and move first', () => {
+    let s = createGame(3, ['A', 'B'], { first: 1 });
+    const order: PlayerIdx[] = [];
+    for (const patron of ['crows', 'hlaalu', 'pelin', 'eagle'] as const) {
+      const pi = actingPlayer(s);
+      order.push(pi);
+      s = applyAction(s, pi, { t: 'draft', patron });
+    }
+    expect(order).toEqual([1, 0, 0, 1]);
+    expect(s.current).toBe(1);
+    expect(s.turn).toBe(1);
+    expect(() => applyAction(s, 0, { t: 'end' })).toThrow();
+    // The second player, here player 0, gets the extra coin on their first turn.
+    s = applyAction(s, 1, { t: 'end' });
+    expect(s.current).toBe(0);
+    expect(s.players[0].coin).toBe(1);
+  });
+
   it('rejects moves out of turn', () => {
     const s = draftAll(createGame(2, ['A', 'B']));
     expect(() => applyAction(s, 1, { t: 'end' })).toThrow();

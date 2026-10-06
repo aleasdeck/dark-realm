@@ -12,6 +12,7 @@ import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
+import { closeCoin, showCoin } from './ui/coin';
 import { clearFx, onStateChange } from './ui/feed';
 import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
@@ -50,6 +51,8 @@ let lastError = '';
 let coach: Coach | null = null;
 /** The hint for the current state; while it is up, only what it points at responds. */
 let hint: Hint | null = null;
+/** Whether this game's coin toss has been shown; the tutorial tosses none. */
+let tossed = false;
 
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
@@ -116,6 +119,7 @@ function leaveGame() {
   lastState = null;
   coach = null;
   hint = null;
+  closeCoin();
   clearFx();
   clearMotion();
   const peer = new URLSearchParams(location.search).get('peer');
@@ -209,7 +213,8 @@ function rulesHtml() {
     })
     .join('');
   return paintIcons(`<ul>
-    <li>Игроки по очереди выбирают 4 покровителей; их колоды образуют таверну. Сундук Бездны есть всегда.</li>
+    <li>В начале партии бросается монетка. Кому выпало, тот первым выбирает покровителя и первым ходит, а второй игрок получает +1 ● в свой первый ход.</li>
+    <li>Игроки по очереди выбирают 4 покровителей: первый, второй, второй, первый. Их колоды образуют таверну. Сундук Бездны есть всегда.</li>
     <li>Начальная колода: 6 «Золота» и по одной начальной карте каждого покровителя. В руке 5 карт.</li>
     <li>Сыгранные карты дают <b>монеты</b> ● (покупка карт в таверне) и <b>силу</b> ⚔ (в конце хода становится престижем ✦ или идёт на атаку агентов).</li>
     <li><b>Комбо N</b> срабатывает, когда за ход сыграно N карт одного покровителя, даже задним числом.</li>
@@ -277,6 +282,8 @@ function startGame(c: Controller) {
   lastError = '';
   coach = c instanceof BotController && c.tutorial ? new Coach() : null;
   hint = null;
+  tossed = false;
+  closeCoin();
   clearFx();
   clearMotion();
   c.subscribe(render);
@@ -304,6 +311,11 @@ function render() {
   if (s.phase === 'draft') {
     app.innerHTML = draftHtml(s);
     if (hint) showHint(app, hint);
+    if (s.first !== undefined && !tossed) {
+      tossed = true;
+      const c = ctrl;
+      showCoin(s.first === me, () => c.tossShown());
+    }
   } else {
     const myTurn = s.current === me && s.phase === 'play';
     const idle = myTurn && !s.pending && s.queue.length === 0;
@@ -374,7 +386,9 @@ function draftHtml(s: GameState): string {
   const tiles = s.draftPool.map((pid) => tile(pid, false)).join('') + locked.map((pid) => tile(pid, true)).join('');
   return `<div class="draft">
     <h2>${mine ? 'Выберите покровителя' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
-    <div class="draft-picks"><div><b>${esc(s.players[me].name)}</b>${picks(me)}</div><div><b>${esc(s.players[me === 0 ? 1 : 0].name)}</b>${picks(me === 0 ? 1 : 0)}</div></div>
+    <div class="draft-picks">${([me, me === 0 ? 1 : 0] as const)
+      .map((pi) => `<div><b>${esc(s.players[pi].name)}</b>${s.first === pi ? '<span class="first-mark">ходит первым</span>' : ''}${picks(pi)}</div>`)
+      .join('')}</div>
     <div class="draft-tiles">${tiles}</div>
     <button class="ghost" data-act="leave">Выйти</button>
   </div>`;
@@ -554,6 +568,7 @@ app.addEventListener('click', (ev) => {
   if (act === 'leave') return leaveGame();
   if (act === 'rematch' && ctrl instanceof BotController) {
     if (ctrl.tutorial) coach = new Coach();
+    tossed = false;
     return ctrl.restart();
   }
   if (act === 'tut-ok' || act === 'tut-skip') {

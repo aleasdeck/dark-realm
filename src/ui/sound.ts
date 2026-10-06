@@ -107,6 +107,11 @@ const SOUNDS = {
     tone(988, 0, 0.07, 'square', 0.22);
     tone(1319, 0.07, 0.22, 'square', 0.22);
   },
+  toss: () => {
+    tone(1568, 0, 0.05, 'square', 0.12);
+    tone(2093, 0.05, 0.12, 'triangle', 0.14);
+    noise(0.02, 0.35, 900, 0.18, 1.5, 'bandpass', 3200);
+  },
   hit: () => {
     noise(0, 0.18, 900, 0.7, 0.6, 'lowpass', 200);
     tone(140, 0, 0.16, 'square', 0.35, 55);
