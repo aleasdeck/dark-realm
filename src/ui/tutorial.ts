@@ -227,7 +227,7 @@ export class Coach {
 }
 
 /** Taps that still work while the hint is up: its target, the coach itself and choice sheets. */
-const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'pick', 'confirm', 'cancel', 'close', 'leave', 'rematch'];
+const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'pick', 'peek', 'peek-pick', 'peek-close', 'confirm', 'cancel', 'close', 'leave', 'rematch'];
 
 export function hintAllows(h: Hint | null, el: HTMLElement): boolean {
   if (!h) return true;
