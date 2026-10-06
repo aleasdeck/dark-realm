@@ -846,9 +846,9 @@ input {
   outline: 2px solid var(--glow);
   outline-offset: 3px;
 }
-/* the treasury is a slightly larger medallion between the two sides */
+/* the treasury is a clearly larger medallion between the two sides; it has no name under it, so it takes that height too */
 .patron.chest {
-  --disc: calc(var(--emb) * 1.6);
+  --disc: calc(var(--emb) * 2.2);
 }
 .chest .p-track {
   width: var(--disc);
