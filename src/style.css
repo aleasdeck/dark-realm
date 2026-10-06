@@ -22,7 +22,8 @@
   --text-font: 'PT Sans', system-ui, sans-serif;
   --narrow-font: 'PT Sans Narrow', 'PT Sans', system-ui, sans-serif;
   /* tile width: fits five in a row and scales with the screen height */
-  --tw: min(calc((min(100vw, 860px) - 44px) / 5.3), 12.5dvh, 124px);
+  /* five tiles across the tavern frame, which leaves the block names a gutter on its left */
+  --tw: min(calc((min(100vw, 860px) - 70px) / 5), 12.5dvh, 124px);
   color-scheme: dark;
 }
 
@@ -387,11 +388,22 @@ input {
   display: grid;
   /* the agent strips take whatever height the fanned hands leave free */
   grid-template-rows: auto auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto auto auto;
-  grid-template-areas: 'oppbar' 'opphand' 'oppag' 'tavern' 'patrons' 'table' 'hand' 'mybar' 'ctrl';
+  /* the framed blocks keep their names in a narrow column on the left */
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'oppbar oppbar'
+    'opphand opphand'
+    'l-oppag oppag'
+    'l-tavern tavern'
+    'l-patrons patrons'
+    'l-table table'
+    'hand hand'
+    'mybar mybar'
+    'ctrl ctrl';
   /* hand cards are a little larger than tavern tiles; declared here so a zoomed --tw carries over */
   --hw: calc(var(--tw) * 1.12);
   --chip: calc(var(--tw) * 0.7);
-  gap: 6px;
+  gap: 6px 3px;
   overflow: hidden;
 }
 .opp-bar {
@@ -426,6 +438,62 @@ input {
 }
 .controls {
   grid-area: ctrl;
+}
+.sl-oppag {
+  grid-area: l-oppag;
+}
+.sl-tavern {
+  grid-area: l-tavern;
+}
+.sl-patrons {
+  grid-area: l-patrons;
+}
+.sl-table {
+  grid-area: l-table;
+}
+
+/* block names run bottom to top along the left edge, outside the frames */
+.side-label {
+  width: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--title-font);
+  font-size: 12px;
+  line-height: 15px;
+  color: #c9b27a;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.side-label small {
+  font-family: var(--text-font);
+  font-size: 11px;
+  color: var(--muted);
+}
+.side-label.picking {
+  color: var(--green-glow);
+}
+.side-label.attack {
+  color: var(--them);
+}
+/* the agent strips share their height with the hands, so a low strip gets the short name */
+.sl-oppag,
+.sl-table {
+  container-type: size;
+}
+.sl-short {
+  display: none;
+}
+@container (max-height: 104px) {
+  .sl-full {
+    display: none;
+  }
+  .sl-short {
+    display: inline;
+  }
 }
 
 .bar {
@@ -517,7 +585,7 @@ input {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 3px 6px 4px;
+  padding: 3px 6px;
   border-radius: 10px;
   background: #0a140e;
   border: 1px solid var(--line);
@@ -531,16 +599,11 @@ input {
   gap: 6px;
   min-height: calc(var(--tw) * 0.55 + 4px);
   container-type: size;
-  padding-top: 2px;
 }
 .strip .part {
   display: flex;
   gap: 5px;
   align-items: center;
-}
-.strip .label .hint {
-  color: var(--them);
-  font-family: var(--text-font);
 }
 /* agents fill the strip's height, and shrink only when there are too many to fit across */
 .strip .agents .chip {
@@ -663,7 +726,7 @@ input {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 4px 6px 6px;
+  padding: 5px 6px;
   border-radius: 10px;
   background: #0a140e;
   border: 1px solid var(--line);
@@ -676,7 +739,6 @@ input {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding-top: 3px;
 }
 .p-side {
   display: grid;
@@ -769,39 +831,41 @@ input {
 }
 
 .tavern {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   background: linear-gradient(180deg, #14110a, #0c0d08);
   border: 1px solid #4a3d22;
   border-radius: 10px;
-  padding: 4px 6px 6px;
-}
-.tavern .label,
-.patrons .label,
-.strip .label {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--title-font);
-  font-size: 12px;
-  color: #c9b27a;
+  padding: 6px;
 }
 .tavern.picking {
   border-color: var(--green-glow);
 }
-.tavern .label .pick {
+/* what a tavern pick asks for, set into the top edge of the frame */
+.tavern .pick {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 16px);
+  padding: 0 8px;
+  border: 1px solid var(--green-glow);
+  border-radius: 8px;
+  background: #0c0d08;
+  font-size: 11px;
+  line-height: 15px;
   color: var(--green-glow);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tavern .label small,
-.strip .label small {
-  color: var(--muted);
-  font-family: var(--text-font);
-}
 .tavern .row {
   display: flex;
   justify-content: center;
   gap: 5px;
-  padding-top: 3px;
 }
 
 /* tiles: compact cards */
@@ -1100,16 +1164,18 @@ input {
   }
   .game {
     max-width: none;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      'oppbar table'
-      'opphand table'
-      'oppag table'
-      'tavern hand'
-      'patrons mybar'
-      'patrons ctrl';
-    column-gap: 10px;
+      'oppbar oppbar l-table table'
+      'opphand opphand l-table table'
+      'l-oppag oppag l-table table'
+      'l-tavern tavern hand hand'
+      'l-patrons patrons mybar mybar'
+      'l-patrons patrons ctrl ctrl';
+  }
+  .sl-table {
+    margin-left: 7px;
   }
   .patron,
   .patron.chest {

@@ -257,6 +257,11 @@ function pickButton(pick: TavernPick): string {
   return '<button class="end" data-act="confirm">Не брать</button>';
 }
 
+/** A block's name, written up the left edge outside its frame; the short form shows when the full one would not fit. */
+function sideLabel(cls: string, full: string, short: string) {
+  return `<div class="side-label sl-${cls}"><span class="sl-full">${full}</span><span class="sl-short">${short}</span></div>`;
+}
+
 export function boardHtml(
   s: GameState,
   me: PlayerIdx,
@@ -303,20 +308,22 @@ export function boardHtml(
       <span class="counts">${count(them.deck.length, 'колода', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
+    ${targets.size ? sideLabel('oppag attack', 'Атакуйте агентов', 'Атака') : sideLabel('oppag', 'Агенты соперника', 'Агенты')}
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
-      <div class="label"><span>Агенты соперника</span>${targets.size ? '<small class="hint">нажмите, чтобы атаковать</small>' : ''}</div>
       <div class="s-body">
         ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">агентов нет</span>'}
         ${theirPlayed}
       </div>
     </section>
+    <div class="side-label sl-tavern${pick ? ' picking' : ''}"><span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small></div>
     <section class="tavern${pick ? ' picking' : ''}">
-      <div class="label">${pick ? `<span class="pick">${esc(pick.pending.prompt)}</span>` : `<span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small>`}</div>
+      ${pick ? `<div class="pick" title="${esc(pick.pending.prompt)}">${esc(pick.pending.prompt)}</div>` : ''}
       <div class="row">${slots(tavern)}</div>
     </section>
-    <section class="patrons"><div class="label"><span>Покровители</span></div><div class="p-row">${patronsRowHtml(s, me, focusPatron)}</div></section>
+    <div class="side-label sl-patrons"><span>Покровители</span></div>
+    <section class="patrons"><div class="p-row">${patronsRowHtml(s, me, focusPatron)}</div></section>
+    ${sideLabel('table', 'Ваши агенты', 'Агенты')}
     <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">
-      <div class="label"><span>Ваши агенты</span></div>
       <div class="s-body">
         <div class="part agents">${myAgents || '<span class="empty">агентов нет</span>'}</div>
         ${played}

@@ -341,7 +341,7 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
   const anchor = (el: Element | null): Box | null => (el ? pileSize(boxOf(el)) : null);
   const deckBox = (p: PlayerIdx | null) => anchor(sel(p, '.my-bar [data-act="pile-deck"]', '.opp-bar [data-act="pile-opp-deck"]'));
   const cdBox = (p: PlayerIdx | null) => anchor(sel(p, '.my-bar [data-act="pile-cd"]', '.opp-bar [data-act="pile-opp-cd"]'));
-  const tdeckBox = () => anchor(game.querySelector('.tavern .label small') ?? game.querySelector('.tavern .label'));
+  const tdeckBox = () => anchor(game.querySelector('.sl-tavern small') ?? game.querySelector('.sl-tavern'));
   const oppHandBox = () => anchor(game.querySelector('.opp-hand'));
   const newBacks = [...game.querySelectorAll<HTMLElement>('.opp-hand .back')];
   // The middle of the table, where the opponent's moves are shown.
