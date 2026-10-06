@@ -427,5 +427,5 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, 
 }
 
 export function pileGridHtml(cards: Card[]): string {
-  return cards.map((c) => tileHtml(c.id)).join('');
+  return cards.map((c) => tileHtml(c.id, { act: 'peek' })).join('');
 }

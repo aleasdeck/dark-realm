@@ -1888,6 +1888,39 @@ button.toggle[aria-pressed='true'] b {
   width: min(280px, 86vw);
 }
 
+/* ── a card opened from a sheet (pile, choice) to read it ── */
+.overlay.peek {
+  z-index: 12;
+  background: #000d;
+  flex-direction: column;
+  gap: 12px;
+  animation: tip-in 0.12s ease-out;
+}
+.peek-card {
+  cursor: pointer;
+  filter: drop-shadow(0 12px 24px #000);
+}
+.peek-card .card.big {
+  width: min(250px, 70vw);
+}
+.peek-card .card.big .c-art {
+  width: min(180px, 26dvh);
+  height: min(180px, 26dvh);
+}
+.peek-card.can .card {
+  box-shadow: 0 0 0 2px var(--green-glow), 0 0 24px var(--green);
+}
+.peek-actions {
+  display: flex;
+  gap: 8px;
+  width: min(320px, 100%);
+}
+.peek-actions button {
+  flex: 1;
+  padding: 12px;
+  font-size: 17px;
+}
+
 /* ── tooltips: hover with a mouse, long press on touch ── */
 .tooltip {
   position: fixed;
@@ -1911,6 +1944,7 @@ button.toggle[aria-pressed='true'] b {
 /* phones held sideways: the enlarged card lies on its side, art left of the text, so long texts fit the low screen */
 @media (orientation: landscape) and (max-height: 560px) {
   .zoom .card.big,
+  .peek-card .card.big,
   .tooltip .card.big {
     width: min(440px, 66vw);
     display: grid;
@@ -1924,6 +1958,7 @@ button.toggle[aria-pressed='true'] b {
     align-items: start;
   }
   .zoom .card.big .c-art,
+  .peek-card .card.big .c-art,
   .tooltip .card.big .c-art {
     grid-area: art;
     width: min(130px, 34dvh);

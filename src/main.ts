@@ -44,6 +44,11 @@ let pendingKey = '';
 let autoPlay = false;
 let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'log' } | { kind: 'menu' } | null = null;
 let focus: Focus | null = null;
+/**
+ * A card opened from a sheet (a pile or a choice) to read its text; ref is set when the card
+ * is an option of the current choice, so the enlarged card can also pick it.
+ */
+let peek: { id: string; ref?: number } | null = null;
 let animatedFocus = '';
 let lastState: GameState | null = null;
 let lastError = '';
@@ -114,6 +119,7 @@ function leaveGame(message = '') {
   autoPlay = false;
   modal = null;
   focus = null;
+  peek = null;
   lastState = null;
   coach = null;
   hint = null;
@@ -277,6 +283,7 @@ function startGame(c: Controller) {
   pendingKey = '';
   focus = null;
   modal = null;
+  peek = null;
   lastState = null;
   lastError = '';
   coach = c instanceof BotController && c.tutorial ? new Coach() : null;
@@ -403,6 +410,7 @@ function syncPending(s: GameState) {
   if (key !== pendingKey) {
     pendingKey = key;
     selected = new Set();
+    if (peek?.ref !== undefined) peek = null;
   }
 }
 
@@ -450,7 +458,7 @@ function overlays(s: GameState): string {
         .map((o) => {
           const sel = selected.has(o.ref) ? ' selected' : '';
           return o.cardId
-            ? `<div class="opt-card${sel}" data-act="pick" data-ref="${o.ref}">${tileHtml(o.cardId)}<span>${richText(o.label)}</span></div>`
+            ? `<div class="opt-card${sel}" data-act="peek" data-card="${o.cardId}" data-ref="${o.ref}">${tileHtml(o.cardId)}<span>${richText(o.label)}</span></div>`
             : `<button class="opt${sel}" data-act="pick" data-ref="${o.ref}">${richText(o.label)}</button>`;
         })
         .join('');
@@ -492,7 +500,28 @@ function overlays(s: GameState): string {
       <div class="options">${pileGridHtml(cards) || '<p>Пусто</p>'}</div>
       <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
   }
+  if (peek && (modal?.kind === 'pile' || (peek.ref !== undefined && s.pending?.player === me))) html += peekHtml(s.pending, peek);
+  else peek = null;
   return html;
+}
+
+/**
+ * A card from a sheet, enlarged over it so its text can be read. An option of a choice gets a
+ * button that picks it (as does a second tap on the card); anything else closes it.
+ */
+function peekHtml(p: GameState['pending'], k: { id: string; ref?: number }): string {
+  let pick = '';
+  if (p && k.ref !== undefined) {
+    const on = selected.has(k.ref);
+    const full = p.max > 1 && !on && selected.size >= p.max;
+    const label = on ? 'Снять выбор' : full ? `Выбрано уже ${selected.size}` : 'Выбрать';
+    pick = `<button data-act="peek-pick" ${full ? 'disabled' : ''}>${label}</button>`;
+  }
+  const act = pick && !pick.includes('disabled') ? 'peek-pick' : 'peek-close';
+  return `<div class="overlay peek" data-act="peek-close">
+    <div class="peek-card${act === 'peek-pick' ? ' can' : ''}" data-act="${act}">${cardHtml(k.id, { cls: 'big' })}</div>
+    <div class="peek-actions"><button class="ghost" data-act="peek-close">${pick ? 'Назад' : 'Закрыть'}</button>${pick}</div>
+  </div>`;
 }
 
 const focusKey = (f: Focus) => (f.kind === 'card' ? `card:${f.uid}` : `patron:${f.patron}`);
@@ -608,6 +637,7 @@ app.addEventListener('click', (ev) => {
   if (act === 'close') {
     if (el.classList.contains('overlay') && ev.target !== el) return;
     modal = null;
+    peek = null;
     return render();
   }
   if (!s) return;
@@ -635,10 +665,20 @@ app.addEventListener('click', (ev) => {
     case 'concede':
       if (confirm('Сдаться?')) ctrl.dispatch({ t: 'concede' });
       return;
+    case 'peek':
+      play('click');
+      peek = { id: el.dataset.card!, ref: el.dataset.ref === undefined ? undefined : Number(el.dataset.ref) };
+      return render();
+    case 'peek-close':
+      if (el.classList.contains('overlay') && ev.target !== el) return;
+      peek = null;
+      return render();
+    case 'peek-pick':
     case 'pick': {
       const p = s.pending;
-      if (!p) return;
-      const ref = Number(el.dataset.ref);
+      const ref = act === 'peek-pick' ? peek?.ref : Number(el.dataset.ref);
+      peek = null;
+      if (!p || ref === undefined) return render();
       if (p.max === 1) return ctrl.dispatch({ t: 'choose', picks: [ref] });
       if (selected.has(ref)) selected.delete(ref);
       else if (selected.size < p.max) selected.add(ref);
@@ -707,7 +747,10 @@ document.addEventListener('pointerdown', unlockAudio, { capture: true });
 document.addEventListener('keydown', unlockAudio, { capture: true });
 
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && (modal || focus)) {
+  if (ev.key === 'Escape' && peek) {
+    peek = null;
+    render();
+  } else if (ev.key === 'Escape' && (modal || focus)) {
     modal = null;
     focus = null;
     render();
