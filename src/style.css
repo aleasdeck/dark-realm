@@ -51,7 +51,8 @@ body {
   overscroll-behavior: none;
 }
 
-img {
+/* only the generated pixel art (data: URLs); hand-drawn files scale smoothly */
+img[src^='data:'] {
   image-rendering: pixelated;
 }
 
@@ -777,6 +778,12 @@ input {
   height: var(--emb);
   transform: translate(-50%, -50%);
   border-radius: 50%;
+}
+/* a hand-drawn emblem is dark on a transparent backdrop: a rim of the patron's glow keeps it readable on the dark plaque */
+.p-track img:not([src^='data:']),
+.draft-tile img:not([src^='data:']),
+.tp-head img:not([src^='data:']) {
+  filter: drop-shadow(0 0 2px var(--glow));
 }
 .patron.fav-mine .p-track {
   border-color: var(--you);
@@ -1806,7 +1813,6 @@ button.toggle[aria-pressed='true'] b {
   height: 30px;
   flex: 0 0 auto;
   border-radius: 4px;
-  image-rendering: pixelated;
 }
 .feed-item b {
   color: var(--gold);
