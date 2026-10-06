@@ -220,6 +220,8 @@ export interface GameState {
   tavernTop?: string[];
   /** Tutorial: the first player's next purchases go on top of their deck, not to the cooldown. */
   buyOnTop?: number;
+  /** Who moves first and opens the draft, as the coin fell; player 0 when no coin was tossed. */
+  first?: PlayerIdx;
   /** Turn on which the Druid patron last handed out its Chimera. */
   chimeraTurn?: number;
 }
