@@ -5,6 +5,7 @@ import '@fontsource/pt-sans/700.css';
 import '@fontsource/pt-sans-narrow/400.css';
 import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
+import { preloadCustomArt } from './art/custom';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
 import { actingPlayer, canCancel } from './engine/engine';
@@ -779,4 +780,5 @@ window.addEventListener('resize', () => {
   if (focus) render();
 });
 
+preloadCustomArt();
 if (!resume()) menu();

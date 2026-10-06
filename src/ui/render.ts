@@ -1,4 +1,5 @@
 import { artUrl, patronEmblemUrl, type Subject } from '../art';
+import { customCardArt, customEmblem } from '../art/custom';
 import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
@@ -15,7 +16,7 @@ export function paletteOf(def: CardDef) {
 }
 
 export function cardArt(def: CardDef): string {
-  return artUrl(def.art as Subject, paletteOf(def), def.seed ?? 0);
+  return customCardArt(def.id) ?? artUrl(def.art as Subject, paletteOf(def), def.seed ?? 0);
 }
 
 function styleVars(def: CardDef) {
@@ -154,7 +155,7 @@ function playedHtml(cards: Card[], side: 'me' | 'opp', focusUid: number): string
 }
 
 export function patronEmblem(pid: PatronId) {
-  return patronEmblemUrl(pid, PATRONS[pid].palette);
+  return customEmblem(pid) ?? patronEmblemUrl(pid, PATRONS[pid].palette);
 }
 
 /** Where a patron leans: the emblem slides along a track toward that player's side of the table. */
