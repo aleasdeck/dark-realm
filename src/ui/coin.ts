@@ -34,7 +34,7 @@ export function showCoin(meFirst: boolean, done: () => void) {
   box.innerHTML = `<div class="coin-box">
     <h2>Жребий</h2>
     <p class="coin-key"><span class="you">${SUN} вы</span><span class="them">${MOON} соперник</span></p>
-    <div class="coin-stage"><div class="coin"><div class="face sun">${SUN}</div><div class="face moon">${MOON}</div></div></div>
+    <div class="coin-stage"><div class="toss-coin"><div class="face sun">${SUN}</div><div class="face moon">${MOON}</div></div></div>
     <div class="coin-result">
       <h3 class="${meFirst ? 'you' : 'them'}">${meFirst ? 'Вы ходите первым' : 'Соперник ходит первым'}</h3>
       <p>${richText(
@@ -64,7 +64,7 @@ export function showCoin(meFirst: boolean, done: () => void) {
   };
   box.addEventListener('click', close);
 
-  const coin = box.querySelector<HTMLElement>('.coin')!;
+  const coin = box.querySelector<HTMLElement>('.toss-coin')!;
   const result = box.querySelector<HTMLElement>('.coin-result')!;
   // The moon is the back of the coin: it lands face down when the opponent moves first.
   const end = meFirst ? 0 : 180;

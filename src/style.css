@@ -1266,7 +1266,7 @@ input {
   perspective: 600px;
   padding: min(64px, 9dvh) 0 min(14px, 2dvh);
 }
-.coin {
+.toss-coin {
   --coin: min(112px, 22dvh);
   position: relative;
   width: var(--coin);
@@ -1274,7 +1274,7 @@ input {
   margin: 0 auto;
   transform-style: preserve-3d;
 }
-.coin .face {
+.toss-coin .face {
   position: absolute;
   inset: 0;
   border-radius: 50%;
@@ -1284,11 +1284,11 @@ input {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-.coin .face svg {
+.toss-coin .face svg {
   width: 62%;
   height: 62%;
 }
-.coin .sun {
+.toss-coin .sun {
   color: #7a4f0e;
   background: radial-gradient(circle at 35% 30%, #fff1b8, #f0c860 45%, #a8781e 100%);
   box-shadow:
@@ -1296,7 +1296,7 @@ input {
     inset 0 0 0 7px #7a4f0e,
     0 0 26px #f0c86066;
 }
-.coin .moon {
+.toss-coin .moon {
   color: #2a3346;
   background: radial-gradient(circle at 35% 30%, #ffffff, #c9d4e8 45%, #6f7b94 100%);
   box-shadow:
