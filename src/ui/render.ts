@@ -74,16 +74,18 @@ function typeBadge(def: CardDef): string {
   return `<span class="c-kind k-${cls}" title="${TYPE_NAMES[def.type]}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${glyph}"/></svg></span>`;
 }
 
-/** Full size card with art and rules text. */
+/** Full size card: the art fills the top edge to edge, cost, type and name sit on it, rules text below. */
 export function cardHtml(id: string, o: CardOpts = {}): string {
   const def = cardDef(id);
   const lines = cardLines(def)
     .map((l) => `<p>${l.label ? `<b>${esc(l.label)}:</b> ` : ''}${richText(l.text)}</p>`)
     .join('');
   return `<div class="card ${o.cls ?? ''} t-${def.type}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
-    <div class="c-head"><span class="c-cost">${def.cost}</span><span class="c-name">${esc(def.name)}</span></div>
-    <img class="c-art" src="${cardArt(def)}" alt="" draggable="false">
-    <div class="c-type">${TYPE_NAMES[def.type]} · ${esc(patronLabel(def))}</div>
+    <div class="c-top">
+      <img class="c-art" src="${cardArt(def)}" alt="" draggable="false">
+      <span class="c-cost">${def.cost}</span>
+      <div class="c-title"><span class="c-name">${esc(def.name)}</span><span class="c-type">${TYPE_NAMES[def.type]} · ${esc(patronLabel(def))}</span></div>
+    </div>
     <div class="c-text">${lines}</div>
     ${typeBadge(def)}
     ${hpBadge(def, o.agent)}

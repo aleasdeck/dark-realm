@@ -272,57 +272,76 @@ input {
   border: 2px solid var(--accent);
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px #000, 0 6px 16px #000a;
-  padding: 8px 10px 10px;
+  padding: 0 0 10px;
   display: flex;
   flex-direction: column;
-  align-items: center;
   user-select: none;
 }
-.c-head {
-  display: flex;
+/* the art runs edge to edge across the top; cost, type and name are laid over it */
+.c-top {
+  position: relative;
   width: 100%;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
+  height: var(--art-h, 220px);
+  flex: 0 0 auto;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid var(--accent);
+  overflow: hidden;
+}
+.c-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .c-cost {
-  flex: 0 0 28px;
-  height: 28px;
-  line-height: 26px;
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 30px;
+  height: 30px;
+  line-height: 28px;
   text-align: center;
   background: radial-gradient(circle at 35% 35%, #ffe9a0, #d9a630);
   color: #2a1a05;
   border: 1px solid #000;
   font-weight: 700;
   border-radius: 50%;
+  box-shadow: 0 1px 4px #000c;
+}
+.c-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 28px 10px 6px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg1) 78%, transparent) 50%, var(--bg1));
+  text-align: left;
 }
 .c-name {
   font-family: var(--title-font);
-  font-size: 18px;
+  font-size: 19px;
   line-height: 1.05;
   font-weight: 700;
   color: var(--glow);
-  text-shadow: 0 1px 0 #000;
-  text-align: left;
-}
-.c-art {
-  width: min(200px, 28dvh);
-  height: min(200px, 28dvh);
-  border: 1px solid #000;
-  border-radius: 4px;
-  outline: 1px solid var(--accent);
-  margin: 4px 0;
+  text-shadow:
+    0 1px 2px #000,
+    0 0 6px #000;
 }
 .c-type {
   font-family: var(--narrow-font);
   font-size: 13px;
-  color: var(--muted);
+  color: #cfc8b8;
+  text-shadow: 0 1px 2px #000;
 }
 .c-text {
   font-family: var(--narrow-font);
   font-size: 16px;
   line-height: 1.25;
   width: 100%;
+  padding: 2px 10px 0;
   text-align: left;
 }
 .c-text p {
@@ -369,6 +388,17 @@ input {
   width: 15px;
   height: 15px;
   fill: currentColor;
+}
+.card .c-kind {
+  left: 10px;
+  top: 44px;
+  box-shadow:
+    inset 0 0 0 1.5px var(--k),
+    0 1px 4px #000c;
+}
+.card .c-hp {
+  right: 8px;
+  top: 8px;
 }
 .c-kind.k-agent {
   --k: var(--k-agent);
@@ -746,12 +776,13 @@ input {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
 }
-/* the emblem stays centred; the tile's colour says whose side the patron is on */
+/* a bare emblem without a plaque; a coloured halo round it says whose side the patron is on */
 .patron {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  /* room for the gold "can call" ring between the emblem and the name */
+  gap: 6px;
   min-width: 0;
   cursor: pointer;
   user-select: none;
@@ -761,37 +792,36 @@ input {
 }
 .p-track {
   position: relative;
-  width: 100%;
-  height: calc(var(--emb) * 1.4);
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #07110b;
+  width: calc(var(--emb) * 1.5);
+  height: calc(var(--emb) * 1.5);
+  border-radius: 50%;
   transition:
     background 0.35s,
-    border-color 0.35s;
+    box-shadow 0.35s;
 }
 .p-track img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--emb);
-  height: var(--emb);
-  transform: translate(-50%, -50%);
+  display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
 }
-/* a hand-drawn emblem is dark on a transparent backdrop: a rim of the patron's glow keeps it readable on the dark plaque */
+/* a hand-drawn emblem is dark on a transparent backdrop: a rim of the patron's glow keeps it readable on the dark table */
 .p-track img:not([src^='data:']),
 .draft-tile img:not([src^='data:']),
 .tp-head img:not([src^='data:']) {
   filter: drop-shadow(0 0 2px var(--glow));
 }
 .patron.fav-mine .p-track {
-  border-color: var(--you);
   background: radial-gradient(circle, #2f9a55 0%, #1a5a32 70%);
+  box-shadow:
+    0 0 0 2px var(--you),
+    0 0 12px var(--you);
 }
 .patron.fav-theirs .p-track {
-  border-color: var(--them);
   background: radial-gradient(circle, #a83a30 0%, #5e1c18 70%);
+  box-shadow:
+    0 0 0 2px var(--them),
+    0 0 12px var(--them);
 }
 .p-name {
   font-family: var(--title-font);
@@ -804,29 +834,27 @@ input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* gold, so "can call now" never reads as green "on your side"; offset so it rings the side halo */
 .patron.can .p-track {
-  /* gold, so "can call now" never reads as green "on your side" */
-  box-shadow: 0 0 10px #f0c860aa;
-  outline: 1px solid var(--gold);
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.patron.can:not(.fav-mine, .fav-theirs) .p-track {
+  box-shadow: 0 0 12px #f0c860aa;
 }
 .patron.focused .p-track {
   outline: 2px solid var(--glow);
+  outline-offset: 3px;
 }
-/* the treasury is no plaque but a round medallion between the two sides */
+/* the treasury is a slightly larger medallion between the two sides */
 .patron.chest {
-  --disc: calc(var(--emb) * 1.5);
+  --disc: calc(var(--emb) * 1.6);
 }
 .chest .p-track {
   width: var(--disc);
   height: var(--disc);
-  border: none;
-  border-radius: 50%;
-  background: none;
 }
 .chest .p-track img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
   filter: drop-shadow(0 2px 3px #000);
 }
 .patron.chest.can .p-track {
@@ -835,6 +863,7 @@ input {
 }
 .patron.chest.focused .p-track {
   outline: 2px solid var(--glow);
+  outline-offset: 0;
 }
 
 .tavern {
@@ -1866,10 +1895,7 @@ button.toggle[aria-pressed='true'] b {
 }
 .zoom .card.big {
   width: min(230px, 62vw);
-}
-.zoom .card.big .c-art {
-  width: min(170px, 22dvh);
-  height: min(170px, 22dvh);
+  --art-h: min(210px, 30dvh);
 }
 .zoom.can .card {
   box-shadow: 0 0 0 2px var(--green-glow), 0 0 24px var(--green);
@@ -1908,10 +1934,7 @@ button.toggle[aria-pressed='true'] b {
 }
 .peek-card .card.big {
   width: min(250px, 70vw);
-}
-.peek-card .card.big .c-art {
-  width: min(180px, 26dvh);
-  height: min(180px, 26dvh);
+  --art-h: min(230px, 34dvh);
 }
 .peek-card.can .card {
   box-shadow: 0 0 0 2px var(--green-glow), 0 0 24px var(--green);
@@ -1942,43 +1965,27 @@ button.toggle[aria-pressed='true'] b {
 }
 .tooltip .card.big {
   width: 220px;
-}
-.tooltip .card.big .c-art {
-  width: 150px;
-  height: 150px;
+  --art-h: 200px;
 }
 /* phones held sideways: the enlarged card lies on its side, art left of the text, so long texts fit the low screen */
 @media (orientation: landscape) and (max-height: 560px) {
   .zoom .card.big,
   .peek-card .card.big,
   .tooltip .card.big {
-    width: min(440px, 66vw);
+    --art-h: min(170px, 46dvh);
+    width: min(460px, 70vw);
+    padding: 0;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-      'art head'
-      'art type'
-      'art text';
-    column-gap: 10px;
+    grid-template-columns: var(--art-h) minmax(0, 1fr);
     align-items: start;
   }
-  .zoom .card.big .c-art,
-  .peek-card .card.big .c-art,
-  .tooltip .card.big .c-art {
-    grid-area: art;
-    width: min(130px, 34dvh);
-    height: min(130px, 34dvh);
-    margin: 2px 0 0;
-  }
-  .card.big .c-head {
-    grid-area: head;
-  }
-  .card.big .c-type {
-    grid-area: type;
+  .card.big .c-top {
+    border-radius: 8px 0 0 8px;
+    border-bottom: none;
+    border-right: 1px solid var(--accent);
   }
   .card.big .c-text {
-    grid-area: text;
+    padding: 4px 10px 8px;
     font-size: 15px;
   }
   .card.big .c-text p:first-child {
