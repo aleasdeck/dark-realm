@@ -20,6 +20,7 @@ import type {
   GameState,
   Pending,
   PatronId,
+  PatronUndo,
   PlayerIdx,
   PlayerState,
   QueuedEffect,
@@ -685,6 +686,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
   if (!patronAvailable(s, pi, pid)) throw new RuleError('Покровитель недоступен');
   const p = s.players[pi];
   const opp = s.players[other(pi)];
+  const undo: PatronUndo = { patron: pid, coin: p.coin, power: p.power, favor: s.favor[pid] ?? null };
   s.patronCalls--;
   s.patronsUsed.push(pid);
   log(s, `${p.name} взывает к покровителю «${PATRONS[pid].name}»`);
@@ -794,6 +796,31 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       }
       break;
   }
+  // A call that only opened a choice of known cards can still be taken back.
+  if (s.pending && CANCELABLE.includes(pid)) s.pending.undo = undo;
+}
+
+/** Patrons whose choice shows nothing hidden, so backing out of it gives nothing away. */
+const CANCELABLE: PatronId[] = ['treasury', 'hlaalu', 'pelin', 'psijic'];
+
+/** Whether `pi` may call off the patron whose choice is open now. */
+export function canCancel(s: GameState, pi: PlayerIdx): boolean {
+  return s.phase === 'play' && s.pending?.player === pi && !!s.pending.undo;
+}
+
+/** Calls off the patron: what it took comes back, and the call for this turn is not used. */
+function cancelPatron(s: GameState, pi: PlayerIdx) {
+  const undo = s.pending?.undo;
+  if (!undo || !canCancel(s, pi)) throw new RuleError('Этот выбор отменить нельзя');
+  const p = s.players[pi];
+  p.coin = undo.coin;
+  p.power = undo.power;
+  if (undo.patron !== 'treasury') s.favor[undo.patron] = undo.favor;
+  s.patronCalls++;
+  s.patronsUsed.splice(s.patronsUsed.lastIndexOf(undo.patron), 1);
+  s.pending = null;
+  log(s, `${p.name} передумывает взывать к «${PATRONS[undo.patron].name}»`);
+  emit(s, { k: 'cancel', p: pi, patron: undo.patron });
 }
 
 // ── turn flow ────────────────────────────────────────────
@@ -932,6 +959,10 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
   }
 
   if (s.pending) {
+    if (a.t === 'cancel') {
+      cancelPatron(s, pi);
+      return s;
+    }
     if (a.t !== 'choose') throw new RuleError('Сначала сделайте выбор');
     resolvePending(s, a.picks);
     checkInstantWin(s);

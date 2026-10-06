@@ -7,7 +7,7 @@ import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
-import { actingPlayer } from './engine/engine';
+import { actingPlayer, canCancel } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
@@ -435,11 +435,18 @@ function overlays(s: GameState): string {
         })
         .join('');
       const ok = selected.size >= p.min && selected.size <= p.max;
+      // A patron call that only opened this choice can be called off: nothing is spent.
+      const cancel = canCancel(s, me) ? '<button class="ghost" data-act="cancel">Отмена</button>' : '';
+      const done =
+        single && p.min > 0
+          ? ''
+          : `<button data-act="confirm" ${ok ? '' : 'disabled'}>${single || (selected.size === 0 && p.min === 0) ? 'Пропустить' : `Готово (${selected.size})`}</button>`;
+      const buttons = cancel + done;
       const range = p.min === p.max ? `${p.min}` : p.min === 0 ? `до ${p.max}` : `${p.min}–${p.max}`;
       html += `<div class="overlay sheet-wrap"><div class="sheet choice">
         <h2>${esc(p.prompt)}</h2><p class="hint">Выберите ${range}</p>
         <div class="options">${opts}</div>
-        ${single && p.min > 0 ? '' : `<div class="buttons"><button data-act="confirm" ${ok ? '' : 'disabled'}>${single || (selected.size === 0 && p.min === 0) ? 'Пропустить' : `Готово (${selected.size})`}</button></div>`}
+        ${buttons ? `<div class="buttons">${buttons}</div>` : ''}
       </div></div>`;
     }
   }
@@ -584,7 +591,7 @@ app.addEventListener('click', (ev) => {
     return render();
   }
   if (!s) return;
-  if (['end', 'confirm', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
+  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':
@@ -619,6 +626,8 @@ app.addEventListener('click', (ev) => {
     }
     case 'confirm':
       return ctrl.dispatch({ t: 'choose', picks: [...selected] });
+    case 'cancel':
+      return ctrl.dispatch({ t: 'cancel' });
     case 'inspect':
       return tapFocus({ kind: 'card', uid });
     case 'inspect-patron':

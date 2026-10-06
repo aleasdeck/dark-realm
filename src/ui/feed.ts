@@ -63,6 +63,7 @@ const SOUND: Record<GameEvent['k'], SoundName> = {
   attack: 'hit',
   knockout: 'knockout',
   patron: 'patron',
+  cancel: 'click',
   destroy: 'destroy',
   discard: 'discard',
   prestige: 'prestige',
@@ -91,6 +92,8 @@ function describe(e: GameEvent, me: PlayerIdx): [string | null, string] | null {
       return e.p === me ? [cardArt(cardDef(e.card)), `<em class="bad">Ваш агент ${q(cardDef(e.card).name)} сражён</em>`] : null;
     case 'patron':
       return [patronEmblem(e.patron), `взывает к покровителю ${q(PATRONS[e.patron].name)}`];
+    case 'cancel':
+      return [patronEmblem(e.patron), `передумывает взывать к ${q(PATRONS[e.patron].name)}`];
     case 'destroy':
       return [cardArt(cardDef(e.card)), `уничтожает ${q(cardDef(e.card).name)}`];
     case 'discard':
