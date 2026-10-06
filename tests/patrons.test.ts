@@ -31,7 +31,7 @@ describe('locked patrons', () => {
   });
 
   it('each deck has 20 tavern cards and one starter', () => {
-    for (const pid of LOCKED) {
+    for (const pid of ALL) {
       const own = CARDS.filter((c) => c.patron === pid);
       expect(own.reduce((n, c) => n + c.copies, 0)).toBe(20);
       expect(own.filter((c) => c.type === 'starter' || c.starter)).toHaveLength(1);

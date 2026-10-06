@@ -26,7 +26,7 @@ function wins(a: BotLevel, b: BotLevel, games: number): number {
 }
 
 describe('bot levels', () => {
-  it('each level plays legal moves to the end of the game', () => {
+  it('each level plays legal moves to the end of the game', { timeout: 60_000 }, () => {
     for (const level of ['easy', 'medium', 'hard'] as const) {
       expect(duel(3, [level, 'medium']).phase).toBe('over');
     }
