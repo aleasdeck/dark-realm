@@ -51,6 +51,28 @@ function hpBadge(def: CardDef, agent?: AgentInPlay) {
   return `<div class="c-hp${def.taunt ? ' taunt' : ''}" title="${def.taunt ? 'Провокация: атакуют первым' : 'Прочность'}">${left}</div>`;
 }
 
+const BOLT = 'M14.2 1.5 4.6 13.6h6.1L8.9 22.5 19.4 9.9h-6.2z';
+const BUST = 'M12 2.4a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8zM2.8 22.3c.5-5.3 4.3-8.5 9.2-8.5s8.7 3.2 9.2 8.5z';
+const SCROLL =
+  'M7.5 2.5h11.2a3 3 0 0 1 0 6H17v10.2a3 3 0 0 1-3 3H5.3a3 3 0 0 1 0-6H7V3zM9.6 6.3v1.6h5.4V6.3zM9.6 10v1.6h5.4V10zM9.6 13.7v1.6h4V13.7z';
+const SKULL =
+  'M12 2C6.9 2 3.5 5.5 3.5 10c0 2.6 1.1 4.6 3 5.8V20c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2v-4.2c1.9-1.2 3-3.2 3-5.8C20.5 5.5 17.1 2 12 2zM8.6 9.3a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2zm6.8 0a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2zM12 14.2l1.4 2.6h-2.8z';
+/** Type badge glyph and color class: the drawing says action or agent, the color says contract. */
+const TYPE_BADGE: Record<CardDef['type'], [glyph: string, cls: string]> = {
+  action: [BOLT, 'act'],
+  starter: [BOLT, 'act'],
+  agent: [BUST, 'agent'],
+  contractAction: [SCROLL, 'contract'],
+  contractAgent: [BUST, 'contract'],
+  curse: [SKULL, 'curse'],
+};
+
+/** Small coin under the cost that tells the card's type at a glance; agents already on the table go without it. */
+function typeBadge(def: CardDef): string {
+  const [glyph, cls] = TYPE_BADGE[def.type];
+  return `<span class="c-kind k-${cls}" title="${TYPE_NAMES[def.type]}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${glyph}"/></svg></span>`;
+}
+
 /** Full size card with art and rules text. */
 export function cardHtml(id: string, o: CardOpts = {}): string {
   const def = cardDef(id);
@@ -62,6 +84,7 @@ export function cardHtml(id: string, o: CardOpts = {}): string {
     <img class="c-art" src="${cardArt(def)}" alt="" draggable="false">
     <div class="c-type">${TYPE_NAMES[def.type]} · ${esc(patronLabel(def))}</div>
     <div class="c-text">${lines}</div>
+    ${typeBadge(def)}
     ${hpBadge(def, o.agent)}
   </div>`;
 }
@@ -104,6 +127,7 @@ export function tileHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {})
   return `<div class="tile ${o.cls ?? ''}" style="${styleVars(def)}" data-card="${def.id}"${attrs(o)}>
     <img src="${cardArt(def)}" alt="" draggable="false">
     ${def.type === 'curse' ? '' : `<span class="t-cost">${def.cost}</span>`}
+    ${typeBadge(def)}
     ${hpBadge(def, o.agent)}
     <span class="t-name">${esc(def.name)}</span>
     <span class="t-fx">${shortFx(def)}</span>

@@ -12,6 +12,11 @@
   --power: #ff7262;
   --prestige: #c7a8ff;
   --you: #5fe08a;
+  /* card type badges: action, agent, contract (contract agents too), curse */
+  --k-act: #6cc6ff;
+  --k-agent: #e9dfc8;
+  --k-contract: #d8455a;
+  --k-curse: #a99bc2;
   --them: #ff6b5e;
   --title-font: 'Philosopher', Georgia, serif;
   --text-font: 'PT Sans', system-ui, sans-serif;
@@ -340,6 +345,37 @@ input {
 }
 .c-hp.taunt {
   background: #a33b2c;
+}
+/* card type: a dark coin with a colored ring under the cost, mirroring the durability shield on the right */
+.c-kind {
+  --k: var(--k-act);
+  position: absolute;
+  left: -7px;
+  top: 40px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2b3631, #070b09 75%);
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1.5px var(--k);
+  color: var(--k);
+  pointer-events: none;
+}
+.c-kind svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+.c-kind.k-agent {
+  --k: var(--k-agent);
+}
+.c-kind.k-contract {
+  --k: var(--k-contract);
+}
+.c-kind.k-curse {
+  --k: var(--k-curse);
 }
 
 /* ── game screen: one viewport, no page scroll ─────── */
@@ -818,6 +854,22 @@ input {
   border: 1px solid #000;
   font-weight: 700;
   font-size: 13px;
+}
+/* tiles: under the cost coin, on the left edge that stays visible when the hand fans out */
+.tile .c-kind {
+  left: -3px;
+  top: 20px;
+  width: 20px;
+  height: 20px;
+}
+.tile .c-kind svg {
+  width: 12px;
+  height: 12px;
+}
+/* a curse has no cost, so its badge takes the cost's place */
+.tile .c-kind.k-curse {
+  left: -4px;
+  top: -4px;
 }
 .tile .c-hp {
   top: calc(var(--tw) - 30px);
