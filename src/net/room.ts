@@ -181,7 +181,10 @@ export const joinRoom: JoinRoom = (code, h) =>
     const timer = setTimeout(() => fail(new RoomError('timeout', 'Не удалось подключиться к комнате.')), 15000);
     peer.on('error', (err) => fail(roomError(err)));
     peer.on('open', () => {
-      const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
+      // PeerJS's binary serialization splits big messages into chunks; its JSON one drops
+      // anything over 16 KB, which a game state passes after a few turns. The host's end of
+      // the connection takes the serialization the guest picks here.
+      const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'binary' });
       conn.on('open', () => {
         if (done) return;
         done = true;
