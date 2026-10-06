@@ -160,6 +160,15 @@ export interface Pending {
   max: number;
   /** Extra data the resolver needs (e.g. choice branches, heal amount). */
   data?: unknown;
+  /** A patron call that opened this choice can still be called off: what it took, to give back. */
+  undo?: PatronUndo;
+}
+
+export interface PatronUndo {
+  patron: PatronId;
+  coin: number;
+  power: number;
+  favor: PlayerIdx | null;
 }
 
 export interface QueuedEffect {
@@ -182,7 +191,7 @@ export type GameEvent =
   | { k: 'play' | 'activate' | 'buy' | 'gain' | 'destroy'; p: PlayerIdx; card: string }
   | { k: 'attack'; p: PlayerIdx; card: string; n: number }
   | { k: 'knockout'; p: PlayerIdx; card: string }
-  | { k: 'patron'; p: PlayerIdx; patron: PatronId }
+  | { k: 'patron' | 'cancel'; p: PlayerIdx; patron: PatronId }
   | { k: 'discard'; p: PlayerIdx; n: number }
   | { k: 'prestige'; p: PlayerIdx; n: number }
   | { k: 'turn'; p: PlayerIdx }
@@ -234,5 +243,7 @@ export type Action =
   | { t: 'buy'; uid: number }
   | { t: 'patron'; patron: PatronId }
   | { t: 'choose'; picks: number[] }
+  /** Calls off the patron whose choice is open: nothing is spent. */
+  | { t: 'cancel' }
   | { t: 'end' }
   | { t: 'concede' };

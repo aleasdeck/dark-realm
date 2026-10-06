@@ -90,7 +90,7 @@ const SCRIPT: Step[] = [
   {
     id: 'treasury',
     target: '.patrons .patron.chest',
-    text: 'Это Сундук: к нему можно воззвать в любой партии. За 2 ● он уничтожит ненужную карту, а взамен даст «Долговую расписку» на 2 ●. Нажмите на Сундук, затем ещё раз, и выберите, например, «Золото».',
+    text: 'Это Сундук: к нему можно воззвать в любой партии. За 2 ● он уничтожит ненужную карту, а взамен даст «Долговую расписку» на 2 ●. Нажмите на Сундук, затем ещё раз, и выберите, например, «Золото». Если передумаете, «Отмена» вернёт монеты.',
     // No "OK": the player has to call it. It steps aside only if the Chest can't be called.
     done: (s, me) => firstTurnOver(s) || called(s, me, (p) => p === 'treasury') || !patronAvailable(s, me, 'treasury'),
   },
@@ -227,7 +227,7 @@ export class Coach {
 }
 
 /** Taps that still work while the hint is up: its target, the coach itself and choice sheets. */
-const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'pick', 'confirm', 'close', 'leave', 'rematch'];
+const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'pick', 'confirm', 'cancel', 'close', 'leave', 'rematch'];
 
 export function hintAllows(h: Hint | null, el: HTMLElement): boolean {
   if (!h) return true;
