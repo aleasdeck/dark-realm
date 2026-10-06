@@ -3,7 +3,8 @@ import { actingPlayer, applyAction, createGame, RuleError } from '../engine/engi
 import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
-import type { Link, LinkHandlers, NetMessage } from '../net/room';
+import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '../net/room';
+import { clientId, forgetMatch, saveMatch } from '../net/saved';
 import { draftPool, recordGame } from './unlocks';
 
 /** One running match as seen by the local player. */
@@ -13,6 +14,8 @@ export abstract class Controller {
   state: GameState | null = null;
   notice = '';
   error = '';
+  /** Set when this side's match is gone for good: the game goes back to the menu with this message. */
+  gone = '';
   /** Patrons the game that just ended opened. */
   unlocked: PatronId[] = [];
   /** Whether finished games count toward unlocking patrons. */
@@ -189,45 +192,136 @@ export class BotController extends Controller {
   }
 }
 
+/** Pauses between tries to get a lost room or link back. */
+const RETRY_MS = [1000, 2000, 3000, 5000];
+const retryDelay = (n: number) => RETRY_MS[Math.min(n, RETRY_MS.length - 1)];
+/** A connection that hasn't said hello by then is dropped. */
+const HELLO_MS = 15000;
+
+/**
+ * The room's host runs the game. The room stays open for the whole match: a guest who
+ * drops out comes back by connecting again, and only the guest who joined gets in.
+ * The match is saved after every move, so a reloaded host page opens the same room again.
+ */
 export class HostController extends Controller {
   readonly me: PlayerIdx = 0;
   readonly kind = 'host';
-  private link: Link;
+  /** The room is registered, so its code can be handed out. */
+  ready = false;
+  /** The guest's connection, while they are in the room. */
+  private link: Link | null = null;
+  /** The guest who joined this match. */
+  private client: string | null = null;
+  private room: HostedRoom | null = null;
+  private tries = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private disposed = false;
 
-  constructor(private playerName: string, connect: (h: LinkHandlers) => Link) {
+  constructor(
+    private playerName: string,
+    readonly code: string,
+    private openRoom: OpenRoom,
+    saved?: { client: string | null; state: GameState },
+  ) {
     super();
-    this.link = connect({ onMessage: (m) => this.onMessage(m), onClose: () => this.onClose() });
-    this.notice = 'Соперник подключается…';
+    if (saved) {
+      this.state = saved.state;
+      this.client = saved.client;
+    }
+    this.notice = saved ? 'Восстанавливаем комнату…' : 'Открываем комнату…';
+    this.open();
   }
 
-  private onMessage(m: NetMessage) {
+  /** Whether the guest is in the room right now. */
+  get online() {
+    return !!this.link;
+  }
+
+  private async open() {
+    try {
+      const room = await this.openRoom(this.code, (accept) => this.accept(accept));
+      if (this.disposed) return room.close();
+      this.room = room;
+      this.ready = true;
+      this.tries = 0;
+      this.notice = this.state && !this.link ? 'Соперник переподключается…' : '';
+    } catch (e) {
+      if (this.disposed) return;
+      // A new room gives up at once; a match in progress keeps trying, as the broker
+      // may hold the code of the reloaded page for a while.
+      if (!this.state) this.gone = e instanceof Error ? e.message : String(e);
+      else this.timer = setTimeout(() => this.open(), retryDelay(this.tries++));
+    }
+    this.emit();
+  }
+
+  private accept(accept: Accept) {
+    if (this.disposed) return;
+    let hello = false;
+    const link: Link = accept({
+      onMessage: (m) => {
+        if (m.type === 'hello') hello = true;
+        this.onMessage(link, m);
+      },
+      onClose: () => {
+        if (link === this.link) this.lost();
+      },
+    });
+    setTimeout(() => {
+      if (!hello) link.close();
+    }, HELLO_MS);
+  }
+
+  private onMessage(link: Link, m: NetMessage) {
     if (m.type === 'hello') {
-      // The host tosses the coin; the guest gets the result with the state, so both see the same.
-      this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], {
-        pool: draftPool(),
-        first: tossCoin(),
-      });
+      const client = m.client ?? null;
+      if (!this.state) {
+        // The host tosses the coin; the guest gets the result with the state, so both see the same.
+        this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], {
+          pool: draftPool(),
+          first: tossCoin(),
+        });
+        this.client = client;
+      } else if (client !== this.client) {
+        link.send({ type: 'reject', message: 'Комната уже занята.' });
+        setTimeout(() => link.close(), 500);
+        return;
+      }
+      // The same guest on a new connection: the old one is stale.
+      if (this.link !== link) this.link?.close();
+      this.link = link;
       this.notice = '';
       this.broadcast();
-    } else if (m.type === 'action' && this.state) {
+      return;
+    }
+    if (link !== this.link) return;
+    if (m.type === 'action' && this.state) {
       try {
         this.state = applyAction(this.state, 1, m.action);
         this.broadcast();
       } catch (e) {
-        this.link.send({ type: 'error', message: e instanceof Error ? e.message : 'Ошибка' });
+        link.send({ type: 'error', message: e instanceof Error ? e.message : 'Ошибка' });
       }
     } else if (m.type === 'bye') {
-      this.onClose();
+      link.close();
+      this.link = null;
+      this.notice = 'Соперник покинул партию.';
+      this.emit();
     }
   }
 
-  private onClose() {
-    this.notice = 'Соперник отключился.';
+  private lost() {
+    this.link = null;
+    this.notice = this.state?.phase === 'over' ? 'Соперник отключился.' : 'Соперник переподключается…';
     this.emit();
   }
 
   private broadcast() {
-    if (this.state) this.link.send({ type: 'state', state: this.state });
+    const s = this.state;
+    if (!s) return;
+    this.link?.send({ type: 'state', state: s });
+    if (s.phase === 'over') forgetMatch('host');
+    else saveMatch({ role: 'host', code: this.code, name: this.playerName, client: this.client, state: s, at: Date.now() });
     this.emit();
   }
 
@@ -245,52 +339,139 @@ export class HostController extends Controller {
   }
 
   dispose() {
-    this.link.send({ type: 'bye' });
-    this.link.close();
+    this.disposed = true;
+    clearTimeout(this.timer);
+    this.link?.send({ type: 'bye' });
+    this.link?.close();
+    this.room?.close();
+    forgetMatch('host');
     super.dispose();
   }
 }
 
+/**
+ * The guest plays on the host's state. A lost link is tried again until the host is back,
+ * and a reloaded guest page comes back to the room it played in.
+ */
 export class GuestController extends Controller {
   readonly me: PlayerIdx = 1;
   readonly kind = 'guest';
   private link: Link | null = null;
+  /** The host has answered on the current link, so the state shown is the live one. */
+  private live = false;
+  /** The guest has been in this match: a lost link is tried again instead of given up. */
+  private joined: boolean;
+  /** The host left the match on purpose: there is nothing to come back to. */
+  private hostLeft = false;
+  private tries = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private disposed = false;
 
-  attach(link: Link, name: string) {
+  constructor(
+    readonly code: string,
+    private playerName: string,
+    private join: JoinRoom,
+    restoring = false,
+  ) {
+    super();
+    this.joined = restoring;
+    this.notice = restoring ? 'Возвращаемся в партию…' : `Подключаемся к комнате ${code}…`;
+    this.connect();
+  }
+
+  /** Whether the link to the host is down (or not answered yet), so moves can't be sent. */
+  get offline() {
+    return !this.live;
+  }
+
+  private async connect() {
+    let link: Link | undefined;
+    try {
+      link = await this.join(this.code, {
+        onMessage: (m) => {
+          if (link && link === this.link) this.onMessage(link, m);
+        },
+        onClose: () => {
+          if (link && link === this.link) this.lost();
+        },
+      });
+    } catch (e) {
+      if (this.disposed) return;
+      if (this.joined) this.retry();
+      else {
+        this.gone = e instanceof Error ? e.message : String(e);
+        this.emit();
+      }
+      return;
+    }
+    if (this.disposed) return link.close();
     this.link = link;
-    this.notice = 'Ждём начала игры…';
-    link.send({ type: 'hello', name });
+    this.tries = 0;
+    link.send({ type: 'hello', name: this.playerName, client: clientId() });
+    if (!this.state) this.notice = 'Ждём начала игры…';
     this.emit();
   }
 
-  handlers(): LinkHandlers {
-    return {
-      onMessage: (m) => {
-        if (m.type === 'state') {
-          this.state = m.state;
-          this.notice = '';
-          this.error = '';
-        } else if (m.type === 'error') {
-          this.error = m.message;
-        } else if (m.type === 'bye') {
-          this.notice = 'Хозяин комнаты отключился.';
-        }
-        this.emit();
-      },
-      onClose: () => {
-        this.notice = 'Соединение потеряно.';
-        this.emit();
-      },
-    };
+  private onMessage(link: Link, m: NetMessage) {
+    if (m.type === 'state') {
+      this.state = m.state;
+      this.live = true;
+      this.joined = true;
+      this.notice = '';
+      this.error = '';
+      if (m.state.phase === 'over') forgetMatch('guest');
+      else saveMatch({ role: 'guest', code: this.code, name: this.playerName, at: Date.now() });
+    } else if (m.type === 'error') {
+      this.error = m.message;
+    } else if (m.type === 'reject') {
+      link.close();
+      this.link = null;
+      this.live = false;
+      forgetMatch('guest');
+      this.gone = m.message;
+    } else if (m.type === 'bye') {
+      link.close();
+      this.link = null;
+      this.live = false;
+      this.hostLeft = true;
+      forgetMatch('guest');
+      this.notice = 'Хозяин комнаты покинул партию.';
+    }
+    this.emit();
+  }
+
+  private lost() {
+    this.link = null;
+    this.live = false;
+    if (!this.joined) {
+      this.gone = 'Соединение потеряно.';
+    } else if (this.state?.phase === 'over') {
+      this.notice = 'Соединение потеряно.';
+    } else {
+      this.notice = 'Связь потеряна. Переподключаемся…';
+      this.retry();
+    }
+    this.emit();
+  }
+
+  private retry() {
+    if (this.disposed || this.hostLeft) return;
+    this.notice = 'Связь потеряна. Переподключаемся…';
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.connect(), retryDelay(this.tries++));
+    this.emit();
   }
 
   dispatch(a: Action) {
-    this.link?.send({ type: 'action', action: a });
+    if (this.live) this.link?.send({ type: 'action', action: a });
   }
 
   dispose() {
+    this.disposed = true;
+    clearTimeout(this.timer);
     this.link?.send({ type: 'bye' });
     this.link?.close();
+    forgetMatch('guest');
     super.dispose();
   }
 }
