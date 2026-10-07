@@ -8,8 +8,8 @@ const byName = (files: Record<string, string>) =>
 
 const CARDS = byName(import.meta.glob<string>('../assets/cards/*.webp', { eager: true, query: '?url', import: 'default' }));
 const PATRONS = byName(import.meta.glob<string>('../assets/patrons/*.webp', { eager: true, query: '?url', import: 'default' }));
-/** The card back and the backdrops, used from style.css; listed here only to be fetched early. */
-const SCENERY = import.meta.glob<string>(['../assets/ui/*.webp', '../assets/bg/*.webp'], { eager: true, query: '?url', import: 'default' });
+/** The card back, the backdrops and the interface icons, used from style.css and src/ui/icons.ts; listed here only to be fetched early. */
+const SCENERY = import.meta.glob<string>(['../assets/ui/*.webp', '../assets/bg/*.webp', '../assets/icons/*.webp'], { eager: true, query: '?url', import: 'default' });
 
 export const customCardArt = (cardId: string): string | undefined => CARDS[cardId];
 export const customEmblem = (patronId: string): string | undefined => PATRONS[patronId];

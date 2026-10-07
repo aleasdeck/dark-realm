@@ -2214,3 +2214,209 @@ button.toggle[aria-pressed='true'] b {
 .float.heal {
   color: var(--green-glow);
 }
+
+/* ── hand-drawn interface icons: src/assets/icons, placed by src/ui/icons.ts ── */
+img.ic {
+  width: 1.35em;
+  height: 1.35em;
+  flex: none;
+  object-fit: contain;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 1px #000c);
+}
+button:has(> img.ic) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+/* the icon may stand out of the line, so buttons keep the height they had with text only */
+button > img.ic {
+  margin-block: -0.25em;
+}
+summary > img.ic {
+  margin-right: 0.3em;
+}
+.controls .icon {
+  padding: 4px 10px;
+}
+.controls .icon img.ic {
+  width: 28px;
+  height: 28px;
+}
+.controls .icon.off {
+  text-decoration: none;
+}
+.controls .end img.ic {
+  width: 24px;
+  height: 24px;
+  margin: -4px 0;
+}
+.toggle .t-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.toggle .t-label img.ic {
+  width: 26px;
+  height: 26px;
+}
+.lock-left img.ic,
+.patron-rules img.ic {
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+}
+.end-dialog .end-ic {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin: -8px auto 0;
+}
+
+/* resource amounts: the painted coin, swords and star stand in for the glyphs, which stay in the text */
+.res i,
+.ri i {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  vertical-align: -0.28em;
+  overflow: hidden;
+  color: transparent;
+  text-indent: 2em;
+  white-space: nowrap;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 1px 1px #000c);
+}
+.res i {
+  width: 17px;
+  height: 17px;
+}
+.res.pre i,
+.ri.pre i {
+  background-image: url('./assets/icons/res_prestige.webp');
+}
+.res.pow i,
+.ri.pow i {
+  background-image: url('./assets/icons/res_power.webp');
+}
+.res.coin i,
+.ri.coin i {
+  background-image: url('./assets/icons/res_coin.webp');
+}
+.fx.coin::after,
+.fx.pow::after,
+.fx.pre::after {
+  content: '';
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+  background: center / contain no-repeat;
+}
+.fx.coin::after {
+  background-image: url('./assets/icons/res_coin.webp');
+}
+.fx.pow::after {
+  background-image: url('./assets/icons/res_power.webp');
+}
+.fx.pre::after {
+  background-image: url('./assets/icons/res_prestige.webp');
+}
+.fx:has(img.ic) {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.fx img.ic {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+/* deck and discard counters: the pile's picture next to the number */
+.count.with-ic {
+  flex-direction: row;
+  gap: 2px;
+  padding: 2px 5px 2px 3px;
+}
+.count.with-ic img.ic {
+  width: 18px;
+  height: 18px;
+}
+
+/* card type coin: the painted mark inside the colored ring */
+.c-kind img.ic {
+  width: 19px;
+  height: 19px;
+}
+.tile .c-kind img.ic {
+  width: 15px;
+  height: 15px;
+}
+
+/* price medallion and durability shields: painted frames, the number on their dark middle */
+.c-cost,
+.t-cost {
+  background: url('./assets/icons/cost.webp') center / contain no-repeat;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #ffe6a0;
+  text-shadow:
+    0 0 3px #000,
+    0 1px 2px #000;
+}
+.c-cost {
+  width: 34px;
+  height: 34px;
+  line-height: 34px;
+  left: 6px;
+  top: 6px;
+}
+.t-cost {
+  width: 25px;
+  height: 25px;
+  line-height: 25px;
+  left: -5px;
+  top: -5px;
+}
+.c-hp {
+  background: url('./assets/icons/hp.webp') center / contain no-repeat;
+  border: 0;
+  clip-path: none;
+  text-shadow:
+    0 0 3px #000,
+    0 1px 2px #000;
+}
+.c-hp.taunt {
+  background: url('./assets/icons/hp_taunt.webp') center / contain no-repeat;
+}
+
+/* tavern cards marked for a refresh */
+.tile.marked::after {
+  content: '';
+  background:
+    url('./assets/icons/tavern_marked.webp') center / calc(var(--tw) * 0.55) no-repeat,
+    #2a0d0daa;
+}
+
+/* coin toss: the painted faces are whole coins */
+.coin-key img.ic {
+  width: 18px;
+  height: 18px;
+}
+.toss-coin.painted .face {
+  background: none;
+  box-shadow: none;
+}
+.toss-coin.painted .face img.ic {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 14px #0009);
+}
+.toss-coin.painted .sun img.ic {
+  filter: drop-shadow(0 0 18px #4fd17a66);
+}
+.toss-coin.painted .moon img.ic {
+  filter: drop-shadow(0 0 18px #ff6b5e55);
+}

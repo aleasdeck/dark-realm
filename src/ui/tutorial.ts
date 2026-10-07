@@ -2,6 +2,7 @@ import { cardDef, PATRONS } from '../engine/cards';
 import { actingPlayer, attackable, other, patronAvailable } from '../engine/engine';
 import { TUTORIAL_GOAL, TUTORIAL_PATRONS } from '../engine/tutorial';
 import type { GameState, PlayerIdx } from '../engine/types';
+import { icon, withIcon } from './icons';
 import { paintIcons } from './rich';
 
 /** One coach hint: what it points at, what it says, and when it is no longer needed. */
@@ -254,9 +255,10 @@ export function showHint(root: HTMLElement, h: Hint) {
   }
   const bubble = document.createElement('div');
   bubble.className = 'coach';
-  bubble.innerHTML = `<p>${paintIcons(h.text)}</p><div class="coach-actions">
-    <button class="ghost" data-act="tut-skip">Пропустить туториал</button>
-    ${h.ok ? `<button data-act="tut-ok" data-hint="${h.id}">Понятно</button>` : ''}</div>`;
+  // the play-all button is named by its icon, as it is drawn under the table
+  bubble.innerHTML = `<p>${paintIcons(h.text).replace('▶▶', icon('play_all', '▶▶'))}</p><div class="coach-actions">
+    <button class="ghost" data-act="tut-skip">${withIcon('skip', 'Пропустить туториал')}</button>
+    ${h.ok ? `<button data-act="tut-ok" data-hint="${h.id}">${withIcon('confirm', 'Понятно')}</button>` : ''}</div>`;
   root.appendChild(bubble);
   const bw = bubble.offsetWidth;
   const bh = bubble.offsetHeight;

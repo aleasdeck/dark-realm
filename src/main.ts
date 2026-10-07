@@ -33,6 +33,7 @@ import {
   type Focus,
 } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
+import { icon, withIcon } from './ui/icons';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
@@ -79,6 +80,7 @@ function saveName(n: string) {
 
 const LEVEL_KEY = 'dr-bot-level';
 const LEVEL_NAMES: Record<BotLevel, string> = { gentle: 'Наставник', easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
+const LEVEL_ICONS: Record<BotLevel, string> = { gentle: 'level_gentle', easy: 'level_easy', medium: 'level_medium', hard: 'level_hard' };
 /** The level chosen for the last game against the bot. */
 function botLevel(): BotLevel {
   try {
@@ -98,7 +100,7 @@ function saveLevel(v: BotLevel) {
 
 function levelButtons() {
   const cur = botLevel();
-  return BOT_LEVELS.map((v) => `<button data-level="${v}" aria-pressed="${v === cur}">${LEVEL_NAMES[v]}</button>`).join('');
+  return BOT_LEVELS.map((v) => `<button data-level="${v}" aria-pressed="${v === cur}">${withIcon(LEVEL_ICONS[v], LEVEL_NAMES[v])}</button>`).join('');
 }
 
 function roomFromUrl(): string {
@@ -140,17 +142,17 @@ function menu(message = '') {
     <p class="subtitle">Карточная дуэль покровителей тёмного мира</p>
     <label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}"></label>
     <div class="menu-buttons">
-      <button data-go="tutorial">Туториал</button>
+      <button data-go="tutorial">${withIcon('tutorial', 'Туториал')}</button>
       <div class="bot-play">
-        <button data-go="bot">Играть против бота</button>
+        <button data-go="bot">${withIcon('play_bot', 'Играть против бота')}</button>
         <div class="levels" role="group" aria-label="Сложность бота">${levelButtons()}</div>
       </div>
-      <button data-go="host">Создать комнату</button>
-      <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">Войти</button></div>
-      <button class="ghost" data-go="settings">⚙ Настройки</button>
+      <button data-go="host">${withIcon('host', 'Создать комнату')}</button>
+      <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">${withIcon('join', 'Войти')}</button></div>
+      <button class="ghost" data-go="settings">${icon('settings') ? withIcon('settings', 'Настройки') : '⚙ Настройки'}</button>
     </div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
-    <details class="rules"><summary>Правила</summary>${rulesHtml()}</details>
+    <details class="rules"><summary>${withIcon('rules', 'Правила')}</summary>${rulesHtml()}</details>
   </div>`;
   const nameInput = app.querySelector<HTMLInputElement>('#name')!;
   const levels = app.querySelector<HTMLElement>('.levels')!;
@@ -177,14 +179,14 @@ function menu(message = '') {
 
 /** Music, sounds and animations, each switched on or off; the same sheet opens from the main menu and in a game. */
 const SETTINGS = [
-  { key: 'music', label: 'Музыка', on: musicOn, set: setMusic },
-  { key: 'sound', label: 'Звуки', on: soundOn, set: setSound },
-  { key: 'motion', label: 'Анимации', on: motionOn, set: setMotion },
+  { key: 'music', label: 'Музыка', icon: 'set_music', on: musicOn, set: setMusic },
+  { key: 'sound', label: 'Звуки', icon: 'set_sound', on: soundOn, set: setSound },
+  { key: 'motion', label: 'Анимации', icon: 'set_motion', on: motionOn, set: setMotion },
 ];
 
 function settingsRows() {
   return SETTINGS.map(
-    (o) => `<button class="toggle" data-set="${o.key}" aria-pressed="${o.on()}"><span>${o.label}</span><b>${o.on() ? 'Вкл' : 'Выкл'}</b></button>`,
+    (o) => `<button class="toggle" data-set="${o.key}" aria-pressed="${o.on()}"><span class="t-label">${icon(o.icon)}<span>${o.label}</span></span><b>${o.on() ? 'Вкл' : 'Выкл'}</b></button>`,
   ).join('');
 }
 
@@ -192,7 +194,7 @@ function showSettings() {
   const box = document.createElement('div');
   box.className = 'overlay sheet-wrap';
   box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2><div class="settings">${settingsRows()}</div>
-    <div class="sheet-actions"><button data-close>Готово</button></div></div>`;
+    <div class="sheet-actions"><button data-close>${withIcon('confirm', 'Готово')}</button></div></div>`;
   box.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
     const row = t.closest<HTMLElement>('[data-set]');
@@ -204,7 +206,7 @@ function showSettings() {
     }
     if (t === box || t.closest('[data-close]')) {
       box.remove();
-      // the ♪ button on the table follows the music setting
+      // the music button on the table follows the music setting
       if (ctrl?.state) render();
     }
   });
@@ -214,7 +216,7 @@ function showSettings() {
 function rulesHtml() {
   const patrons = (Object.keys(PATRON_RULES) as PatronId[])
     .map((p) => {
-      const lock = isUnlocked(p) ? '' : ` 🔒 (${unlockHint(p).replace(/\.$/, '').toLowerCase()})`;
+      const lock = isUnlocked(p) ? '' : ` ${icon('lock', '🔒')} (${unlockHint(p).replace(/\.$/, '').toLowerCase()})`;
       return `<li><b>${esc(PATRONS[p].name)}</b>${lock}: ${richText(PATRON_RULES[p].cost)} → ${richText(PATRON_RULES[p].effect)}</li>`;
     })
     .join('');
@@ -235,7 +237,7 @@ function rulesHtml() {
 
 function waiting(text: string, extra = '') {
   app.innerHTML = `<div class="menu"><h1 class="title small">Dark Realm</h1><p class="wait">${text}</p>${extra}
-    <button data-go="back">Назад</button></div>`;
+    <button data-go="back">${withIcon('back', 'Назад')}</button></div>`;
   app.querySelector('[data-go="back"]')!.addEventListener('click', () => leaveGame());
 }
 
@@ -249,7 +251,7 @@ function roomScreen(code: string) {
   waiting(
     'Ждём соперника. Отправьте ему код или ссылку.',
     `<div class="room-code">${code}</div>
-     <div class="join"><input readonly value="${esc(link)}" id="link"><button id="copy">Копировать</button></div>`,
+     <div class="join"><input readonly value="${esc(link)}" id="link"><button id="copy">${withIcon('copy', 'Копировать')}</button></div>`,
   );
   app.querySelector('#copy')?.addEventListener('click', () => {
     const input = app.querySelector<HTMLInputElement>('#link')!;
@@ -385,7 +387,7 @@ function draftHtml(s: GameState): string {
         <img src="${patronEmblem(pid)}" alt="">
         <h3>${esc(p.name)}</h3><p class="p-title">${esc(p.title)}</p>
         <p><b>Воззвание:</b> ${richText(r.cost)} → ${richText(r.effect)}</p>
-        ${locked ? `<p class="lock-left">🔒 ${esc(unlockLeft(pid))}</p>` : ''}
+        ${locked ? `<p class="lock-left">${icon('lock', '🔒')} ${esc(unlockLeft(pid))}</p>` : ''}
       </div>`;
   };
   // Locked patrons are listed too, greyed out, with the games left until they open.
@@ -401,7 +403,7 @@ function draftHtml(s: GameState): string {
       .map((pi) => `<div><b>${esc(s.players[pi].name)}</b>${s.first === pi ? '<span class="first-mark">ходит первым</span>' : ''}${picks(pi)}</div>`)
       .join('')}</div>
     <div class="draft-tiles">${tiles}</div>
-    <button class="ghost" data-act="leave">Выйти</button>
+    <button class="ghost" data-act="leave">${withIcon('back', 'Выйти')}</button>
   </div>`;
 }
 
@@ -425,7 +427,7 @@ function netOverlay(s: GameState): string {
   if (ctrl instanceof GuestController && ctrl.offline) {
     return `<div class="overlay"><div class="dialog reconnect"><h2>Нет связи</h2>
       <p class="wait">${esc(ctrl.notice)}</p>
-      <div class="buttons"><button class="ghost" data-act="leave">В меню</button></div></div></div>`;
+      <div class="buttons"><button class="ghost" data-act="leave">${withIcon('back', 'В меню')}</button></div></div></div>`;
   }
   if (ctrl instanceof HostController && !ctrl.online) return `<div class="toast away">${esc(ctrl.notice)}</div>`;
   return '';
@@ -442,11 +444,11 @@ function overlays(s: GameState): string {
   if (s.phase === 'over') {
     const win = s.winner === me;
     html += `<div class="overlay"><div class="dialog end-dialog ${win ? 'win' : 'lose'}">
-      <h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${richText(s.winReason)}</p>
+      ${icon(win ? 'win' : 'lose', '', 'end-ic')}<h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${richText(s.winReason)}</p>
       <p>Престиж ${s.players[me].prestige} : ${s.players[me === 0 ? 1 : 0].prestige}</p>
       ${ctrl!.unlocked.map((pid) => `<p class="unlocked"><img src="${patronEmblem(pid)}" alt=""><span>Открыт покровитель <b>${esc(PATRONS[pid].name)}</b></span></p>`).join('')}
-      <div class="buttons">${ctrl instanceof BotController ? `<button data-act="rematch">${ctrl.tutorial ? 'Пройти ещё раз' : 'Ещё партия'}</button>` : ''}
-      <button data-act="leave">В меню</button></div></div></div>`;
+      <div class="buttons">${ctrl instanceof BotController ? `<button data-act="rematch">${withIcon('rematch', ctrl.tutorial ? 'Пройти ещё раз' : 'Ещё партия')}</button>` : ''}
+      <button data-act="leave">${withIcon('back', 'В меню')}</button></div></div></div>`;
     return html;
   }
   if (s.pending) {
@@ -466,11 +468,11 @@ function overlays(s: GameState): string {
         .join('');
       const ok = selected.size >= p.min && selected.size <= p.max;
       // A patron call that only opened this choice can be called off: nothing is spent.
-      const cancel = canCancel(s, me) ? '<button class="ghost" data-act="cancel">Отмена</button>' : '';
+      const cancel = canCancel(s, me) ? `<button class="ghost" data-act="cancel">${withIcon('cancel', 'Отмена')}</button>` : '';
       const done =
         single && p.min > 0
           ? ''
-          : `<button data-act="confirm" ${ok ? '' : 'disabled'}>${single || (selected.size === 0 && p.min === 0) ? 'Пропустить' : `Готово (${selected.size})`}</button>`;
+          : `<button data-act="confirm" ${ok ? '' : 'disabled'}>${single || (selected.size === 0 && p.min === 0) ? withIcon('skip', 'Пропустить') : withIcon('confirm', `Готово (${selected.size})`)}</button>`;
       const buttons = cancel + done;
       const range = p.min === p.max ? `${p.min}` : p.min === 0 ? `до ${p.max}` : `${p.min}–${p.max}`;
       html += `<div class="overlay sheet-wrap"><div class="sheet choice">
@@ -484,16 +486,16 @@ function overlays(s: GameState): string {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
       <h2>Журнал партии</h2>
       <div class="log">${s.log.map((l) => `<div>${richText(l)}</div>`).join('')}</div>
-      <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
+      <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
       <h2>Меню</h2>
       <div class="sheet-actions column">
-        <button data-act="log">Журнал партии</button>
-        <button data-act="rules">Правила</button>
-        <button data-act="settings">Настройки</button>
-        <button class="danger" data-act="concede">Сдаться</button>
-        <button class="ghost" data-act="close">Вернуться к игре</button>
+        <button data-act="log">${withIcon('log', 'Журнал партии')}</button>
+        <button data-act="rules">${withIcon('rules', 'Правила')}</button>
+        <button data-act="settings">${withIcon('settings', 'Настройки')}</button>
+        <button class="danger" data-act="concede">${withIcon('concede', 'Сдаться')}</button>
+        <button class="ghost" data-act="close">${withIcon('back', 'Вернуться к игре')}</button>
       </div></div></div>`;
   } else if (modal?.kind === 'pile') {
     const cards = [...modal.cards].sort((a, b) => cardDef(a.id).name.localeCompare(cardDef(b.id).name));
@@ -513,7 +515,7 @@ function pileSheet(title: string, cards: Card[]): string {
   return `<div class="overlay sheet-wrap" data-act="close"><div class="sheet pile-view">
       <h2>${esc(title)}</h2>
       <div class="options">${pileGridHtml(cards) || '<p>Пусто</p>'}</div>
-      <div class="sheet-actions"><button data-act="close">Закрыть</button></div></div></div>`;
+      <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
 }
 
 /**
@@ -526,12 +528,12 @@ function peekHtml(p: GameState['pending'], k: { id: string; ref?: number }): str
     const on = selected.has(k.ref);
     const full = p.max > 1 && !on && selected.size >= p.max;
     const label = on ? 'Снять выбор' : full ? `Выбрано уже ${selected.size}` : 'Выбрать';
-    pick = `<button data-act="peek-pick" ${full ? 'disabled' : ''}>${label}</button>`;
+    pick = `<button data-act="peek-pick" ${full ? 'disabled' : ''}>${on ? withIcon('cancel', label) : withIcon('confirm', label)}</button>`;
   }
   const act = pick && !pick.includes('disabled') ? 'peek-pick' : 'peek-close';
   return `<div class="overlay peek" data-act="peek-close">
     <div class="peek-card${act === 'peek-pick' ? ' can' : ''}" data-act="${act}">${cardHtml(k.id, { cls: 'big' })}</div>
-    <div class="peek-actions"><button class="ghost" data-act="peek-close">${pick ? 'Назад' : 'Закрыть'}</button>${pick}</div>
+    <div class="peek-actions"><button class="ghost" data-act="peek-close">${pick ? withIcon('back', 'Назад') : withIcon('close', 'Закрыть')}</button>${pick}</div>
   </div>`;
 }
 
@@ -745,9 +747,9 @@ function showRules() {
   const box = document.createElement('div');
   box.className = 'overlay sheet-wrap';
   box.innerHTML = `<div class="sheet rules-sheet"><h2>Правила</h2><div class="rules-body">${rulesHtml()}</div>
-    <div class="sheet-actions"><button>Закрыть</button></div></div>`;
+    <div class="sheet-actions"><button>${withIcon('close', 'Закрыть')}</button></div></div>`;
   box.addEventListener('click', (ev) => {
-    if (ev.target === box || (ev.target as HTMLElement).tagName === 'BUTTON') box.remove();
+    if (ev.target === box || (ev.target as HTMLElement).closest('button')) box.remove();
   });
   document.body.appendChild(box);
   render();

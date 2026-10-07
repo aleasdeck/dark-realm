@@ -1,3 +1,4 @@
+import { icon } from './icons';
 import { richText } from './rich';
 import { still } from './motion';
 import { play } from './sound';
@@ -20,6 +21,10 @@ const MOON = `<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentCol
   d="M40 10a22 22 0 1 0 14 34A18 18 0 0 1 40 10z"/>
   <circle cx="44" cy="22" r="2" fill="currentColor"/><circle cx="50" cy="31" r="1.4" fill="currentColor"/></svg>`;
 
+/** The painted coin faces, or the drawn sun and moon when the files are missing. */
+const sun = () => icon('coin_sun', SUN);
+const moon = () => icon('coin_moon', MOON);
+
 let open: HTMLElement | null = null;
 
 export function closeCoin() {
@@ -33,8 +38,8 @@ export function showCoin(meFirst: boolean, done: () => void) {
   box.className = 'overlay coin-toss';
   box.innerHTML = `<div class="coin-box">
     <h2>Жребий</h2>
-    <p class="coin-key"><span class="you">${SUN} вы</span><span class="them">${MOON} соперник</span></p>
-    <div class="coin-stage"><div class="toss-coin"><div class="face sun">${SUN}</div><div class="face moon">${MOON}</div></div></div>
+    <p class="coin-key"><span class="you">${sun()} вы</span><span class="them">${moon()} соперник</span></p>
+    <div class="coin-stage"><div class="toss-coin${icon('coin_sun') ? ' painted' : ''}"><div class="face sun">${sun()}</div><div class="face moon">${moon()}</div></div></div>
     <div class="coin-result">
       <h3 class="${meFirst ? 'you' : 'them'}">${meFirst ? 'Вы ходите первым' : 'Соперник ходит первым'}</h3>
       <p>${richText(

@@ -1,7 +1,7 @@
 import { actingPlayer, hpLeft } from '../engine/engine';
 import type { AgentInPlay, GameState, PlayerIdx } from '../engine/types';
 import { cardMoves, type Move, type Place } from './moves';
-import { tileHtml } from './render';
+import { richText, tileHtml } from './render';
 
 /**
  * Card movement on the table. The board is redrawn from scratch on every state, so the cards
@@ -309,7 +309,7 @@ function fly(f: Flight) {
 function floatText(at: Box, text: string, cls: string, delay: number) {
   const el = document.createElement('div');
   el.className = `float ${cls}`;
-  el.textContent = text;
+  el.innerHTML = richText(text);
   el.style.left = `${at.x}px`;
   el.style.top = `${at.y}px`;
   layer.appendChild(el);
