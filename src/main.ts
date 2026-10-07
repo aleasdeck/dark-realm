@@ -5,6 +5,7 @@ import '@fontsource/pt-sans/700.css';
 import '@fontsource/pt-sans-narrow/400.css';
 import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
+import logoUrl from './assets/app/logo.webp';
 import { preloadCustomArt } from './art/custom';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
@@ -72,36 +73,15 @@ function playerName(): string {
 }
 function saveName(n: string) {
   try {
-    localStorage.setItem(NAME_KEY, n);
+    if (n) localStorage.setItem(NAME_KEY, n);
+    else localStorage.removeItem(NAME_KEY);
   } catch {
     /* storage unavailable */
   }
 }
 
-const LEVEL_KEY = 'dr-bot-level';
 const LEVEL_NAMES: Record<BotLevel, string> = { gentle: 'Наставник', easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
 const LEVEL_ICONS: Record<BotLevel, string> = { gentle: 'level_gentle', easy: 'level_easy', medium: 'level_medium', hard: 'level_hard' };
-/** The level chosen for the last game against the bot. */
-function botLevel(): BotLevel {
-  try {
-    const v = localStorage.getItem(LEVEL_KEY) as BotLevel;
-    return BOT_LEVELS.includes(v as (typeof BOT_LEVELS)[number]) ? v : 'medium';
-  } catch {
-    return 'medium';
-  }
-}
-function saveLevel(v: BotLevel) {
-  try {
-    localStorage.setItem(LEVEL_KEY, v);
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-function levelButtons() {
-  const cur = botLevel();
-  return BOT_LEVELS.map((v) => `<button data-level="${v}" aria-pressed="${v === cur}">${withIcon(LEVEL_ICONS[v], LEVEL_NAMES[v])}</button>`).join('');
-}
 
 function roomFromUrl(): string {
   return normalizeCode(new URLSearchParams(location.search).get('room') ?? '');
@@ -135,44 +115,71 @@ function leaveGame(message = '') {
   menu(message);
 }
 
-function menu(message = '') {
-  const code = roomFromUrl();
-  app.innerHTML = `<div class="menu home">
-    <h1 class="title">Dark Realm</h1>
-    <p class="subtitle">Карточная дуэль покровителей тёмного мира</p>
-    <label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}"></label>
-    <div class="menu-buttons">
-      <button data-go="tutorial">${withIcon('tutorial', 'Туториал')}</button>
-      <div class="bot-play">
-        <button data-go="bot">${withIcon('play_bot', 'Играть против бота')}</button>
-        <div class="levels" role="group" aria-label="Сложность бота">${levelButtons()}</div>
-      </div>
-      <button data-go="host">${withIcon('host', 'Создать комнату')}</button>
-      <div class="join"><input id="code" placeholder="КОД" maxlength="8" value="${esc(code)}"><button data-go="join">${withIcon('join', 'Войти')}</button></div>
-      <button class="ghost" data-go="settings">${icon('settings') ? withIcon('settings', 'Настройки') : '⚙ Настройки'}</button>
-    </div>
+/** Screens of the main menu; each one but the first has a way back to the one it came from. */
+type MenuView = 'home' | 'play' | 'bot' | 'net' | 'join' | 'settings';
+const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
+  home: { title: '', back: 'home' },
+  play: { title: 'Играть', back: 'home' },
+  bot: { title: 'Сложность бота', back: 'play' },
+  net: { title: 'Сетевая игра', back: 'home' },
+  join: { title: 'Присоединиться', back: 'net' },
+  settings: { title: 'Настройки', back: 'home' },
+};
+
+const menuButton = (go: string, ic: string, label: string) => `<button class="menu-btn" data-go="${go}">${withIcon(ic, label)}</button>`;
+
+function menuBody(view: MenuView): string {
+  switch (view) {
+    case 'home':
+      return menuButton('play', 'play_all', 'Играть') + menuButton('net', 'combo', 'Сетевая игра') + menuButton('settings', 'settings', 'Настройки');
+    case 'play':
+      return menuButton('tutorial', 'tutorial', 'Туториал') + menuButton('bot', 'play_bot', 'Против бота');
+    case 'bot':
+      return BOT_LEVELS.map((v) => menuButton(`level-${v}`, LEVEL_ICONS[v], LEVEL_NAMES[v])).join('');
+    case 'net':
+      return menuButton('host', 'host', 'Создать комнату') + menuButton('join', 'join', 'Присоединиться');
+    case 'join':
+      return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter">${withIcon('join', 'Войти')}</button></div>`;
+    case 'settings':
+      return `<label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}" autocomplete="nickname"></label>
+        <div class="settings">${settingsRows()}</div>
+        ${menuButton('rules', 'rules', 'Правила')}`;
+  }
+}
+
+/** The main menu: three buttons, each opening a screen of its own. A room link opens straight on joining it. */
+function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
+  const v = MENU_VIEWS[view];
+  app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
+    <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
+    ${view === 'home' ? '<p class="subtitle">Карточная дуэль покровителей тёмного мира</p>' : `<h2 class="menu-title">${v.title}</h2>`}
+    <div class="menu-buttons">${menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
-    <details class="rules"><summary>${withIcon('rules', 'Правила')}</summary>${rulesHtml()}</details>
   </div>`;
-  const nameInput = app.querySelector<HTMLInputElement>('#name')!;
-  const levels = app.querySelector<HTMLElement>('.levels')!;
-  levels.addEventListener('click', (ev) => {
-    const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-level]');
-    if (!b) return;
-    saveLevel(b.dataset.level as BotLevel);
-    levels.innerHTML = levelButtons();
-    play('click');
+  const nameInput = app.querySelector<HTMLInputElement>('#name');
+  nameInput?.addEventListener('input', () => saveName(nameInput.value.trim()));
+  const codeInput = app.querySelector<HTMLInputElement>('#code');
+  codeInput?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') join(playerName(), normalizeCode(codeInput.value));
+  });
+  app.querySelector('.settings')?.addEventListener('click', (ev) => {
+    const row = (ev.target as HTMLElement).closest<HTMLElement>('[data-set]');
+    if (!row) return;
+    const o = SETTINGS.find((x) => x.key === row.dataset.set)!;
+    o.set(!o.on());
+    app.querySelector('.settings')!.innerHTML = settingsRows();
   });
   app.querySelectorAll<HTMLButtonElement>('[data-go]').forEach((b) =>
     b.addEventListener('click', () => {
-      const n = nameInput.value.trim() || 'Странник';
-      saveName(n);
-      const go = b.dataset.go;
-      if (go === 'settings') return showSettings();
-      if (go === 'tutorial') startGame(new BotController(n, 'gentle'));
-      else if (go === 'bot') startGame(new BotController(n, botLevel()));
-      else if (go === 'host') host(n);
-      else join(n, normalizeCode(app.querySelector<HTMLInputElement>('#code')!.value));
+      const go = b.dataset.go!;
+      const n = playerName();
+      if (go === 'back') return menu('', v.back);
+      if (go === 'play' || go === 'net' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
+      if (go === 'rules') return showRules();
+      if (go === 'tutorial') return startGame(new BotController(n, 'gentle'));
+      if (go.startsWith('level-')) return startGame(new BotController(n, go.slice(6) as BotLevel));
+      if (go === 'host') return host(n);
+      if (go === 'enter') return join(n, normalizeCode(codeInput!.value));
     }),
   );
 }
@@ -204,11 +211,7 @@ function showSettings() {
       box.querySelector('.settings')!.innerHTML = settingsRows();
       return;
     }
-    if (t === box || t.closest('[data-close]')) {
-      box.remove();
-      // the music button on the table follows the music setting
-      if (ctrl?.state) render();
-    }
+    if (t === box || t.closest('[data-close]')) box.remove();
   });
   document.body.appendChild(box);
 }
@@ -230,7 +233,7 @@ function rulesHtml() {
     <li><b>Контракты</b> срабатывают сразу при покупке и не попадают в колоду. Колода Сундука Бездны целиком из контрактов.</li>
     <li><b>Морок</b> (проклятие) надо разыграть раньше остальных карт в руке.</li>
     <li>Нажмите на счётчик колоды или сброса, своего или соперника, чтобы посмотреть эти карты. Порядок колоды скрыт.</li>
-    <li>За ход можно один раз воззвать к покровителю. Он становится благосклонен к вам, а если благоволил сопернику, то нейтрален.</li>
+    <li>За ход можно один раз воззвать к покровителю. Он становится благосклонен к вам, а если благоволил сопернику, то нейтрален. Ворон нейтрален только в начале игры: после вызова он сразу на вашей стороне.</li>
     <li>Победа: 40 ✦ и перевес после хода соперника, или сразу: 80 ✦ либо благосклонность всех 4 покровителей.</li>
   </ul>`) + `<ul class="patron-rules">${patrons}</ul>`;
 }
@@ -261,7 +264,7 @@ function roomScreen(code: string) {
 }
 
 function join(name: string, code: string) {
-  if (!code) return menu('Введите код комнаты.');
+  if (!code) return menu('Введите код комнаты.', 'join');
   startGame(new GuestController(code, name, joinRoom));
 }
 
@@ -728,9 +731,6 @@ app.addEventListener('click', (ev) => {
       modal = null;
       render();
       return showSettings();
-    case 'music':
-      setMusic(!musicOn());
-      return render();
     case 'rules':
       modal = null;
       showRules();

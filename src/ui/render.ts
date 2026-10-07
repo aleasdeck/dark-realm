@@ -5,7 +5,6 @@ import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable } 
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { esc, paintIcons, richText } from './rich';
 import { icon } from './icons';
-import { musicOn } from './music';
 import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, Pending, PlayerIdx } from '../engine/types';
 
 export { esc, paintIcons, richText };
@@ -354,7 +353,6 @@ export function boardHtml(
     </div>
     <footer class="controls">
       <button class="icon" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
-      <button class="icon${musicOn() ? '' : ' off'}" data-act="music" aria-label="Музыка" aria-pressed="${musicOn()}">${musicOn() ? icon('music_on', '♪') : icon('music_off', '♪')}</button>
       <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">${icon('play_all', '▶▶')}</button>
       ${pick ? pickButton(pick) : `<button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? endLabel('end_turn', 'Конец хода') : endLabel('opponent_turn', 'Ход соперника')}</button>`}
     </footer>
