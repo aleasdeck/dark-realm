@@ -1,5 +1,5 @@
 import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
-import type { Action, GameState } from '../engine/types';
+import type { Action, GameState, PatronId } from '../engine/types';
 
 /*
  * Serverless rooms: the host registers a PeerJS id derived from the room code
@@ -13,7 +13,8 @@ import type { Action, GameState } from '../engine/types';
  */
 
 export type NetMessage =
-  | { type: 'hello'; name: string; client?: string }
+  /** `patrons`: the locked patrons the guest has opened, added to the draft by the host. */
+  | { type: 'hello'; name: string; client?: string; patrons?: PatronId[] }
   | { type: 'state'; state: GameState }
   | { type: 'action'; action: Action }
   | { type: 'error'; message: string }

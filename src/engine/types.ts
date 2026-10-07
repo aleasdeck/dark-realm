@@ -207,6 +207,11 @@ export interface GameState {
   /** Drafted patrons (4) + treasury, in display order. */
   patrons: PatronId[];
   draftPool: PatronId[];
+  /**
+   * Online games: the locked patrons each player has opened and may draft. The pool holds
+   * both players' ones; without this list either player may take anything in the pool.
+   */
+  own?: [PatronId[], PatronId[]];
   draftStep: number;
   /** null = neutral, otherwise the favored player. */
   favor: Partial<Record<PatronId, PlayerIdx | null>>;
