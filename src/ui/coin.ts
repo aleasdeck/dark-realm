@@ -34,7 +34,7 @@ export const coinFace = (mine: boolean) => (mine ? sun() : moon());
  * The coin's thickness: thin discs stacked between the faces, lit in the middle like the side
  * of a cylinder, so the edge shows while it tumbles and at rest.
  */
-const RIMS = 14;
+const RIMS = 8;
 function rim(painted: boolean): string {
   // Dark stone round the painted faces, bronze round the drawn ones.
   const [h, sat, l] = painted ? [28, 9, 21] : [38, 60, 28];

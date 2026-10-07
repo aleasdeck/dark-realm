@@ -1472,7 +1472,7 @@ input {
 }
 .toss-coin {
   --coin: min(112px, 22dvh);
-  --thick: calc(var(--coin) * 0.14);
+  --thick: calc(var(--coin) * 0.065);
   position: relative;
   width: var(--coin);
   height: var(--coin);
