@@ -86,6 +86,22 @@ describe('engine', () => {
     expect(() => applyAction(s, 0, { t: 'patron', patron: 'crows' })).toThrow();
   });
 
+  it('the Crow never goes back to neutral once called', () => {
+    let s = draftAll(createGame(5, ['A', 'B']));
+    expect(s.favor.crows).toBeNull();
+    s.favor.crows = 1;
+    s.favor.eagle = 1;
+    s.players[0].coin = 3;
+    s.players[0].power = 2;
+    s = applyAction(s, 0, { t: 'patron', patron: 'crows' });
+    expect(s.favor.crows).toBe(0);
+    expect(s.players[0].power).toBe(4);
+    // Other patrons still step back to neutral first.
+    s.patronCalls = 1;
+    s = applyAction(s, 0, { t: 'patron', patron: 'eagle' });
+    expect(s.favor.eagle).toBeNull();
+  });
+
   it('opponent discard is asked at the start of their turn', () => {
     let s = draftAll(createGame(6, ['A', 'B']));
     s.players[1].pendingDiscard = 1;

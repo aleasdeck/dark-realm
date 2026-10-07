@@ -693,7 +693,8 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
   emit(s, { k: 'patron', p: pi, patron: pid });
   // What the favor was before this call: several patrons pay out according to it.
   const was = s.favor[pid];
-  if (pid !== 'treasury') s.favor[pid] = was === other(pi) ? null : pi;
+  // The Crow never goes back to neutral: after the first call he always sides with whoever called him last.
+  if (pid !== 'treasury') s.favor[pid] = was === other(pi) && pid !== 'crows' ? null : pi;
   const mine = was === pi;
   const neutral = was === null;
   switch (pid) {
