@@ -1348,12 +1348,69 @@ input {
   font-weight: 700;
 }
 
-.draft-picks .first-mark {
-  display: block;
+/* under each name: the patrons picked so far, and the coin beside whoever moves first */
+.draft-picks b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* the same height with or without the coin, so both rows of picks line up */
+  height: 24px;
+}
+.pick-coin {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
   color: var(--gold);
+}
+.pick-coin svg,
+.pick-coin img.ic {
+  width: 100%;
+  height: 100%;
+}
+.draft-picks .picks {
+  --pick: min(36px, 5dvh);
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.draft-picks .pick,
+.draft-picks .pick-slot {
+  width: calc(var(--pick) + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.draft-picks .pick img {
+  width: var(--pick);
+  height: var(--pick);
+}
+.draft-picks .pick img:not([src^='data:']) {
+  filter: drop-shadow(0 0 3px var(--glow));
+}
+.draft-picks .pick small {
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  line-height: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+/* a slot still to fill: a dashed ring the height of an emblem and its name */
+.draft-picks .pick-slot::before {
+  content: '';
+  width: var(--pick);
+  height: var(--pick);
+  box-sizing: border-box;
+  border: 2px dashed #ffffff26;
+  border-radius: 50%;
+}
+.draft-picks .pick-slot::after {
+  content: '';
+  height: 12px;
+}
+.draft-picks .pick-slot.next::before {
+  border-color: var(--green);
+  box-shadow: 0 0 10px #4fd17a55;
 }
 
 /* ── coin toss before the draft ───────────────────── */
@@ -1398,16 +1455,36 @@ input {
   color: #c9d4e8;
 }
 .coin-stage {
+  position: relative;
   perspective: 600px;
   padding: min(64px, 9dvh) 0 min(14px, 2dvh);
 }
+/* the coin's shadow on the ground; it shrinks while the coin is up */
+.coin-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: min(4px, 0.6dvh);
+  width: calc(min(112px, 22dvh) * 0.9);
+  height: calc(min(112px, 22dvh) * 0.16);
+  margin-left: calc(min(112px, 22dvh) * -0.45);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #000d, #0000);
+}
 .toss-coin {
   --coin: min(112px, 22dvh);
+  --thick: calc(var(--coin) * 0.14);
   position: relative;
   width: var(--coin);
   height: var(--coin);
   margin: 0 auto;
   transform-style: preserve-3d;
+}
+/* the edge: discs stacked through the thickness */
+.toss-coin .rim {
+  position: absolute;
+  inset: 3%;
+  border-radius: 50%;
+  transform: translateZ(calc(var(--z) * var(--thick)));
 }
 .toss-coin .face {
   position: absolute;
@@ -1418,6 +1495,29 @@ input {
   justify-content: center;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+/* a glint runs over the face once it lands */
+.toss-coin .face::after {
+  content: '';
+  position: absolute;
+  inset: 3%;
+  border-radius: 50%;
+  background: linear-gradient(115deg, #fff0 35%, #ffffff55 48%, #fff0 60%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 120% 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.toss-coin.shine .face::after {
+  animation: coin-glint 0.9s ease-out;
+}
+@keyframes coin-glint {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
 }
 .toss-coin .face svg {
   width: 62%;
@@ -1430,6 +1530,7 @@ input {
     inset 0 0 0 5px #c99a33,
     inset 0 0 0 7px #7a4f0e,
     0 0 26px #f0c86066;
+  transform: translateZ(calc(var(--thick) / 2));
 }
 .toss-coin .moon {
   color: #2a3346;
@@ -1438,7 +1539,7 @@ input {
     inset 0 0 0 5px #9aa6bf,
     inset 0 0 0 7px #2a3346,
     0 0 26px #c9d4e866;
-  transform: rotateY(180deg);
+  transform: rotateX(180deg) translateZ(calc(var(--thick) / 2));
 }
 .coin-result {
   min-height: 4.6em;
@@ -1775,7 +1876,11 @@ button.toggle[aria-pressed='true'] b {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    align-items: center;
     column-gap: 8px;
+  }
+  .draft-picks .picks {
+    margin-top: 0;
   }
   .draft-tile {
     grid-template-rows: auto 1fr;
