@@ -1404,37 +1404,125 @@ button.menu-btn {
   white-space: nowrap;
 }
 
-/* phones held sideways: two columns */
+/* the opponent's name over their hand shows only when the phone is held sideways (see below) */
+.oh-name {
+  display: none;
+}
+
+/* phones held sideways: the fields run the full width, as in the original game, and the patrons
+   stand in a column on the right. The bars sit in the corners next to the patrons, the opponent's
+   on top and yours at the bottom over the controls; the hands fill the rest of those rows */
 @media (orientation: landscape) and (max-height: 560px) {
   :root {
-    /* low enough that the opponent's strip keeps room above the tavern */
-    --tw: min(calc((50vw - 50px) / 5.2), 17dvh, 110px);
+    --tw: min(15.5dvh, 100px);
   }
   .game {
     max-width: none;
-    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+    /* emblems shrink with the screen so the four patrons and the treasury fit one column */
+    --emb: clamp(18px, (100dvh - 156px) / 8.2, 34px);
+    --pcol: max(72px, calc(var(--emb) * 2.2 + 14px));
+    /* the third column is as wide as your bar; the fields run over it */
+    grid-template-columns: auto minmax(0, 1fr) auto auto var(--pcol);
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      'oppbar oppbar l-table table'
-      'opphand opphand l-table table'
-      'l-oppag oppag l-table table'
-      'l-tavern tavern hand hand'
-      'l-patrons patrons mybar mybar'
-      'l-patrons patrons ctrl ctrl';
+      'opphand opphand oppbar l-patrons patrons'
+      'l-oppag oppag oppag l-patrons patrons'
+      'l-tavern tavern tavern l-patrons patrons'
+      'l-table table table l-patrons patrons'
+      'hand hand mybar l-patrons patrons'
+      'hand hand ctrl l-patrons patrons';
+    gap: 4px 3px;
+    padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));
   }
-  .sl-table {
-    margin-left: 7px;
+  .bar {
+    padding: 2px 8px;
   }
-  .patron,
-  .patron.chest {
-    --emb: 30px;
+  .bar .res {
+    font-size: 15px;
+    padding: 2px 6px;
+  }
+  .bar .count {
+    padding-block: 0;
+  }
+  /* the bars keep only the counters, whose turn it is shows in their glow; the opponent's name
+     moves over to their hand */
+  .bar .who {
+    display: none;
+  }
+  .bar {
+    justify-content: space-between;
+  }
+  .oh-name {
+    display: block;
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: calc(50% - 60px);
+    font-family: var(--title-font);
+    font-weight: 700;
+    color: var(--them);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tavern {
+    padding-block: 4px;
   }
   .controls button {
     padding-block: 6px;
   }
-  /* only the tips of the opponent's card backs peek out, to leave their strip room */
+  /* the patrons, top to bottom: the opponent's, the treasury, yours */
+  .patrons {
+    padding: 5px 4px;
+  }
+  .p-row {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    gap: 4px;
+  }
+  .p-side {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .p-side.theirs {
+    order: -1;
+  }
+  .p-side.mine {
+    order: 1;
+  }
+  .patron,
+  .patron.chest {
+    --emb: inherit;
+    gap: 4px;
+  }
+  /* your hand fills the corner left of your bar and the controls; the cards run off the bottom
+     edge of the screen, showing the cost and the art (a tap enlarges the card anyway) */
+  .hand {
+    height: auto;
+    clip-path: inset(-80px -80px calc(-1 * max(6px, env(safe-area-inset-bottom))) -80px);
+  }
+  .fan-slot {
+    top: 8px;
+    bottom: auto;
+  }
+  /* the opponent's hand: small card backs over the middle of the fields */
   .opp-hand {
-    height: 16px;
+    height: auto;
+    margin: 0;
+    overflow: hidden;
+  }
+  .opp-hand .back {
+    top: 2px;
+    bottom: auto;
+    width: 24px;
+    height: 34px;
+    margin-left: -12px;
+    transform: translateX(calc(var(--o) * 13px)) translateY(calc(var(--ao) * var(--ao) * -1px)) rotate(calc(var(--o) * -5deg));
+    font-size: 10px;
+    line-height: 16px;
   }
 }
 
@@ -2278,13 +2366,11 @@ button.toggle[aria-pressed='true'] b {
     box-shadow: 0 0 22px #ff3b2fbb;
   }
 }
-/* landscape: keep the feed over the hand column */
+/* landscape: the feed stays over the middle of the fields, clear of the patron column */
 @media (orientation: landscape) and (max-height: 560px) {
   .feed {
-    left: auto;
-    right: 12px;
-    transform: none;
-    width: min(48vw, 420px);
+    left: calc(50% - 50px);
+    width: min(60vw, 420px);
   }
 }
 
