@@ -1,5 +1,6 @@
 import { botAction, type BotLevel } from '../engine/bot';
 import { actingPlayer, applyAction, createGame, prestigeGoal, RuleError } from '../engine/engine';
+import { LOCKED } from '../engine/cards';
 import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
@@ -284,9 +285,11 @@ export class HostController extends Controller {
       const client = m.client ?? null;
       if (!this.state) {
         // The host tosses the coin; the guest gets the result with the state, so both see the same.
-        // The draft offers the patrons either player has opened.
+        // The draft holds the patrons either player has opened, and each may take only their own.
+        const theirs = (Array.isArray(m.patrons) ? m.patrons : []).filter((pid) => LOCKED.includes(pid));
         this.state = createGame(randomSeed(), [this.playerName, m.name.slice(0, 24) || 'Гость'], {
-          pool: draftPool(Array.isArray(m.patrons) ? m.patrons : []),
+          pool: draftPool(theirs),
+          own: [unlockedPatrons(), theirs],
           first: tossCoin(),
         });
         this.client = client;

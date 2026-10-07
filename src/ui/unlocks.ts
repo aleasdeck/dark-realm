@@ -84,10 +84,10 @@ export function unlockedPatrons(): PatronId[] {
 }
 
 /**
- * Patrons this player can draft. In an online game the host adds the patrons the guest
- * has opened, so a patron either player opened is in the draft for both.
+ * Patrons in the draft. In an online game the host adds the patrons the guest has opened;
+ * each player may still take only their own (`GameState.own`).
  */
-export function draftPool(also: readonly unknown[] = []): PatronId[] {
+export function draftPool(also: readonly PatronId[] = []): PatronId[] {
   return [...DRAFTABLE, ...LOCKED.filter((pid) => isUnlocked(pid) || also.includes(pid))];
 }
 

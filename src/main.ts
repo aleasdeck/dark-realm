@@ -9,7 +9,7 @@ import logoUrl from './assets/app/logo.webp';
 import { preloadCustomArt } from './art/custom';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
-import { actingPlayer, canCancel, draftedBy } from './engine/engine';
+import { actingPlayer, canCancel, draftedBy, mayDraft } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
@@ -401,16 +401,17 @@ function draftHtml(s: GameState): string {
         <h3>${esc(p.name)}</h3><p class="p-title">${esc(p.title)}</p>
         <p><b>Воззвание:</b> ${richText(r.cost)} → ${richText(r.effect)}</p>
         ${locked ? `<p class="lock-left">${icon('lock', '🔒')} ${esc(unlockLeft(pid))}</p>` : ''}
-        ${!locked && !isUnlocked(pid) ? '<p class="lock-left">Открыт у соперника</p>' : ''}
       </div>`;
   };
-  // Locked patrons are listed too, greyed out, with the games left until they open.
+  // Locked patrons are listed too, greyed out, with the wins left until they open. Online,
+  // a patron only the opponent opened stays greyed out here, though the opponent may take it.
   // The tutorial offers only its own four patrons.
   const tutorial = ctrl instanceof BotController && ctrl.tutorial;
-  const locked = (tutorial ? [] : LOCKED).filter((pid) => !s.draftPool.includes(pid) && !s.patrons.includes(pid)).sort(
+  const open = s.draftPool.filter((pid) => mayDraft(s, me, pid));
+  const locked = (tutorial ? [] : LOCKED).filter((pid) => !open.includes(pid) && !s.patrons.includes(pid)).sort(
     (a, b) => (UNLOCK_AT[a] ?? 0) - (UNLOCK_AT[b] ?? 0),
   );
-  const tiles = s.draftPool.map((pid) => tile(pid, false)).join('') + locked.map((pid) => tile(pid, true)).join('');
+  const tiles = open.map((pid) => tile(pid, false)).join('') + locked.map((pid) => tile(pid, true)).join('');
   return `<div class="draft">
     <h2>${mine ? 'Выберите покровителя' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
     <div class="draft-picks">${([me, me === 0 ? 1 : 0] as const)

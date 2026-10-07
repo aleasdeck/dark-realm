@@ -61,6 +61,8 @@ export interface GameOptions {
   buyOnTop?: number;
   /** Who moves first, as the coin fell; player 0 when no coin was tossed (the tutorial). */
   first?: PlayerIdx;
+  /** Online games: the locked patrons each player has opened; only they may draft them. */
+  own?: [PatronId[], PatronId[]];
 }
 
 export function createGame(seed: number, names: [string, string], opts: GameOptions = {}): GameState {
@@ -947,6 +949,11 @@ export function attackable(s: GameState, pi: PlayerIdx): AgentInPlay[] {
   return taunts.length ? taunts : opp.agents;
 }
 
+/** Whether player `pi` may draft a patron from the pool: a locked one only if they opened it. */
+export function mayDraft(s: GameState, pi: PlayerIdx, pid: PatronId): boolean {
+  return !s.own || DRAFTABLE.includes(pid) || s.own[pi].includes(pid);
+}
+
 /** Applies an action for player `pi` and returns the new state. Throws RuleError on illegal moves. */
 export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameState {
   const s = structuredClone(state) as GameState;
@@ -961,6 +968,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
 
   if (s.phase === 'draft') {
     if (a.t !== 'draft' || !s.draftPool.includes(a.patron)) throw new RuleError('Выберите покровителя');
+    if (!mayDraft(s, pi, a.patron)) throw new RuleError('Этот покровитель у вас ещё не открыт');
     s.draftPool = s.draftPool.filter((x) => x !== a.patron);
     s.patrons.push(a.patron);
     log(s, `${s.players[pi].name} выбирает покровителя «${PATRONS[a.patron].name}»`);

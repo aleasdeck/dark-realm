@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Accept, JoinRoom, Link, LinkHandlers, NetMessage, OpenRoom } from '../src/net/room';
 import { savedMatch } from '../src/net/saved';
+import type { PatronId } from '../src/engine/types';
 import { GuestController, HostController } from '../src/ui/controller';
 
 /** In-memory stand-ins for localStorage and sessionStorage. */
@@ -247,16 +248,29 @@ describe('guest reconnect', () => {
 });
 
 describe('online draft', () => {
-  it('offers the patrons the guest has opened as well as the host’s', async () => {
+  it('lets each player draft only the locked patrons they have opened', async () => {
     localStorage.setItem('dr-wins', '10');
     const room = fakeRoom();
     const host = new HostController('Хозяин', 'ABCDE', room.open);
     await Promise.resolve();
-    room.connect().say({ type: 'hello', name: 'Гость', client: 'g1', patrons: ['alessia', 'nonsense' as never] });
-    const pool = host.state!.draftPool;
-    expect(pool).toEqual(expect.arrayContaining(['hunding', 'orgnum', 'alessia']));
-    expect(pool).not.toContain('druid');
-    expect(pool).not.toContain('nonsense');
+    const g = room.connect();
+    g.say({ type: 'hello', name: 'Гость', client: 'g1', patrons: ['alessia', 'nonsense' as never] });
+    const s = host.state!;
+    expect(s.draftPool).toEqual(expect.arrayContaining(['hunding', 'orgnum', 'alessia']));
+    expect(s.draftPool).not.toContain('druid');
+    expect(s.draftPool).not.toContain('nonsense');
+    expect(s.own).toEqual([['hunding', 'orgnum'], ['alessia']]);
+    const first = s.current;
+    const guestPick = (patron: PatronId) => g.say({ type: 'action', action: { t: 'draft', patron } });
+    if (first === 0) {
+      host.dispatch({ t: 'draft', patron: 'alessia' });
+      expect(host.error).toMatch(/не открыт/);
+      host.dispatch({ t: 'draft', patron: 'hunding' });
+    }
+    guestPick('orgnum');
+    expect(g.sent.at(-1)).toMatchObject({ type: 'error' });
+    guestPick('alessia');
+    expect(host.state!.patrons).toContain('alessia');
     host.dispose();
   });
 
