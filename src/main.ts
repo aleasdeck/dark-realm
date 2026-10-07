@@ -9,13 +9,13 @@ import logoUrl from './assets/app/logo.webp';
 import { preloadCustomArt } from './art/custom';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
-import { actingPlayer, canCancel } from './engine/engine';
+import { actingPlayer, canCancel, draftedBy } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { forgetMatch, savedMatch } from './net/saved';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
-import { closeCoin, showCoin } from './ui/coin';
+import { closeCoin, coinFace, showCoin } from './ui/coin';
 import { clearFx, onStateChange } from './ui/feed';
 import { musicOn, setMusic, unlockMusic } from './ui/music';
 import { play, setSound, soundOn, unlock } from './ui/sound';
@@ -377,11 +377,21 @@ function draftHtml(s: GameState): string {
   const me = ctrl!.me;
   const turn = actingPlayer(s);
   const mine = turn === me;
-  const picks = (pi: 0 | 1) =>
-    s.log
-      .filter((l) => l.startsWith(s.players[pi].name + ' выбирает'))
-      .map((l) => `<div>${esc(l.replace(/^.*«(.*)»$/, '$1'))}</div>`)
+  // Each player's two picks as emblems, with empty slots for the ones still to come;
+  // the slot the acting player fills next glows.
+  const picks = (pi: 0 | 1) => {
+    const mine = s.patrons.filter((pid) => draftedBy(s, pid) === pi);
+    return [0, 1]
+      .map((i) => {
+        const pid = mine[i];
+        if (!pid) return `<span class="pick-slot${turn === pi && i === mine.length ? ' next' : ''}"></span>`;
+        const p = PATRONS[pid];
+        return `<span class="pick" style="--glow:${p.palette.glow}"><img src="${patronEmblem(pid)}" alt=""><small>${esc(p.name)}</small></span>`;
+      })
       .join('');
+  };
+  // The coin as it fell, beside the name of whoever moves first: the sun if it is you, the moon if not.
+  const coin = (pi: 0 | 1) => (s.first === pi ? `<span class="pick-coin" title="Ходит первым">${coinFace(pi === me)}</span>` : '');
   const tile = (pid: PatronId, locked: boolean) => {
     const p = PATRONS[pid];
     const r = PATRON_RULES[pid];
@@ -403,7 +413,7 @@ function draftHtml(s: GameState): string {
   return `<div class="draft">
     <h2>${mine ? 'Выберите покровителя' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
     <div class="draft-picks">${([me, me === 0 ? 1 : 0] as const)
-      .map((pi) => `<div><b>${esc(s.players[pi].name)}</b>${s.first === pi ? '<span class="first-mark">ходит первым</span>' : ''}${picks(pi)}</div>`)
+      .map((pi) => `<div><b>${coin(pi)}${esc(s.players[pi].name)}</b><span class="picks">${picks(pi)}</span></div>`)
       .join('')}</div>
     <div class="draft-tiles">${tiles}</div>
     <button class="ghost" data-act="leave">${withIcon('back', 'Выйти')}</button>
