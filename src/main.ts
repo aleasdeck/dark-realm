@@ -116,14 +116,20 @@ function leaveGame(message = '') {
   menu(message);
 }
 
+/** The player chose to play without a nick: the network menu doesn't ask again until a reload. */
+let nickAsked = false;
+/** Where the nick screen leads on to. */
+let nickNext: MenuView = 'net';
+
 /** Screens of the main menu; each one but the first has a way back to the one it came from. */
-type MenuView = 'home' | 'play' | 'bot' | 'net' | 'join' | 'rating' | 'settings';
+type MenuView = 'home' | 'play' | 'bot' | 'net' | 'join' | 'nick' | 'rating' | 'settings';
 const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   home: { title: '', back: 'home' },
   play: { title: 'Играть', back: 'home' },
   bot: { title: 'Сложность бота', back: 'play' },
   net: { title: 'Сетевая игра', back: 'home' },
   join: { title: 'Присоединиться', back: 'net' },
+  nick: { title: 'Ваш ник', back: 'home' },
   rating: { title: 'Рейтинг', back: 'home' },
   settings: { title: 'Настройки', back: 'home' },
 };
@@ -147,6 +153,10 @@ function menuBody(view: MenuView): string {
       return menuButton('host', 'host', 'Создать комнату') + menuButton('join', 'join', 'Присоединиться');
     case 'join':
       return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter">${withIcon('join', 'Войти')}</button></div>`;
+    case 'nick':
+      return `<p class="nick-text">Придумайте ник: его увидит соперник, и под ним вы попадёте в рейтинг. Сменить ник можно в Настройках.</p>
+        <input id="nick" maxlength="24" placeholder="Ваш ник" autocomplete="nickname">
+        ${menuButton('nick-ok', 'confirm', 'Продолжить')}${menuButton('nick-skip', 'skip', 'Без ника')}`;
     case 'rating':
       return `<div class="rating-board">${ratingUrl() ? '<p class="wait">Загружаем…</p>' : '<p class="wait">Таблица рейтинга ещё не подключена.</p>'}</div>`;
     case 'settings':
@@ -158,6 +168,11 @@ function menuBody(view: MenuView): string {
 
 /** The main menu: three buttons, each opening a screen of its own. A room link opens straight on joining it. */
 function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
+  // A player without a nick is offered one on the way to a network game.
+  if ((view === 'net' || view === 'join') && !nickAsked && sameName(playerName(), DEFAULT_NAME)) {
+    nickNext = view;
+    view = 'nick';
+  }
   const v = MENU_VIEWS[view];
   app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
@@ -167,6 +182,16 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   </div>`;
   const nameInput = app.querySelector<HTMLInputElement>('#name');
   nameInput?.addEventListener('input', () => saveName(nameInput.value.trim()));
+  const nickInput = app.querySelector<HTMLInputElement>('#nick');
+  const setNick = () => {
+    const nick = nickInput!.value.trim();
+    if (!nick || sameName(nick, DEFAULT_NAME)) return menu('Введите ник.', 'nick');
+    saveName(nick);
+    menu('', nickNext);
+  };
+  nickInput?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') setNick();
+  });
   const codeInput = app.querySelector<HTMLInputElement>('#code');
   codeInput?.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') join(playerName(), normalizeCode(codeInput.value));
@@ -185,6 +210,11 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
       if (go === 'back') return menu('', v.back);
       if (go === 'play' || go === 'net' || go === 'rating' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
       if (go === 'rules') return showRules();
+      if (go === 'nick-ok') return setNick();
+      if (go === 'nick-skip') {
+        nickAsked = true;
+        return menu('', nickNext);
+      }
       if (go === 'tutorial') return startGame(new BotController(n, 'gentle'));
       if (go.startsWith('level-')) return startGame(new BotController(n, go.slice(6) as BotLevel));
       if (go === 'host') return host(n);

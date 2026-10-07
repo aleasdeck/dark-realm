@@ -286,6 +286,14 @@ button.menu-btn {
     padding-block: 7px;
   }
 }
+.nick-text {
+  margin: 0 0 4px;
+  color: var(--muted);
+}
+.menu #nick {
+  background: #07110bcc;
+  text-align: center;
+}
 /* the rating screen: the table scrolls inside it, the screen itself never does */
 .menu[data-view='rating'] {
   height: 100dvh;
