@@ -286,6 +286,118 @@ button.menu-btn {
     padding-block: 7px;
   }
 }
+.nick-text {
+  margin: 0 0 4px;
+  color: var(--muted);
+}
+.menu #nick {
+  background: #07110bcc;
+  text-align: center;
+}
+/* the rating screen: the table scrolls inside it, the screen itself never does */
+.menu[data-view='rating'] {
+  height: 100dvh;
+}
+.menu[data-view='rating'] .menu-buttons {
+  flex: 1;
+  min-height: 0;
+}
+.rating-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #07110bb8;
+  border: 1px solid #3f8a5c99;
+  border-radius: 10px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.rating-board .wait {
+  margin: auto 0;
+}
+.rating-head,
+.rating-list li {
+  display: grid;
+  grid-template-columns: 2em 1fr 4.6em 3.4em;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+}
+.rating-head {
+  color: var(--muted);
+  font-size: 13px;
+  border-bottom: 1px solid var(--line2);
+}
+.rating-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.rating-list li + li {
+  border-top: 1px solid #3f8a5c33;
+}
+.rating-list li.me {
+  background: #3fb46838;
+  border-radius: 6px;
+}
+.r-place,
+.r-wl {
+  color: var(--muted);
+}
+.r-name {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rating-list .r-name {
+  font-weight: 700;
+}
+.r-score {
+  text-align: right;
+}
+.rating-list .r-score {
+  font-family: var(--title-font);
+  font-weight: 700;
+  color: var(--green);
+}
+.r-wl {
+  text-align: right;
+}
+.rating-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+/* the rating of a finished network game, under its result */
+.rating-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu.home[data-view='rating'] {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr);
+  }
+  .menu.home[data-view='rating'] .logo {
+    grid-row: 2;
+  }
+  .menu.home[data-view='rating'] .menu-title {
+    grid-row: 3;
+  }
+  .menu.home[data-view='rating'] > .menu-buttons {
+    grid-row: 1 / span 4;
+    align-self: stretch;
+  }
+}
 .join {
   display: flex;
   gap: 8px;

@@ -12,6 +12,7 @@ import { actingPlayer, canCancel, draftedBy, mayDraft } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
+import { DEFAULT_NAME, flushReports, ratingLine, ratingUrl, sameName, topPlayers, type RatedPlayer } from './net/rating';
 import { forgetMatch, savedMatch } from './net/saved';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
 import { closeCoin, coinFace, showCoin } from './ui/coin';
@@ -66,9 +67,9 @@ let tossed = false;
 const NAME_KEY = 'dark-realm-name';
 function playerName(): string {
   try {
-    return localStorage.getItem(NAME_KEY) || 'Странник';
+    return localStorage.getItem(NAME_KEY) || DEFAULT_NAME;
   } catch {
-    return 'Странник';
+    return DEFAULT_NAME;
   }
 }
 function saveName(n: string) {
@@ -115,14 +116,21 @@ function leaveGame(message = '') {
   menu(message);
 }
 
+/** The player chose to play without a nick: the network menu doesn't ask again until a reload. */
+let nickAsked = false;
+/** Where the nick screen leads on to. */
+let nickNext: MenuView = 'net';
+
 /** Screens of the main menu; each one but the first has a way back to the one it came from. */
-type MenuView = 'home' | 'play' | 'bot' | 'net' | 'join' | 'settings';
+type MenuView = 'home' | 'play' | 'bot' | 'net' | 'join' | 'nick' | 'rating' | 'settings';
 const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   home: { title: '', back: 'home' },
   play: { title: 'Играть', back: 'home' },
   bot: { title: 'Сложность бота', back: 'play' },
   net: { title: 'Сетевая игра', back: 'home' },
   join: { title: 'Присоединиться', back: 'net' },
+  nick: { title: 'Ваш ник', back: 'home' },
+  rating: { title: 'Рейтинг', back: 'home' },
   settings: { title: 'Настройки', back: 'home' },
 };
 
@@ -131,7 +139,12 @@ const menuButton = (go: string, ic: string, label: string) => `<button class="me
 function menuBody(view: MenuView): string {
   switch (view) {
     case 'home':
-      return menuButton('play', 'play_all', 'Играть') + menuButton('net', 'combo', 'Сетевая игра') + menuButton('settings', 'settings', 'Настройки');
+      return (
+        menuButton('play', 'play_all', 'Играть') +
+        menuButton('net', 'combo', 'Сетевая игра') +
+        menuButton('rating', 'win', 'Рейтинг') +
+        menuButton('settings', 'settings', 'Настройки')
+      );
     case 'play':
       return menuButton('tutorial', 'tutorial', 'Туториал') + menuButton('bot', 'play_bot', 'Против бота');
     case 'bot':
@@ -140,6 +153,12 @@ function menuBody(view: MenuView): string {
       return menuButton('host', 'host', 'Создать комнату') + menuButton('join', 'join', 'Присоединиться');
     case 'join':
       return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter">${withIcon('join', 'Войти')}</button></div>`;
+    case 'nick':
+      return `<p class="nick-text">Придумайте ник: его увидит соперник, и под ним вы попадёте в рейтинг. Сменить ник можно в Настройках.</p>
+        <input id="nick" maxlength="24" placeholder="Ваш ник" autocomplete="nickname">
+        ${menuButton('nick-ok', 'confirm', 'Продолжить')}${menuButton('nick-skip', 'skip', 'Без ника')}`;
+    case 'rating':
+      return `<div class="rating-board">${ratingUrl() ? '<p class="wait">Загружаем…</p>' : '<p class="wait">Таблица рейтинга ещё не подключена.</p>'}</div>`;
     case 'settings':
       return `<label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}" autocomplete="nickname"></label>
         <div class="settings">${settingsRows()}</div>
@@ -149,6 +168,11 @@ function menuBody(view: MenuView): string {
 
 /** The main menu: three buttons, each opening a screen of its own. A room link opens straight on joining it. */
 function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
+  // A player without a nick is offered one on the way to a network game.
+  if ((view === 'net' || view === 'join') && !nickAsked && sameName(playerName(), DEFAULT_NAME)) {
+    nickNext = view;
+    view = 'nick';
+  }
   const v = MENU_VIEWS[view];
   app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
@@ -158,6 +182,16 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   </div>`;
   const nameInput = app.querySelector<HTMLInputElement>('#name');
   nameInput?.addEventListener('input', () => saveName(nameInput.value.trim()));
+  const nickInput = app.querySelector<HTMLInputElement>('#nick');
+  const setNick = () => {
+    const nick = nickInput!.value.trim();
+    if (!nick || sameName(nick, DEFAULT_NAME)) return menu('Введите ник.', 'nick');
+    saveName(nick);
+    menu('', nickNext);
+  };
+  nickInput?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') setNick();
+  });
   const codeInput = app.querySelector<HTMLInputElement>('#code');
   codeInput?.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') join(playerName(), normalizeCode(codeInput.value));
@@ -174,14 +208,49 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
       const go = b.dataset.go!;
       const n = playerName();
       if (go === 'back') return menu('', v.back);
-      if (go === 'play' || go === 'net' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
+      if (go === 'play' || go === 'net' || go === 'rating' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
       if (go === 'rules') return showRules();
+      if (go === 'nick-ok') return setNick();
+      if (go === 'nick-skip') {
+        nickAsked = true;
+        return menu('', nickNext);
+      }
       if (go === 'tutorial') return startGame(new BotController(n, 'gentle'));
       if (go.startsWith('level-')) return startGame(new BotController(n, go.slice(6) as BotLevel));
       if (go === 'host') return host(n);
       if (go === 'enter') return join(n, normalizeCode(codeInput!.value));
     }),
   );
+  if (view === 'rating' && ratingUrl()) loadRating();
+}
+
+/** Fills the rating screen once the table arrives, if the player is still on it. */
+async function loadRating() {
+  const board = app.querySelector<HTMLElement>('.rating-board')!;
+  let players: RatedPlayer[];
+  try {
+    players = await topPlayers();
+  } catch {
+    if (board.isConnected) board.innerHTML = '<p class="wait">Не удалось загрузить рейтинг. Проверьте связь.</p>';
+    return;
+  }
+  if (!board.isConnected) return;
+  const name = playerName();
+  const rows = players
+    .map(
+      (p, i) => `<li class="${sameName(p.name, name) ? 'me' : ''}"><span class="r-place">${i + 1}</span><span class="r-name">${esc(p.name)}</span>
+        <span class="r-score">${p.rating}</span><span class="r-wl">${p.wins}–${p.losses}</span></li>`,
+    )
+    .join('');
+  const note = sameName(name, DEFAULT_NAME)
+    ? 'Задайте имя в Настройках, чтобы попасть в рейтинг.'
+    : 'Сетевые партии против людей. Партия засчитывается, когда результат пришлют оба игрока.';
+  board.innerHTML = `${
+    rows
+      ? `<div class="rating-head"><span class="r-place">#</span><span class="r-name">Игрок</span><span class="r-score">Рейтинг</span><span class="r-wl">П–П</span></div><ol class="rating-list">${rows}</ol>`
+      : '<p class="wait">В рейтинге пока никого нет. Сыграйте сетевую партию!</p>'
+  }<p class="rating-note">${note}</p>`;
+  board.querySelector('.me')?.scrollIntoView({ block: 'nearest' });
 }
 
 /** Music, sounds and animations, each switched on or off; the same sheet opens from the main menu and in a game. */
@@ -462,6 +531,7 @@ function overlays(s: GameState): string {
     html += `<div class="overlay"><div class="dialog end-dialog ${win ? 'win' : 'lose'}">
       ${icon(win ? 'win' : 'lose', '', 'end-ic')}<h2>${win ? 'Победа' : 'Поражение'}</h2><p>${esc(s.players[s.winner!].name)}: ${richText(s.winReason)}</p>
       <p>Престиж ${s.players[me].prestige} : ${s.players[me === 0 ? 1 : 0].prestige}</p>
+      ${ctrl!.rating ? `<p class="rating-line">${icon('win')}<span>${esc(ratingLine(ctrl!.rating, s.players[me].name))}</span></p>` : ''}
       ${ctrl!.unlocked.map((pid) => `<p class="unlocked"><img src="${patronEmblem(pid)}" alt=""><span>Открыт покровитель <b>${esc(PATRONS[pid].name)}</b></span></p>`).join('')}
       <div class="buttons">${ctrl instanceof BotController ? `<button data-act="rematch">${withIcon('rematch', ctrl.tutorial ? 'Пройти ещё раз' : 'Ещё партия')}</button>` : ''}
       <button data-act="leave">${withIcon('back', 'В меню')}</button></div></div></div>`;
@@ -808,6 +878,9 @@ window.addEventListener('resize', () => {
   hideTooltip();
   if (focus) render();
 });
+
+// Results of network games that didn't reach the rating table before.
+flushReports();
 
 void loadAll().then(() => {
   if (!resume()) menu();

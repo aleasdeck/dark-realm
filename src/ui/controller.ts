@@ -5,6 +5,7 @@ import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '../net/room';
+import { newMatchId, rateGame, type RatingStatus } from '../net/rating';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
 import { strikePause } from './moves';
 import { draftPool, recordGame, unlockedPatrons } from './unlocks';
@@ -20,9 +21,12 @@ export abstract class Controller {
   gone = '';
   /** Patrons the game that just ended opened. */
   unlocked: PatronId[] = [];
+  /** Network games: where the finished game stands in the rating table; null when it isn't rated. */
+  rating: RatingStatus | null = null;
   /** Whether finished games count toward unlocking patrons. */
   protected counts = true;
   private wasOver = false;
+  private stopRating: (() => void) | null = null;
   private listeners: (() => void)[] = [];
 
   subscribe(fn: () => void) {
@@ -32,8 +36,18 @@ export abstract class Controller {
   protected emit() {
     const over = this.state?.phase === 'over';
     // A game counts once, when it ends after the draft; only a win moves the unlocks.
-    if (over && !this.wasOver) this.unlocked = this.counts && this.state!.turn > 0 ? recordGame(this.state!.winner === this.me) : [];
-    else if (!over) this.unlocked = [];
+    if (over && !this.wasOver) {
+      this.unlocked = this.counts && this.state!.turn > 0 ? recordGame(this.state!.winner === this.me) : [];
+      // A network game ended after the draft goes to the rating; one conceded in the draft doesn't.
+      if (this.kind !== 'bot' && this.state!.turn > 0) {
+        let now = true;
+        this.stopRating = rateGame(this.state!, this.me, (r) => {
+          this.rating = r;
+          if (!now) this.emit();
+        });
+        now = false;
+      }
+    } else if (!over) this.unlocked = [];
     this.wasOver = over;
     for (const fn of this.listeners) fn();
   }
@@ -42,6 +56,7 @@ export abstract class Controller {
   /** The coin toss has been shown; the game may go on. */
   tossShown() {}
   dispose() {
+    this.stopRating?.();
     this.listeners = [];
   }
 }
@@ -314,6 +329,7 @@ export class HostController extends Controller {
           own: [unlockedPatrons(), theirs],
           first: tossCoin(),
         });
+        this.state.match = newMatchId();
         this.client = client;
       } else if (client !== this.client) {
         link.send({ type: 'reject', message: 'Комната уже занята.' });

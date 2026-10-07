@@ -238,6 +238,8 @@ export interface GameState {
   buyOnTop?: number;
   /** Who moves first and opens the draft, as the coin fell; player 0 when no coin was tossed. */
   first?: PlayerIdx;
+  /** Online games: the match's id, which both players send to the rating table with its result. */
+  match?: string;
   /** Turn on which the Druid patron last handed out its Chimera. */
   chimeraTurn?: number;
 }
