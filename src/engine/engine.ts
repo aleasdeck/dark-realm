@@ -31,6 +31,9 @@ export class RuleError extends Error {}
 
 const other = (p: PlayerIdx): PlayerIdx => (p === 0 ? 1 : 0);
 
+/** The second player's compensation card on their first turn. */
+const FAKE_COIN = 'fake_coin';
+
 /** Pick order of the draft: the first player, the second twice, the first again. */
 const DRAFT_PICKS = 4;
 function drafter(s: GameState, step: number): PlayerIdx {
@@ -216,6 +219,7 @@ const isAgent = (id: string) => {
 
 /** Puts a card in a player's cooldown and lets their cards in play react. */
 function toCooldown(s: GameState, pi: PlayerIdx, c: Card) {
+  if (cardDef(c.id).fleeting) return;
   s.players[pi].cooldown.push(c);
   fire(s, pi, 'toCooldown', c);
   if (isAgent(c.id)) fire(s, pi, 'agentToCooldown', c);
@@ -887,7 +891,7 @@ function endTurn(s: GameState) {
   }
   p.power = 0;
   p.coin = 0;
-  p.cooldown.push(...p.hand, ...p.played);
+  p.cooldown.push(...[...p.hand, ...p.played].filter((c) => !cardDef(c.id).fleeting));
   p.hand = [];
   p.played = [];
   for (const a of p.agents) a.activated = false;
@@ -907,7 +911,12 @@ function endTurn(s: GameState) {
   emit(s, { k: 'turn', p: next });
   // A player who reached the goal and stayed ahead through the opponent's turn wins.
   if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ ✦`);
-  if (s.turn === 2) n.coin += 1; // second player compensation
+  if (s.turn === 2) {
+    // Second player compensation: a one-off coin contract on top of the usual hand, gone with the turn.
+    n.hand.push(mk(s, FAKE_COIN));
+    log(s, `${n.name} получает «${name(FAKE_COIN)}»`);
+    emit(s, { k: 'gain', p: next, card: FAKE_COIN });
+  }
   if (s.favor.hunding === next) n.coin += 1; // Kenjar pays whoever kept his favor through the turn
   if (n.boon) {
     n.coin += n.boon.coin;

@@ -63,3 +63,19 @@ describe('bot levels', () => {
     expect(wins('hard', 'medium', 10)).toBeGreaterThanOrEqual(7);
   });
 });
+
+describe('fake coin', () => {
+  it('every bot level plays it on its first turn as the second player', () => {
+    for (const level of ['gentle', 'easy', 'medium', 'hard'] as BotLevel[]) {
+      let s = createGame(5, ['A', 'B'], { first: 0 });
+      let played = false;
+      for (let i = 0; i < 400 && s.turn <= 2 && s.phase !== 'over'; i++) {
+        const pi = actingPlayer(s);
+        const a = botAction(s, pi, level)!;
+        if (a.t === 'play' && s.players[pi].hand.find((c) => c.uid === a.uid)?.id === 'fake_coin') played = true;
+        s = applyAction(s, pi, a);
+      }
+      expect(played, level).toBe(true);
+    }
+  }, 60000);
+});
