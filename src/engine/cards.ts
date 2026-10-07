@@ -81,7 +81,7 @@ export const PATRONS: Record<PatronId, PatronDef> = {
     name: 'Богомол',
     title: 'Клинок поёт лишь в верной руке',
     locked: true,
-    palette: { bg1: '#070812', bg2: '#1a1e3e', accent: '#4a5aa8', glow: '#9ab4ff' },
+    palette: { bg1: '#040c08', bg2: '#0f2e21', accent: '#1f7f52', glow: '#7ef0b8' },
   },
   druid: {
     id: 'druid',
