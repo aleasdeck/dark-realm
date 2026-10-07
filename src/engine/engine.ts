@@ -912,7 +912,7 @@ function endTurn(s: GameState) {
   // A player who reached the goal and stayed ahead through the opponent's turn wins.
   if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ ✦`);
   if (s.turn === 2) {
-    // Second player compensation: a one-off coin card on top of the usual hand.
+    // Second player compensation: a one-off coin contract on top of the usual hand, gone with the turn.
     n.hand.push(mk(s, FAKE_COIN));
     log(s, `${n.name} получает «${name(FAKE_COIN)}»`);
     emit(s, { k: 'gain', p: next, card: FAKE_COIN });

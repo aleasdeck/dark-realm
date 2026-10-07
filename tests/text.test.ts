@@ -25,3 +25,10 @@ describe('resource icons in effect texts', () => {
     expect(richText('все ● (мин. 1)')).toBe('все <span class="ri coin"><i>●</i></span> (мин. 1)');
   });
 });
+
+describe('fake coin', () => {
+  it('says only what it gives', () => {
+    const def = CARDS.find((c) => c.id === 'fake_coin')!;
+    expect(cardLines(def)).toEqual([{ label: '', text: '+1 ●' }]);
+  });
+});
