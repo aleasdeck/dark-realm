@@ -6,7 +6,6 @@ import '@fontsource/pt-sans-narrow/400.css';
 import '@fontsource/pt-sans-narrow/700.css';
 import './style.css';
 import logoUrl from './assets/app/logo.webp';
-import { preloadCustomArt } from './art/custom';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
 import { actingPlayer, canCancel, draftedBy, mayDraft } from './engine/engine';
@@ -37,6 +36,7 @@ import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { icon, withIcon } from './ui/icons';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
+import { hideLoading, loadAll } from './ui/loading';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
 
@@ -808,5 +808,7 @@ window.addEventListener('resize', () => {
   if (focus) render();
 });
 
-preloadCustomArt();
-if (!resume()) menu();
+void loadAll().then(() => {
+  if (!resume()) menu();
+  hideLoading();
+});

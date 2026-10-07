@@ -75,6 +75,8 @@ interface Thought {
 let worker: Worker | null | undefined;
 let seq = 0;
 const thinking = new Map<number, Thought>();
+/** Answers the worker owes to warmBot's calls. */
+const pings = new Map<number, () => void>();
 
 /** The bot's worker, started on first use; null where workers are unavailable. */
 function botWorker(): Worker | null {
@@ -82,6 +84,8 @@ function botWorker(): Worker | null {
   try {
     worker = new Worker(new URL('./botWorker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<{ id: number; action: Action | null }>) => {
+      pings.get(e.data.id)?.();
+      pings.delete(e.data.id);
       thinking.get(e.data.id)?.resolve(e.data.action);
       thinking.delete(e.data.id);
     };
@@ -91,11 +95,24 @@ function botWorker(): Worker | null {
       worker = null;
       for (const t of thinking.values()) t.resolve(botAction(t.state, 1, t.level));
       thinking.clear();
+      for (const done of pings.values()) done();
+      pings.clear();
     };
   } catch {
     worker = null;
   }
   return worker;
+}
+
+/** Starts the bot's worker and waits until its code has loaded, so the hard bot's first move fetches nothing. */
+export function warmBot(): Promise<void> {
+  const w = botWorker();
+  if (!w) return Promise.resolve();
+  return new Promise((resolve) => {
+    const id = ++seq;
+    pings.set(id, resolve);
+    w.postMessage({ id });
+  });
 }
 
 /** The bot's next move; the hard bot thinks in the worker. */
