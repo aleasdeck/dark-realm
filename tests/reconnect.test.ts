@@ -245,3 +245,29 @@ describe('guest reconnect', () => {
     expect(guest.gone).toBe('Комната уже занята.');
   });
 });
+
+describe('online draft', () => {
+  it('offers the patrons the guest has opened as well as the host’s', async () => {
+    localStorage.setItem('dr-wins', '10');
+    const room = fakeRoom();
+    const host = new HostController('Хозяин', 'ABCDE', room.open);
+    await Promise.resolve();
+    room.connect().say({ type: 'hello', name: 'Гость', client: 'g1', patrons: ['alessia', 'nonsense' as never] });
+    const pool = host.state!.draftPool;
+    expect(pool).toEqual(expect.arrayContaining(['hunding', 'orgnum', 'alessia']));
+    expect(pool).not.toContain('druid');
+    expect(pool).not.toContain('nonsense');
+    host.dispose();
+  });
+
+  it('sends the guest’s opened patrons in its hello', async () => {
+    localStorage.setItem('dr-wins', '5');
+    const { accept, w } = wire();
+    const join: JoinRoom = async (_code, handlers) => accept(handlers);
+    const guest = new GuestController('ABCDE', 'Гость', join);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(w.sent.find((m) => m.type === 'hello')).toMatchObject({ patrons: ['hunding'] });
+    guest.dispose();
+  });
+});

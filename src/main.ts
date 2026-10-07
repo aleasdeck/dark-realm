@@ -401,6 +401,7 @@ function draftHtml(s: GameState): string {
         <h3>${esc(p.name)}</h3><p class="p-title">${esc(p.title)}</p>
         <p><b>Воззвание:</b> ${richText(r.cost)} → ${richText(r.effect)}</p>
         ${locked ? `<p class="lock-left">${icon('lock', '🔒')} ${esc(unlockLeft(pid))}</p>` : ''}
+        ${!locked && !isUnlocked(pid) ? '<p class="lock-left">Открыт у соперника</p>' : ''}
       </div>`;
   };
   // Locked patrons are listed too, greyed out, with the games left until they open.

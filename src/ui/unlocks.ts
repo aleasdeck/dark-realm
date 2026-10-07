@@ -2,8 +2,8 @@ import { DRAFTABLE, LOCKED } from '../engine/cards';
 import type { PatronId } from '../engine/types';
 
 /*
- * Locked patrons open as the player wins games (against the bot at any level or online;
- * the tutorial does not count). `?unlock=all` in the URL opens every patron for testing
+ * Locked patrons open as the player wins games (one count for the bot at any level and
+ * online games; the tutorial does not count). `?unlock=all` in the URL opens every patron for testing
  * without saving anything.
  */
 const WINS = 'dr-wins';
@@ -78,9 +78,17 @@ export function recordGame(won: boolean): PatronId[] {
   return LOCKED.filter((pid) => isUnlocked(pid) && !before.includes(pid));
 }
 
-/** Patrons this player can draft. */
-export function draftPool(): PatronId[] {
-  return [...DRAFTABLE, ...LOCKED.filter(isUnlocked)];
+/** Locked patrons this player has opened, as the guest tells the host in its hello. */
+export function unlockedPatrons(): PatronId[] {
+  return LOCKED.filter(isUnlocked);
+}
+
+/**
+ * Patrons this player can draft. In an online game the host adds the patrons the guest
+ * has opened, so a patron either player opened is in the draft for both.
+ */
+export function draftPool(also: readonly unknown[] = []): PatronId[] {
+  return [...DRAFTABLE, ...LOCKED.filter((pid) => isUnlocked(pid) || also.includes(pid))];
 }
 
 function winsWord(n: number): string {
