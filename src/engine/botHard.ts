@@ -346,11 +346,12 @@ function favorValue(s: GameState, pi: PlayerIdx, horizon: number): number {
     if (f === pi) v += w;
     else if (f === foe) v -= w;
   }
-  // One favor short of winning outright with the last patron neutral: a call next turn ends the game.
+  // One favor short of winning outright with the last patron neutral (or the Crow): a call next turn ends the game.
   const threat = (who: PlayerIdx) => {
     if (count(who) !== drafted.length - 1) return 0;
     const last = drafted.find((x) => s.favor[x] !== who) as PatronId;
-    return s.favor[last] === null ? 1 : 0.25;
+    // The Crow swings straight over from the other side, so holding him is no shield.
+    return s.favor[last] === null || last === 'crows' ? 1 : 0.25;
   };
   const toMove = s.current;
   v += threat(pi) * (toMove === pi ? T.threat : 7);
