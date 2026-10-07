@@ -11,7 +11,7 @@ import type { GameState, PlayerIdx } from '../engine/types';
  * The web app's address (the /exec link of the deployed server/rating.gs).
  * Empty: the rating isn't connected yet, so the menu says so and no game is reported.
  */
-export const RATING_URL = '';
+export const RATING_URL = 'https://script.google.com/macros/s/AKfycbyCEvA7e6ZOCysPCXpjsMDoapFhRmulQdyjGB__agqH7whn1AKtM9wfbKn_jSqAacKitw/exec';
 
 /** The name of a player who never set one: their games stay out of the rating. */
 export const DEFAULT_NAME = 'Странник';
