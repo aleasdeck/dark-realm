@@ -58,7 +58,7 @@ describe('new mechanics', () => {
     const before = s.players[1].coin;
     s = applyAction(s, 0, { t: 'end' });
     expect(s.players[1].power).toBe(1);
-    expect(s.players[1].coin).toBe(before + 1); // the second player's coin
+    expect(s.players[1].coin).toBe(before);
     expect(s.players[1].boon).toBeUndefined();
   });
 

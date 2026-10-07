@@ -275,7 +275,7 @@ interface Deck {
 }
 
 function deckOf(p: PlayerState): Deck {
-  const cards = [...p.deck, ...p.hand, ...p.played, ...p.cooldown];
+  const cards = [...p.deck, ...p.hand, ...p.played, ...p.cooldown].filter((c) => !cardDef(c.id).fleeting);
   const byPatron = new Map<string, number>();
   for (const c of [...cards, ...p.agents]) {
     const pat = cardDef(c.id).patron;

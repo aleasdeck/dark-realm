@@ -126,6 +126,10 @@ export const LOCKED: PatronId[] = ['alma', 'hunding', 'druid', 'mora', 'alessia'
 export const CARDS: CardDef[] = [
   // ── Neutral ─────────────────────────────────────────────
   { id: 'gold', name: 'Золото', patron: 'neutral', cost: 0, type: 'starter', copies: 0, play: [coin(1)], art: 'coin', seed: 1 },
+  {
+    id: 'fake_coin', name: 'Фальшивая монета', patron: 'neutral', cost: 0, type: 'action', copies: 0, play: [coin(1)], art: 'coin', seed: 9,
+    fleeting: true, flavor: 'Блестит, пока не присмотришься.',
+  },
   { id: 'writ', name: 'Долговая расписка', patron: 'neutral', cost: 0, type: 'starter', copies: 0, play: [coin(2)], art: 'scroll', seed: 7 },
   {
     id: 'bewilderment', name: 'Морок', patron: 'neutral', cost: 0, type: 'curse', copies: 0, play: [], art: 'ghost', seed: 3,

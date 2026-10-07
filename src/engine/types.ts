@@ -86,6 +86,8 @@ export interface CardDef {
   trigger?: { on: TriggerOn; fx: Effect[]; self?: boolean };
   /** Starts in every deck when its patron is drafted (for starters that are not of the starter type). */
   starter?: boolean;
+  /** Leaves the game at the end of the turn (or when discarded) instead of going to the cooldown. */
+  fleeting?: boolean;
 }
 
 export interface PatronDef {

@@ -45,10 +45,11 @@ describe('engine', () => {
     expect(s.current).toBe(1);
     expect(s.turn).toBe(1);
     expect(() => applyAction(s, 0, { t: 'end' })).toThrow();
-    // The second player, here player 0, gets the extra coin on their first turn.
+    // The second player, here player 0, gets the Fake Coin on their first turn.
     s = applyAction(s, 1, { t: 'end' });
     expect(s.current).toBe(0);
-    expect(s.players[0].coin).toBe(1);
+    expect(s.players[0].hand.filter((c) => c.id === 'fake_coin')).toHaveLength(1);
+    expect(s.players[1].hand.some((c) => c.id === 'fake_coin')).toBe(false);
   });
 
   it('rejects moves out of turn', () => {
@@ -56,13 +57,48 @@ describe('engine', () => {
     expect(() => applyAction(s, 1, { t: 'end' })).toThrow();
   });
 
-  it('converts power to prestige at end of turn and gives the second player a coin', () => {
+  it('converts power to prestige at end of turn', () => {
     let s = draftAll(createGame(3, ['A', 'B']));
     s.players[0].power = 4;
     s = applyAction(s, 0, { t: 'end' });
     expect(s.players[0].prestige).toBe(4);
     expect(s.current).toBe(1);
+    expect(s.players[1].coin).toBe(0);
+  });
+
+  it('gives the second player a one-off Fake Coin on top of their hand', () => {
+    let s = draftAll(createGame(3, ['A', 'B']));
+    s = applyAction(s, 0, { t: 'end' });
+    const hand = s.players[1].hand;
+    expect(hand).toHaveLength(6);
+    const fake = hand.find((c) => c.id === 'fake_coin')!;
+    expect(fake).toBeDefined();
+    expect(s.events).toContainEqual({ k: 'gain', p: 1, card: 'fake_coin' });
+    s = applyAction(s, 1, { t: 'play', uid: fake.uid });
     expect(s.players[1].coin).toBe(1);
+    expect(s.players[1].played.map((c) => c.uid)).toContain(fake.uid);
+    s = applyAction(s, 1, { t: 'end' });
+    const p = s.players[1];
+    const owned = [...p.deck, ...p.hand, ...p.played, ...p.cooldown, ...p.agents];
+    expect(owned.some((c) => c.id === 'fake_coin')).toBe(false);
+    // Later turns go without it.
+    s = applyAction(s, 0, { t: 'end' });
+    expect(s.players[1].hand.some((c) => c.id === 'fake_coin')).toBe(false);
+  });
+
+  it('a Fake Coin left in hand or discarded leaves the game', () => {
+    let s = draftAll(createGame(8, ['A', 'B']));
+    s = applyAction(s, 0, { t: 'end' });
+    s = applyAction(s, 1, { t: 'end' });
+    expect(s.players[1].cooldown.some((c) => c.id === 'fake_coin')).toBe(false);
+
+    s = draftAll(createGame(8, ['A', 'B']));
+    s.players[1].pendingDiscard = 1;
+    s = applyAction(s, 0, { t: 'end' });
+    const fake = s.players[1].hand.find((c) => c.id === 'fake_coin')!;
+    s = applyAction(s, 1, { t: 'choose', picks: [fake.uid] });
+    expect(s.players[1].hand).toHaveLength(5);
+    expect(s.players[1].cooldown.some((c) => c.id === 'fake_coin')).toBe(false);
   });
 
   it('fires combos retroactively', () => {
@@ -109,7 +145,7 @@ describe('engine', () => {
     expect(s.pending?.kind).toBe('discard');
     expect(s.pending?.player).toBe(1);
     s = applyAction(s, 1, { t: 'choose', picks: [s.pending!.options[0].ref] });
-    expect(s.players[1].hand).toHaveLength(4);
+    expect(s.players[1].hand).toHaveLength(5); // 5 dealt + the Fake Coin − 1 discarded
   });
 
   it('wins at 40 prestige only after surviving the opponent turn', () => {
@@ -248,7 +284,7 @@ describe('engine', () => {
     s = applyAction(s, 0, { t: 'play', uid: card.uid });
     expect(s.events[0]).toEqual({ k: 'play', p: 0, card: card.id });
     s = applyAction(s, 0, { t: 'end' });
-    expect(s.events.at(-1)).toEqual({ k: 'turn', p: 1 });
+    expect(s.events).toContainEqual({ k: 'turn', p: 1 });
   });
 
   it('tells who climbed to the prestige goal, again after falling below it', () => {
