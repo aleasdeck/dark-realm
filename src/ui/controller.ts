@@ -1,5 +1,5 @@
 import { botAction, type BotLevel } from '../engine/bot';
-import { actingPlayer, applyAction, createGame, RuleError } from '../engine/engine';
+import { actingPlayer, applyAction, createGame, prestigeGoal, RuleError } from '../engine/engine';
 import { randomSeed } from '../engine/rng';
 import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
@@ -52,10 +52,17 @@ export function tossCoin(): PlayerIdx {
 /** Longest the bot waits for the coin toss to be shown before it plays on anyway. */
 const TOSS_WAIT_MS = 8000;
 
+/** Whether the power turned into prestige at the end of the last turn took a player up to the goal. */
+function reachedGoalAtTurnEnd(s: GameState): boolean {
+  const goal = prestigeGoal(s);
+  return !!s.events?.some((e) => e.k === 'prestige' && s.players[e.p].prestige >= goal && s.players[e.p].prestige - e.n < goal);
+}
+
 /** Pause before the bot's next move, long enough to follow what it does. */
 function botDelay(s: GameState): number {
   if (s.phase === 'draft') return 900;
-  if (s.events?.some((e) => e.k === 'turn')) return 1400; // let the turn banner play first
+  // let the turn banner play first, and before it the notice of a player reaching the prestige goal
+  if (s.events?.some((e) => e.k === 'turn')) return reachedGoalAtTurnEnd(s) ? 3400 : 1400;
   return 1150;
 }
 

@@ -1,7 +1,7 @@
 import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { customCardArt, customEmblem } from '../art/custom';
 import { cardDef, PATRONS } from '../engine/cards';
-import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
+import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable, prestigeGoal } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { esc, paintIcons, richText } from './rich';
 import { icon } from './icons';
@@ -218,8 +218,16 @@ export function patronTipHtml(s: GameState | null, me: PlayerIdx, pid: PatronId)
   </div>`;
 }
 
-function res(p: { prestige: number; power: number; coin: number }) {
-  return `<span class="res pre"><i>✦</i>${p.prestige}</span><span class="res pow"><i>⚔</i>${p.power}</span><span class="res coin"><i>●</i>${p.coin}</span>`;
+/** Period of the glow on a prestige counter at the goal. */
+const GOAL_PULSE_MS = 1600;
+
+function res(p: { prestige: number; power: number; coin: number }, goal: number) {
+  // At the goal the counter glows; the delay keeps the pulse in step across redraws of the board.
+  const pre =
+    p.prestige >= goal
+      ? `<span class="res pre at-goal" style="animation-delay:-${Math.round(performance.now() % GOAL_PULSE_MS)}ms">`
+      : '<span class="res pre">';
+  return `${pre}<i>✦</i>${p.prestige}</span><span class="res pow"><i>⚔</i>${p.power}</span><span class="res coin"><i>●</i>${p.coin}</span>`;
 }
 
 function count(n: number, label: string, pic: string, act?: string) {
@@ -320,7 +328,7 @@ export function boardHtml(
   return `<div class="game ${opts.myTurn ? 'my-turn' : 'their-turn'}">
     <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
       <span class="who">${esc(them.name)}</span>
-      <span class="res-group">${res(them)}</span>
+      <span class="res-group">${res(them, prestigeGoal(s))}</span>
       <span class="counts">${count(them.deck.length, 'колода', 'pile_deck', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile_discard', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
@@ -348,7 +356,7 @@ export function boardHtml(
     <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
     <div class="bar my-bar${opts.myTurn ? ' active' : ''}">
       <span class="who">${esc(you.name)}</span>
-      <span class="res-group">${res(you)}</span>
+      <span class="res-group">${res(you, prestigeGoal(s))}</span>
       <span class="counts">${count(you.deck.length, 'колода', 'pile_deck', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile_discard', 'pile-cd')}</span>
     </div>
     <footer class="controls">

@@ -861,6 +861,17 @@ function checkInstantWin(s: GameState): boolean {
   return false;
 }
 
+/** The prestige a player has to reach and keep ahead with through the opponent's turn. */
+export function prestigeGoal(s: GameState): number {
+  return s.goal ?? PRESTIGE_GOAL;
+}
+
+/** The players whose prestige climbed to the goal between two positions of the same game. */
+export function reachedGoal(prev: GameState, next: GameState): PlayerIdx[] {
+  const goal = prestigeGoal(next);
+  return ([0, 1] as const).filter((pi) => prev.players[pi].prestige < goal && next.players[pi].prestige >= goal);
+}
+
 function endTurn(s: GameState) {
   const pi = s.current;
   const p = s.players[pi];
@@ -881,7 +892,7 @@ function endTurn(s: GameState) {
   drawCards(s, p, HAND_SIZE);
 
   if (checkInstantWin(s)) return;
-  const goal = s.goal ?? PRESTIGE_GOAL;
+  const goal = prestigeGoal(s);
 
   const next = other(pi);
   const n = s.players[next];
