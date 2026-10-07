@@ -1,7 +1,7 @@
 import { cardDef, PATRONS } from '../engine/cards';
 import { actingPlayer } from '../engine/engine';
 import type { GameEvent, GameState, PlayerIdx } from '../engine/types';
-import { cardArt, esc, patronEmblem } from './render';
+import { cardArt, esc, paintIcons, patronEmblem } from './render';
 import { play, type SoundName } from './sound';
 
 /**
@@ -99,7 +99,7 @@ function describe(e: GameEvent, me: PlayerIdx): [string | null, string] | null {
     case 'discard':
       return [null, `сбрасывает ${e.n} карт(ы)`];
     case 'prestige':
-      return [null, `получает <em class="pre">+${e.n} ✦</em>`];
+      return [null, `получает ${paintIcons(`+${e.n} ✦`)}`];
     default:
       return null;
   }
@@ -129,7 +129,7 @@ export function onStateChange(prev: GameState | null, next: GameState, me: Playe
     }
   }
   const lost = prev.players[me].prestige - next.players[me].prestige;
-  if (byThem && lost > 0 && next.phase === 'play') feedItem(null, `<em class="bad">Вы теряете ${lost} ✦</em>`);
+  if (byThem && lost > 0 && next.phase === 'play') feedItem(null, `<em class="bad">${paintIcons(`Вы теряете ${lost} ✦`)}</em>`);
   if (next.pending?.player === me && prev.pending?.player !== me && next.phase === 'play') {
     sounds.add('choose');
     if (byThem || next.current !== me) feedItem(null, esc(next.pending.prompt));

@@ -4,6 +4,7 @@ import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { esc, paintIcons, richText } from './rich';
+import { icon } from './icons';
 import { musicOn } from './music';
 import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, Pending, PlayerIdx } from '../engine/types';
 
@@ -58,20 +59,21 @@ const SCROLL =
   'M7.5 2.5h11.2a3 3 0 0 1 0 6H17v10.2a3 3 0 0 1-3 3H5.3a3 3 0 0 1 0-6H7V3zM9.6 6.3v1.6h5.4V6.3zM9.6 10v1.6h5.4V10zM9.6 13.7v1.6h4V13.7z';
 const SKULL =
   'M12 2C6.9 2 3.5 5.5 3.5 10c0 2.6 1.1 4.6 3 5.8V20c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2v-4.2c1.9-1.2 3-3.2 3-5.8C20.5 5.5 17.1 2 12 2zM8.6 9.3a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2zm6.8 0a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2zM12 14.2l1.4 2.6h-2.8z';
-/** Type badge glyph and color class: the drawing says action or agent, the color says contract. */
-const TYPE_BADGE: Record<CardDef['type'], [glyph: string, cls: string]> = {
-  action: [BOLT, 'act'],
-  starter: [BOLT, 'act'],
-  agent: [BUST, 'agent'],
-  contractAction: [SCROLL, 'contract'],
-  contractAgent: [BUST, 'contract'],
-  curse: [SKULL, 'curse'],
+/** Type badge glyph, its hand-drawn icon and color class: the drawing says action or agent, the color says contract. */
+const TYPE_BADGE: Record<CardDef['type'], [glyph: string, icon: string, cls: string]> = {
+  action: [BOLT, 'kind_action', 'act'],
+  starter: [BOLT, 'kind_action', 'act'],
+  agent: [BUST, 'kind_agent', 'agent'],
+  contractAction: [SCROLL, 'kind_contract', 'contract'],
+  contractAgent: [BUST, 'kind_agent', 'contract'],
+  curse: [SKULL, 'kind_curse', 'curse'],
 };
 
 /** Small coin under the cost that tells the card's type at a glance; agents already on the table go without it. */
 function typeBadge(def: CardDef): string {
-  const [glyph, cls] = TYPE_BADGE[def.type];
-  return `<span class="c-kind k-${cls}" title="${TYPE_NAMES[def.type]}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${glyph}"/></svg></span>`;
+  const [glyph, pic, cls] = TYPE_BADGE[def.type];
+  const svg = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${glyph}"/></svg>`;
+  return `<span class="c-kind k-${cls}" title="${TYPE_NAMES[def.type]}">${icon(pic, svg)}</span>`;
 }
 
 /** Full size card: the art fills the top edge to edge, cost, type and name sit on it, rules text below. */
@@ -92,26 +94,29 @@ export function cardHtml(id: string, o: CardOpts = {}): string {
   </div>`;
 }
 
+/** An effect on a tile: its icon with the amount in front, or the short text when the icon is missing. */
+const fx = (pic: string, text: string, n = '', cls = '') => `<i class="fx${cls ? ` ${cls}` : ''}">${icon(pic) ? `${n}${icon(pic)}` : text}</i>`;
+
 const FX: Partial<Record<Effect['k'], (n: number) => string>> = {
   coin: (n) => `<i class="fx coin">+${n}</i>`,
   power: (n) => `<i class="fx pow">+${n}</i>`,
   prestige: (n) => `<i class="fx pre">+${n}</i>`,
-  oppLosePrestige: (n) => `<i class="fx bad">−${n}✦</i>`,
-  draw: (n) => `<i class="fx">+${n} карт.</i>`,
-  oppDiscard: (n) => `<i class="fx">сброс ${n}</i>`,
-  acquire: (n) => `<i class="fx">дар ≤${n}</i>`,
-  toss: (n) => `<i class="fx">отсев ${n}</i>`,
-  destroy: (n) => `<i class="fx">уничт. ${n}</i>`,
-  knockout: () => `<i class="fx">нокаут</i>`,
-  knockoutAll: () => `<i class="fx">нокаут всех</i>`,
-  returnTop: () => `<i class="fx">возврат</i>`,
-  replaceTavern: () => `<i class="fx">замена</i>`,
+  oppLosePrestige: (n) => fx('fx_opp_lose_prestige', `−${n}✦`, `−${n}`, 'bad'),
+  draw: (n) => fx('fx_draw', `+${n} карт.`, `+${n}`),
+  oppDiscard: (n) => fx('fx_opp_discard', `сброс ${n}`, `${n}`),
+  acquire: (n) => fx('fx_acquire', `дар ≤${n}`, `≤${n}`),
+  toss: (n) => fx('fx_toss', `отсев ${n}`, `${n}`),
+  destroy: (n) => fx('fx_destroy', `уничт. ${n}`, `${n}`),
+  knockout: () => fx('fx_knockout', 'нокаут'),
+  knockoutAll: () => fx('fx_knockout_all', 'нокаут всех'),
+  returnTop: () => fx('fx_return', 'возврат'),
+  replaceTavern: () => fx('fx_replace', 'замена'),
   heal: (n) => `<i class="fx">лечение ${n}</i>`,
-  create: () => `<i class="fx">+карта</i>`,
-  patronCall: () => `<i class="fx">+призыв</i>`,
-  donate: () => `<i class="fx">обмен</i>`,
-  confine: () => `<i class="fx">заточ.</i>`,
-  setback: () => `<i class="fx bad">расплата</i>`,
+  create: () => fx('fx_create', '+карта'),
+  patronCall: () => fx('fx_patron_call', '+призыв'),
+  donate: () => fx('fx_donate', 'обмен'),
+  confine: () => fx('fx_confine', 'заточ.'),
+  setback: () => fx('fx_setback', 'расплата', '', 'bad'),
 };
 
 /** Compact summary of a card's main effect for small tiles. */
@@ -119,8 +124,8 @@ function shortFx(def: CardDef): string {
   const one = (e: Effect): string =>
     e.k === 'choice' ? e.options.map((o) => o.map(one).join('')).join('<i class="fx or">/</i>') : (FX[e.k]?.('n' in e ? e.n : 0) ?? '');
   const main = def.play.map(one).join('');
-  const combos = Object.keys(def.combo ?? {}).length ? '<i class="fx combo">К</i>' : '';
-  const trigger = def.trigger ? '<i class="fx">⟳</i>' : '';
+  const combos = Object.keys(def.combo ?? {}).length ? (icon('combo') ? `<i class="fx">${icon('combo')}</i>` : '<i class="fx combo">К</i>') : '';
+  const trigger = def.trigger ? `<i class="fx">${icon('trigger', '⟳')}</i>` : '';
   return main + trigger + combos || '<i class="fx">—</i>';
 }
 
@@ -218,8 +223,9 @@ function res(p: { prestige: number; power: number; coin: number }) {
   return `<span class="res pre"><i>✦</i>${p.prestige}</span><span class="res pow"><i>⚔</i>${p.power}</span><span class="res coin"><i>●</i>${p.coin}</span>`;
 }
 
-function count(n: number, label: string, act?: string) {
-  return `<span class="count"${act ? ` data-act="${act}"` : ''}><b>${n}</b><small>${label}</small></span>`;
+function count(n: number, label: string, pic: string, act?: string) {
+  const ic = icon(pic);
+  return `<span class="count${ic ? ' with-ic' : ''}"${act ? ` data-act="${act}"` : ''} title="${label}">${ic}<b>${n}</b>${ic ? '' : `<small>${label}</small>`}</span>`;
 }
 
 function slots(tiles: string[]) {
@@ -254,13 +260,18 @@ export function tavernPick(s: GameState, me: PlayerIdx, marked: Set<number>): Ta
   return p && p.player === me && TAVERN_KINDS.includes(p.kind) ? { pending: p, marked } : null;
 }
 
+/** The wide button's text with its icon in front. */
+const endLabel = (pic: string, text: string) => `${icon(pic)}<span>${text}</span>`;
+
 /** The button under the table that finishes (or skips) a tavern pick. */
 function pickButton(pick: TavernPick): string {
   const p = pick.pending;
   const n = pick.marked.size;
-  if (p.kind === 'replaceTavern') return `<button class="end" data-act="confirm">${n ? `Заменить (${n})` : 'Не менять'}</button>`;
+  if (p.kind === 'replaceTavern') {
+    return `<button class="end" data-act="confirm">${n ? endLabel('pick_replace', `Заменить (${n})`) : endLabel('pick_skip', 'Не менять')}</button>`;
+  }
   if (p.min > 0) return '<button class="end" disabled>Выберите карту в таверне</button>';
-  return '<button class="end" data-act="confirm">Не брать</button>';
+  return `<button class="end" data-act="confirm">${endLabel('pick_skip', 'Не брать')}</button>`;
 }
 
 /** A block's name, written up the left edge outside its frame; the short form shows when the full one would not fit. */
@@ -311,7 +322,7 @@ export function boardHtml(
     <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
       <span class="who">${esc(them.name)}</span>
       <span class="res-group">${res(them)}</span>
-      <span class="counts">${count(them.deck.length, 'колода', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile-opp-cd')}</span>
+      <span class="counts">${count(them.deck.length, 'колода', 'pile_deck', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile_discard', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}">${backsHtml(them.hand.length)}</section>
     ${targets.size ? sideLabel('oppag attack', 'Атакуйте агентов', 'Атака') : sideLabel('oppag', 'Агенты соперника', 'Агенты')}
@@ -339,13 +350,13 @@ export function boardHtml(
     <div class="bar my-bar${opts.myTurn ? ' active' : ''}">
       <span class="who">${esc(you.name)}</span>
       <span class="res-group">${res(you)}</span>
-      <span class="counts">${count(you.deck.length, 'колода', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile-cd')}</span>
+      <span class="counts">${count(you.deck.length, 'колода', 'pile_deck', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile_discard', 'pile-cd')}</span>
     </div>
     <footer class="controls">
-      <button class="icon" data-act="menu" aria-label="Меню">☰</button>
-      <button class="icon${musicOn() ? '' : ' off'}" data-act="music" aria-label="Музыка" aria-pressed="${musicOn()}">♪</button>
-      <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">▶▶</button>
-      ${pick ? pickButton(pick) : `<button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? 'Конец хода' : 'Ход соперника'}</button>`}
+      <button class="icon" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
+      <button class="icon${musicOn() ? '' : ' off'}" data-act="music" aria-label="Музыка" aria-pressed="${musicOn()}">${musicOn() ? icon('music_on', '♪') : icon('music_off', '♪')}</button>
+      <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">${icon('play_all', '▶▶')}</button>
+      ${pick ? pickButton(pick) : `<button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? endLabel('end_turn', 'Конец хода') : endLabel('opponent_turn', 'Ход соперника')}</button>`}
     </footer>
   </div>`;
 }
