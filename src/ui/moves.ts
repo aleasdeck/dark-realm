@@ -1,3 +1,4 @@
+import { hpLeft } from '../engine/engine';
 import type { GameState, PlayerIdx } from '../engine/types';
 
 /** Where a card can be. Cards that left the game (or were never in it) are `gone`. */
@@ -60,3 +61,32 @@ function strip(p: Place & { id: string }): Place {
   const { id: _, ...rest } = p;
   return rest;
 }
+
+/** An agent hit by power: an attack, or leftover power going into a taunting agent at the end of a turn. */
+export interface AgentHit {
+  uid: number;
+  /** Damage taken. */
+  n: number;
+  /** Whether it was knocked out by the hit. */
+  out: boolean;
+}
+
+/** The opponent's agents the power of the player on turn hit between two states, in the order they were hit. */
+export function agentHits(prev: GameState, next: GameState): AgentHit[] {
+  const struck = new Set(next.events?.filter((e) => e.k === 'attack').map((e) => (e as { card: string }).card));
+  if (!struck.size) return [];
+  const foe = next.players[1 - prev.current];
+  const hits: AgentHit[] = [];
+  for (const was of prev.players[1 - prev.current].agents) {
+    const now = foe.agents.find((a) => a.uid === was.uid);
+    // Knocked out by a hit, not by a card that knocks agents out.
+    if (!now && struck.has(was.id)) hits.push({ uid: was.uid, n: hpLeft(was), out: true });
+    else if (now && now.dmg > was.dmg) hits.push({ uid: was.uid, n: now.dmg - was.dmg, out: false });
+  }
+  return hits;
+}
+
+/** How long the rest of the move waits while power hits agents: one strike after another. */
+export const STRIKE_MS = 820;
+export const STRIKE_GAP = 320;
+export const strikePause = (hits: number) => (hits ? STRIKE_MS + (hits - 1) * STRIKE_GAP : 0);

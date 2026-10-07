@@ -6,6 +6,7 @@ import { createTutorialGame } from '../engine/tutorial';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '../net/room';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
+import { strikePause } from './moves';
 import { draftPool, recordGame, unlockedPatrons } from './unlocks';
 
 /** One running match as seen by the local player. */
@@ -62,8 +63,12 @@ function reachedGoalAtTurnEnd(s: GameState): boolean {
 /** Pause before the bot's next move, long enough to follow what it does. */
 function botDelay(s: GameState): number {
   if (s.phase === 'draft') return 900;
-  // let the turn banner play first, and before it the notice of a player reaching the prestige goal
-  if (s.events?.some((e) => e.k === 'turn')) return reachedGoalAtTurnEnd(s) ? 3400 : 1400;
+  // let the turn banner play first, and before it the notice of a player reaching the prestige goal,
+  // and before both the leftover power hitting taunting agents
+  if (s.events?.some((e) => e.k === 'turn')) {
+    const strikes = strikePause(s.events.filter((e) => e.k === 'attack').length);
+    return strikes + (reachedGoalAtTurnEnd(s) ? 3400 : 1400);
+  }
   return 1150;
 }
 

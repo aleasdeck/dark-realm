@@ -1,6 +1,6 @@
-import { actingPlayer, hpLeft } from '../engine/engine';
+import { actingPlayer } from '../engine/engine';
 import type { AgentInPlay, GameState, PlayerIdx } from '../engine/types';
-import { cardMoves, type Move, type Place } from './moves';
+import { cardMoves, STRIKE_GAP, agentHits, strikePause, type Move, type Place } from './moves';
 import { richText, tileHtml } from './render';
 
 /**
@@ -306,7 +306,7 @@ function fly(f: Flight) {
 }
 
 /** "+3 ●" rising from a counter. */
-function floatText(at: Box, text: string, cls: string, delay: number) {
+function floatText(at: Box, text: string, cls: string, delay: number, duration = 950) {
   const el = document.createElement('div');
   el.className = `float ${cls}`;
   el.innerHTML = richText(text);
@@ -319,8 +319,63 @@ function floatText(at: Box, text: string, cls: string, delay: number) {
       { transform: 'translate(-50%, -90%) scale(1.15)', opacity: 1, offset: 0.2 },
       { transform: 'translate(-50%, -190%) scale(1)', opacity: 0 },
     ],
-    { duration: 950, delay, fill: 'both', easing: 'ease-out' },
+    { duration, delay, fill: 'both', easing: 'ease-out' },
   ).finished.then(() => el.remove(), () => el.remove());
+}
+
+const BOLT_MS = 300;
+
+/** Power hitting an agent: it flies from the power counter and slashes the agent. */
+function strike(from: Box | null, to: Box, n: number, delay: number, el: HTMLElement | null) {
+  if (from) {
+    const b = document.createElement('div');
+    b.className = 'strike-bolt';
+    b.innerHTML = richText('⚔');
+    b.style.left = `${from.x}px`;
+    b.style.top = `${from.y}px`;
+    layer.appendChild(b);
+    b.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(.8)', opacity: 0 },
+        { transform: 'translate(-50%, -50%) scale(1.3)', opacity: 1, offset: 0.25 },
+        { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) scale(1.5)`, opacity: 1 },
+      ],
+      { duration: BOLT_MS, delay, fill: 'both', easing: 'ease-in' },
+    ).finished.then(() => b.remove(), () => b.remove());
+  }
+  const at = delay + (from ? BOLT_MS : 0);
+  // The agent keeps its old health on the board until the hit lands.
+  const hp = el?.querySelector('.c-hp');
+  if (hp) {
+    const left = hp.textContent;
+    hp.textContent = String(Number(left) + n);
+    setTimeout(() => (hp.textContent = left), at);
+  }
+  const slash = document.createElement('div');
+  slash.className = 'strike-slash';
+  slash.style.left = `${to.x}px`;
+  slash.style.top = `${to.y}px`;
+  slash.style.width = `${Math.max(to.w, to.h) * 1.25}px`;
+  layer.appendChild(slash);
+  slash.animate(
+    [
+      { transform: 'translate(-50%, -50%) rotate(-38deg) scaleX(0)', opacity: 1 },
+      { transform: 'translate(-50%, -50%) rotate(-38deg) scaleX(1)', opacity: 1, offset: 0.35 },
+      { transform: 'translate(-50%, -50%) rotate(-38deg) scaleX(1.05)', opacity: 0 },
+    ],
+    { duration: 480, delay: at, fill: 'both', easing: 'ease-out' },
+  ).finished.then(() => slash.remove(), () => slash.remove());
+  el?.animate(
+    [
+      { transform: 'none', filter: 'none' },
+      { transform: 'translateX(-7px) rotate(-4deg) scale(1.08)', filter: 'brightness(1.6) sepia(1) saturate(5) hue-rotate(-40deg)' },
+      { transform: 'translateX(7px) rotate(4deg) scale(1.08)', filter: 'sepia(1) saturate(5) hue-rotate(-40deg)' },
+      { transform: 'translateX(-3px)' },
+      { transform: 'none', filter: 'none' },
+    ],
+    { duration: 480, delay: at, easing: 'ease-out' },
+  );
+  floatText(to, `−${n}`, 'bad hit', at, 1300);
 }
 
 // ── planning ──────────────────────────────────────────
@@ -352,6 +407,9 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
   const actor = actingPlayer(prev);
   const theirs = actor !== me;
   const turnEnded = next.events?.some((e) => e.k === 'turn') ? prev.current : null;
+  // Power hitting agents (an attack, or leftover power going into taunting agents) is shown first; the rest waits for it.
+  const hits = agentHits(prev, next);
+  const pause = strikePause(hits.length);
   const dealt = prev.phase === 'draft';
   const resolvedContracts = new Set(next.events?.filter((e) => e.k === 'buy').map((e) => (e as { card: string }).card));
 
@@ -459,6 +517,7 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
       delay = arriveBase() + arriving++ * (dealt ? 55 : 85);
       dur = DRAW_MS;
     }
+    delay += pause;
     if (showcase) dur = SHOW_MS;
     if (knocked) dur = 760;
     if (!dst) dur = 620;
@@ -537,29 +596,22 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
 
   // Agents: hits, healing, actions.
   const resDelay = firstLanding ? Math.max(0, firstLanding - now - 80) : 0;
+  const powEl = sel(prev.current, '.my-bar .res.pow', '.opp-bar .res.pow');
+  hits.forEach((h, i) => {
+    const el = h.out ? null : cardEl(game, h.uid);
+    const box = el ? boxOf(el) : snap.cards.get(h.uid)?.box;
+    if (box) strike(powEl ? boxOf(powEl) : null, box, h.n, i * STRIKE_GAP, el);
+  });
   next.players.forEach((pl, pi) => {
     const before = new Map(prev.players[pi].agents.map((a) => [a.uid, a] as [number, AgentInPlay]));
     for (const a of pl.agents) {
       const was = before.get(a.uid);
       const el = cardEl(game, a.uid);
       if (!was || !el) continue;
-      const b = boxOf(el);
-      if (a.dmg > was.dmg) {
-        el.animate(
-          [{ transform: 'none' }, { transform: 'translateX(-5px) rotate(-3deg)', filter: 'sepia(1) saturate(5) hue-rotate(-40deg)' }, { transform: 'translateX(5px) rotate(3deg)' }, { transform: 'none' }],
-          { duration: 360, easing: 'ease-out' },
-        );
-        floatText(b, `−${a.dmg - was.dmg}`, 'bad', 0);
-      } else if (a.dmg < was.dmg) floatText(b, `+${was.dmg - a.dmg}`, 'heal', 0);
+      if (a.dmg < was.dmg) floatText(boxOf(el), `+${was.dmg - a.dmg}`, 'heal', 0);
       if (a.activated && !was.activated && turnEnded === null) {
         el.animate([{ scale: '1', filter: 'brightness(1)' }, { scale: '1.12', filter: 'brightness(1.7)' }, { scale: '1', filter: 'brightness(1)' }], { duration: 420, easing: 'ease-out' });
       }
-    }
-    // An agent knocked out by an attack: its last hit point.
-    for (const was of before.values()) {
-      if (pl.agents.some((a) => a.uid === was.uid)) continue;
-      const seen = snap.cards.get(was.uid);
-      if (seen && next.events?.some((e) => e.k === 'attack')) floatText(seen.box, `−${hpLeft(was)}`, 'bad', 0);
     }
   });
 
@@ -576,7 +628,8 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
       const el = sel(pi as PlayerIdx, `.my-bar .res.${cls}`, `.opp-bar .res.${cls}`);
       if (!el) continue;
       // Spending isn't news; what a card or patron gives (or takes) is.
-      const delay = key === 'coin' && d < 0 ? 0 : resDelay;
+      // The power that hits agents leaves the counter as it flies at them.
+      const delay = (key === 'coin' || (key === 'power' && pause)) && d < 0 ? 0 : resDelay;
       floatText(boxOf(el), `${d > 0 ? '+' : '−'}${Math.abs(d)}${icon}`, d > 0 ? cls : 'bad', delay);
       bump(el, 1.3, delay);
     }
