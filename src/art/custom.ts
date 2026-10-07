@@ -8,6 +8,8 @@ const byName = (files: Record<string, string>) =>
 
 const CARDS = byName(import.meta.glob<string>('../assets/cards/*.webp', { eager: true, query: '?url', import: 'default' }));
 const PATRONS = byName(import.meta.glob<string>('../assets/patrons/*.webp', { eager: true, query: '?url', import: 'default' }));
+/** The card back and the backdrops, used from style.css; listed here only to be fetched early. */
+const SCENERY = import.meta.glob<string>(['../assets/ui/*.webp', '../assets/bg/*.webp'], { eager: true, query: '?url', import: 'default' });
 
 export const customCardArt = (cardId: string): string | undefined => CARDS[cardId];
 export const customEmblem = (patronId: string): string | undefined => PATRONS[patronId];
@@ -18,7 +20,7 @@ export const customEmblem = (patronId: string): string | undefined => PATRONS[pa
  */
 const held: HTMLImageElement[] = [];
 export function preloadCustomArt(): void {
-  for (const url of [...Object.values(CARDS), ...Object.values(PATRONS)]) {
+  for (const url of [...Object.values(SCENERY), ...Object.values(CARDS), ...Object.values(PATRONS)]) {
     const img = new Image();
     img.src = url;
     img.decode().catch(() => {});

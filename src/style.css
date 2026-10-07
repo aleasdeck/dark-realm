@@ -49,6 +49,36 @@ body {
     var(--bg);
   background-attachment: fixed;
   overscroll-behavior: none;
+  /* lets the backdrop below sit over the body's own background but under everything else */
+  isolation: isolate;
+}
+/* hand-drawn backdrops over the gradient above, dimmed so text and cards stay readable */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(#0000002e, #00000066),
+    url('./assets/bg/bg_menu_portrait.webp') center / cover no-repeat;
+}
+body:has(.game)::before {
+  background:
+    linear-gradient(#00000059, #00000059),
+    url('./assets/bg/bg_game_portrait.webp') center / cover no-repeat;
+}
+@media (min-aspect-ratio: 1/1) {
+  body::before {
+    background:
+      linear-gradient(#0000002e, #00000066),
+      url('./assets/bg/bg_menu_landscape.webp') center / cover no-repeat;
+  }
+  body:has(.game)::before {
+    background:
+      linear-gradient(#00000059, #00000059),
+      url('./assets/bg/bg_game_landscape.webp') center / cover no-repeat;
+  }
 }
 
 /* only the generated pixel art (data: URLs); hand-drawn files scale smoothly */
@@ -618,7 +648,8 @@ input {
   flex-direction: column;
   padding: 3px 6px;
   border-radius: 10px;
-  background: #0a140e;
+  /* see-through, so the painted table shows under the frames */
+  background: #0a140eb8;
   border: 1px solid var(--line);
   overflow: hidden;
 }
@@ -759,7 +790,8 @@ input {
   justify-content: center;
   padding: 5px 6px;
   border-radius: 10px;
-  background: #0a140e;
+  /* see-through, so the painted table shows under the frames */
+  background: #0a140eb8;
   border: 1px solid var(--line);
   overflow: hidden;
   isolation: isolate;
@@ -871,7 +903,7 @@ input {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: linear-gradient(180deg, #14110a, #0c0d08);
+  background: linear-gradient(180deg, #14110ad0, #0c0d08d0);
   border: 1px solid #4a3d22;
   border-radius: 10px;
   padding: 6px;
@@ -1151,9 +1183,10 @@ input {
   width: 38px;
   height: 54px;
   margin-left: -19px;
-  border: 2px solid #6e3a2a;
+  border: 1px solid #6b5a2c;
   border-radius: 5px;
   background:
+    url('./assets/ui/card_back.webp') center / cover,
     radial-gradient(circle at 50% 70%, #5a1d1d 0 9px, transparent 10px),
     repeating-linear-gradient(45deg, #2a1414 0 4px, #170909 4px 8px);
   box-shadow: 0 2px 4px #000c;
@@ -2135,13 +2168,19 @@ button.toggle[aria-pressed='true'] b {
   translate: none !important;
   scale: none !important;
 }
+/* the ✠ was the mark of the drawn back; the painted back has its own eye */
+.back > span,
+.gh-back > span {
+  visibility: hidden;
+}
 .gh-turned {
   transform: rotateY(180deg);
 }
 .gh-back {
-  border: 2px solid #6e3a2a;
+  border: 1px solid #6b5a2c;
   border-radius: 6px;
   background:
+    url('./assets/ui/card_back.webp') center / cover,
     radial-gradient(circle at 50% 60%, #5a1d1d 0 22%, transparent 24%),
     repeating-linear-gradient(45deg, #2a1414 0 4px, #170909 4px 8px);
   display: grid;
