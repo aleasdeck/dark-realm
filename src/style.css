@@ -651,6 +651,12 @@ button.menu-btn {
 }
 .sl-tavern {
   grid-area: l-tavern;
+  gap: 4px;
+}
+/* the cards left in the tavern deck, in brackets after its name */
+.sl-tavern small {
+  font-family: inherit;
+  font-size: inherit;
 }
 .sl-patrons {
   grid-area: l-patrons;
@@ -743,8 +749,8 @@ button.menu-btn {
   justify-content: center;
   padding: 3px 6px;
   border-radius: 6px;
-  background: #07110b;
-  border: 1px solid var(--line);
+  /* no frame: only the deck and discard, which open a list, are boxed */
+  border: 1px solid transparent;
   font-weight: 700;
   font-size: 17px;
 }
@@ -1408,30 +1414,50 @@ button.menu-btn {
 .oh-name {
   display: none;
 }
+/* the menu button sits in the controls row; held sideways it moves to the top right corner */
+.game .corner-menu {
+  display: none;
+}
 
 /* phones held sideways: the fields run the full width, as in the original game, and the patrons
    stand in a column on the right. The bars sit in the corners next to the patrons, the opponent's
    on top and yours at the bottom over the controls; the hands fill the rest of those rows */
 @media (orientation: landscape) and (max-height: 560px) {
   :root {
-    --tw: min(15.5dvh, 100px);
+    --tw: min(13.5dvh, 90px);
+  }
+  /* the patron column needs no name, and the menu button takes the corner above it */
+  .sl-patrons,
+  .controls [data-act='menu'] {
+    display: none;
+  }
+  .game .corner-menu {
+    display: flex;
+    grid-area: menu;
+    padding: 2px 6px;
+  }
+  .corner-menu img.ic {
+    width: 26px;
+    height: 26px;
   }
   .game {
     max-width: none;
     /* emblems shrink with the screen so the four patrons and the treasury fit one column */
-    --emb: clamp(18px, (100dvh - 156px) / 8.2, 34px);
+    --emb: clamp(18px, (100dvh - 160px) / 8.2, 34px);
     --pcol: max(72px, calc(var(--emb) * 2.2 + 14px));
     /* the third column is as wide as your bar; the fields run over it */
-    grid-template-columns: auto minmax(0, 1fr) auto auto var(--pcol);
+    grid-template-columns: auto minmax(0, 1fr) auto var(--pcol);
     grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      'opphand opphand oppbar l-patrons patrons'
-      'l-oppag oppag oppag l-patrons patrons'
-      'l-tavern tavern tavern l-patrons patrons'
-      'l-table table table l-patrons patrons'
-      'hand hand mybar l-patrons patrons'
-      'hand hand ctrl l-patrons patrons';
-    gap: 4px 3px;
+      'opphand opphand oppbar menu'
+      'l-oppag oppag oppag patrons'
+      'l-tavern tavern tavern patrons'
+      'l-table table table patrons'
+      'hand hand mybar patrons'
+      'hand hand ctrl patrons';
+    gap: 3px;
+    /* your hand keeps its size while the tavern cards get lower */
+    --hw: min(17dvh, 112px);
     padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));
   }
   .bar {
@@ -1470,7 +1496,7 @@ button.menu-btn {
     padding-block: 4px;
   }
   .controls button {
-    padding-block: 6px;
+    padding-block: 4px;
   }
   /* the patrons, top to bottom: the opponent's, the treasury, yours */
   .patrons {
@@ -2459,29 +2485,19 @@ button.toggle[aria-pressed='true'] b {
   width: 220px;
   --art-h: 200px;
 }
-/* phones held sideways: the enlarged card lies on its side, art left of the text, so long texts fit the low screen */
+/* phones held sideways: the enlarged card stays upright like a real card, sized to the low screen */
 @media (orientation: landscape) and (max-height: 560px) {
   .zoom .card.big,
-  .peek-card .card.big,
   .tooltip .card.big {
-    --art-h: min(170px, 46dvh);
-    width: min(460px, 70vw);
-    padding: 0;
-    display: grid;
-    grid-template-columns: var(--art-h) minmax(0, 1fr);
-    align-items: start;
+    width: min(230px, 54dvh);
+    --art-h: min(210px, 40dvh);
   }
-  .card.big .c-top {
-    border-radius: 8px 0 0 8px;
-    border-bottom: none;
-    border-right: 1px solid var(--accent);
+  .peek-card .card.big {
+    width: min(250px, 56dvh);
+    --art-h: min(230px, 38dvh);
   }
   .card.big .c-text {
-    padding: 4px 10px 8px;
-    font-size: 15px;
-  }
-  .card.big .c-text p:first-child {
-    margin-top: 2px;
+    font-size: 14px;
   }
 }
 

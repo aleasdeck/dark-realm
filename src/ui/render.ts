@@ -339,7 +339,7 @@ export function boardHtml(
         ${theirPlayed}
       </div>
     </section>
-    <div class="side-label sl-tavern${pick ? ' picking' : ''}"><span>Таверна</span><small>в запасе ${s.tavernDeck.length}</small></div>
+    <div class="side-label sl-tavern${pick ? ' picking' : ''}"><span>Таверна</span><small>(${s.tavernDeck.length})</small></div>
     <section class="tavern${pick ? ' picking' : ''}">
       ${pick ? `<div class="pick" title="${esc(pick.pending.prompt)}">${esc(pick.pending.prompt)}</div>` : ''}
       <div class="row">${slots(tavern)}</div>
@@ -359,6 +359,7 @@ export function boardHtml(
       <span class="res-group">${res(you, prestigeGoal(s))}</span>
       <span class="counts">${count(you.deck.length, 'колода', 'pile_deck', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile_discard', 'pile-cd')}</span>
     </div>
+    <button class="icon corner-menu" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
     <footer class="controls">
       <button class="icon" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
       <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">${icon('play_all', '▶▶')}</button>
