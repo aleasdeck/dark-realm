@@ -1,11 +1,11 @@
 import { cardDef, PATRONS } from '../engine/cards';
-import { actingPlayer } from '../engine/engine';
+import { actingPlayer, prestigeGoal, reachedGoal } from '../engine/engine';
 import type { GameEvent, GameState, PlayerIdx } from '../engine/types';
 import { cardArt, esc, paintIcons, patronEmblem } from './render';
 import { play, type SoundName } from './sound';
 
 /**
- * Turns state changes into sounds, a turn banner and a feed of the opponent's moves.
+ * Turns state changes into sounds, a turn banner, the prestige goal notice and a feed of the opponent's moves.
  * Lives outside #app so full re-renders don't restart its animations.
  */
 const layer = document.createElement('div');
@@ -20,7 +20,8 @@ const FEED_MAX = 4;
 
 export function clearFx() {
   feed.innerHTML = '';
-  layer.querySelectorAll('.turn-banner').forEach((b) => b.remove());
+  layer.querySelectorAll('.turn-banner, .goal-notice').forEach((b) => b.remove());
+  clearTimeout(bannerTimer);
 }
 
 /** Clears the opponent's moves once they can't be missed, so they don't cover the hand on your turn. */
@@ -33,13 +34,37 @@ function fadeFeed(after: number) {
   }
 }
 
-function banner(text: string, mine: boolean) {
+/** How long the prestige goal notice stays up; the turn banner waits for it. */
+export const GOAL_MS = 2400;
+let bannerTimer = 0;
+
+function banner(text: string, mine: boolean, delay = 0) {
+  clearTimeout(bannerTimer);
+  if (delay) {
+    bannerTimer = window.setTimeout(() => banner(text, mine), delay);
+    return;
+  }
   layer.querySelectorAll('.turn-banner').forEach((b) => b.remove());
   const el = document.createElement('div');
   el.className = `turn-banner ${mine ? 'mine' : 'theirs'}`;
   el.textContent = text;
   layer.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
+}
+
+/** A player reached the prestige goal: a notice in the middle of the screen says who and what it means now. */
+function goalNotice(goal: number, mine: boolean, name: string) {
+  layer.querySelectorAll('.goal-notice').forEach((b) => b.remove());
+  const el = document.createElement('div');
+  el.className = `goal-notice ${mine ? 'mine' : 'theirs'}`;
+  el.style.setProperty('--goal-ms', `${GOAL_MS}ms`);
+  el.innerHTML = `<div class="gn-box">
+    <div class="gn-num">${paintIcons(`${goal} ✦`)}</div>
+    <h3>${mine ? `Вы набрали ${goal} престижа` : `${esc(name)}: ${goal} престижа`}</h3>
+    <p>${mine ? 'Если соперник не догонит вас за свой ход, победа ваша' : 'Догоните соперника за свой ход, иначе поражение'}</p>
+  </div>`;
+  layer.appendChild(el);
+  el.addEventListener('animationend', (ev) => ev.target === el && el.remove());
 }
 
 function feedItem(img: string | null, html: string) {
@@ -110,11 +135,14 @@ export function onStateChange(prev: GameState | null, next: GameState, me: Playe
   const actor = actingPlayer(prev);
   const byThem = actor !== me;
   const sounds = new Set<SoundName>();
+  // Reaching the goal is told first; the turn banner of the same move comes after it.
+  const reached = next.phase === 'play' ? reachedGoal(prev, next) : [];
+  for (const pi of reached) goalNotice(prestigeGoal(next), pi === me, next.players[pi].name);
   for (const e of next.events ?? []) {
     let snd = SOUND[e.k];
     if (e.k === 'turn') {
       snd = e.p === me ? 'myTurn' : 'theirTurn';
-      if (next.phase === 'play') banner(e.p === me ? 'Ваш ход' : 'Ход соперника', e.p === me);
+      if (next.phase === 'play') banner(e.p === me ? 'Ваш ход' : 'Ход соперника', e.p === me, reached.length ? GOAL_MS - 300 : 0);
       if (e.p === me) fadeFeed(1200);
     } else if (e.k === 'win') {
       snd = e.p === me ? 'win' : 'lose';

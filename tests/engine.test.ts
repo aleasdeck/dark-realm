@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botAction } from '../src/engine/bot';
 import { cardDef, CARDS } from '../src/engine/cards';
-import { actingPlayer, applyAction, createGame, patronAvailable } from '../src/engine/engine';
+import { actingPlayer, applyAction, createGame, patronAvailable, reachedGoal } from '../src/engine/engine';
 import type { GameState, PlayerIdx } from '../src/engine/types';
 
 function draftAll(s: GameState): GameState {
@@ -233,5 +233,22 @@ describe('engine', () => {
     expect(s.events[0]).toEqual({ k: 'play', p: 0, card: card.id });
     s = applyAction(s, 0, { t: 'end' });
     expect(s.events.at(-1)).toEqual({ k: 'turn', p: 1 });
+  });
+
+  it('tells who climbed to the prestige goal, again after falling below it', () => {
+    let s = draftAll(createGame(5, ['A', 'B']));
+    const pi = s.current;
+    s.players[pi].prestige = 31;
+    s.players[pi].power = 9;
+    const reached = applyAction(s, pi, { t: 'end' });
+    expect(reached.players[pi].prestige).toBe(40);
+    expect(reachedGoal(s, reached)).toEqual([pi]);
+    // already there: nothing new to tell
+    expect(reachedGoal(reached, structuredClone(reached))).toEqual([]);
+    const below = structuredClone(reached);
+    below.players[pi].prestige = 37;
+    const back = structuredClone(below);
+    back.players[pi].prestige = 41;
+    expect(reachedGoal(below, back)).toEqual([pi]);
   });
 });
