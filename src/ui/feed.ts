@@ -1,6 +1,8 @@
 import { cardDef, PATRONS } from '../engine/cards';
 import { actingPlayer, prestigeGoal, reachedGoal } from '../engine/engine';
 import type { GameEvent, GameState, PlayerIdx } from '../engine/types';
+import { still } from './motion';
+import { agentHits, strikePause } from './moves';
 import { cardArt, esc, paintIcons, patronEmblem } from './render';
 import { play, type SoundName } from './sound';
 
@@ -22,6 +24,7 @@ export function clearFx() {
   feed.innerHTML = '';
   layer.querySelectorAll('.turn-banner, .goal-notice').forEach((b) => b.remove());
   clearTimeout(bannerTimer);
+  clearTimeout(goalTimer);
 }
 
 /** Clears the opponent's moves once they can't be missed, so they don't cover the hand on your turn. */
@@ -37,6 +40,7 @@ function fadeFeed(after: number) {
 /** How long the prestige goal notice stays up; the turn banner waits for it. */
 export const GOAL_MS = 2400;
 let bannerTimer = 0;
+let goalTimer = 0;
 
 function banner(text: string, mine: boolean, delay = 0) {
   clearTimeout(bannerTimer);
@@ -53,7 +57,12 @@ function banner(text: string, mine: boolean, delay = 0) {
 }
 
 /** A player reached the prestige goal: a notice in the middle of the screen says who and what it means now. */
-function goalNotice(goal: number, mine: boolean, name: string) {
+function goalNotice(goal: number, mine: boolean, name: string, delay = 0) {
+  clearTimeout(goalTimer);
+  if (delay) {
+    goalTimer = window.setTimeout(() => goalNotice(goal, mine, name), delay);
+    return;
+  }
   layer.querySelectorAll('.goal-notice').forEach((b) => b.remove());
   const el = document.createElement('div');
   el.className = `goal-notice ${mine ? 'mine' : 'theirs'}`;
@@ -137,12 +146,14 @@ export function onStateChange(prev: GameState | null, next: GameState, me: Playe
   const sounds = new Set<SoundName>();
   // Reaching the goal is told first; the turn banner of the same move comes after it.
   const reached = next.phase === 'play' ? reachedGoal(prev, next) : [];
-  for (const pi of reached) goalNotice(prestigeGoal(next), pi === me, next.players[pi].name);
+  // Both wait while power hits agents (leftover power going into taunting agents at the end of a turn).
+  const pause = still() ? 0 : strikePause(agentHits(prev, next).length);
+  for (const pi of reached) goalNotice(prestigeGoal(next), pi === me, next.players[pi].name, pause);
   for (const e of next.events ?? []) {
     let snd = SOUND[e.k];
     if (e.k === 'turn') {
       snd = e.p === me ? 'myTurn' : 'theirTurn';
-      if (next.phase === 'play') banner(e.p === me ? 'Ваш ход' : 'Ход соперника', e.p === me, reached.length ? GOAL_MS - 300 : 0);
+      if (next.phase === 'play') banner(e.p === me ? 'Ваш ход' : 'Ход соперника', e.p === me, pause + (reached.length ? GOAL_MS - 300 : 0));
       if (e.p === me) fadeFeed(1200);
     } else if (e.k === 'win') {
       snd = e.p === me ? 'win' : 'lose';

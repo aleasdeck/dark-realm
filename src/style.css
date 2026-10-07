@@ -2467,6 +2467,26 @@ button.toggle[aria-pressed='true'] b {
 .float.heal {
   color: var(--green-glow);
 }
+/* leftover power at the end of a turn going into a taunting agent */
+.float.hit {
+  font-size: 34px;
+  text-shadow:
+    0 0 10px #ff3b2f,
+    0 0 4px #000,
+    0 2px 3px #000;
+}
+.strike-bolt {
+  position: absolute;
+  font-size: 26px;
+  filter: drop-shadow(0 0 8px #ff3b2f);
+}
+.strike-slash {
+  position: absolute;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, #ff5a3c 20%, #fff4e0 50%, #ff5a3c 80%, transparent);
+  box-shadow: 0 0 14px 3px #ff3b2fcc;
+}
 
 /* ── hand-drawn interface icons: src/assets/icons, placed by src/ui/icons.ts ── */
 img.ic {
