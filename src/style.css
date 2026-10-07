@@ -1416,6 +1416,11 @@ button.menu-btn {
 }
 
 /* under each name: the patrons picked so far, and the coin beside whoever moves first */
+.draft-picks > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .draft-picks b {
   display: inline-flex;
   align-items: center;
@@ -1462,9 +1467,16 @@ button.menu-btn {
   color: var(--text);
   white-space: nowrap;
 }
-/* a slot still to fill: a dashed ring the height of an emblem and its name */
+/* a slot still to fill: a dashed ring the height of an emblem and its name, with its place in the pick order */
 .draft-picks .pick-slot::before {
-  content: '';
+  content: attr(data-n);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--title-font);
+  font-size: calc(var(--pick) * 0.5);
+  font-weight: 700;
+  color: #ffffff4d;
   width: var(--pick);
   height: var(--pick);
   box-sizing: border-box;
@@ -1477,6 +1489,7 @@ button.menu-btn {
 }
 .draft-picks .pick-slot.next::before {
   border-color: var(--green);
+  color: var(--green);
   box-shadow: 0 0 10px #4fd17a55;
 }
 
@@ -1943,6 +1956,7 @@ button.toggle[aria-pressed='true'] b {
   }
   .draft-picks > div {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;

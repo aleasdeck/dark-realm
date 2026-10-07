@@ -377,14 +377,15 @@ function draftHtml(s: GameState): string {
   const me = ctrl!.me;
   const turn = actingPlayer(s);
   const mine = turn === me;
-  // Each player's two picks as emblems, with empty slots for the ones still to come;
-  // the slot the acting player fills next glows.
+  // Each player's two picks as emblems, with empty slots for the ones still to come numbered
+  // in pick order (first, second, second, first); the slot the acting player fills next glows.
   const picks = (pi: 0 | 1) => {
     const mine = s.patrons.filter((pid) => draftedBy(s, pid) === pi);
+    const order = pi === (s.first ?? 0) ? [1, 4] : [2, 3];
     return [0, 1]
       .map((i) => {
         const pid = mine[i];
-        if (!pid) return `<span class="pick-slot${turn === pi && i === mine.length ? ' next' : ''}"></span>`;
+        if (!pid) return `<span class="pick-slot${turn === pi && i === mine.length ? ' next' : ''}" data-n="${order[i]}"></span>`;
         const p = PATRONS[pid];
         return `<span class="pick" style="--glow:${p.palette.glow}"><img src="${patronEmblem(pid)}" alt=""><small>${esc(p.name)}</small></span>`;
       })
