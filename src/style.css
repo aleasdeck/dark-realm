@@ -153,50 +153,6 @@ input {
   gap: 14px;
   text-align: center;
 }
-/* small phones: the whole menu fits without scrolling */
-@media (max-height: 700px) and (orientation: portrait) {
-  .menu {
-    padding-top: 12px;
-    gap: 9px;
-  }
-  .menu .subtitle {
-    margin-bottom: 0;
-  }
-  .menu .menu-buttons > button,
-  .menu .bot-play > button {
-    padding: 10px;
-  }
-}
-/* phones on their side: title and name on the left, buttons on the right */
-@media (max-height: 500px) and (orientation: landscape) {
-  .menu.home {
-    max-width: 780px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-content: start;
-    gap: 8px 24px;
-    padding-top: 12px;
-  }
-  .menu.home > * {
-    grid-column: 1;
-  }
-  .menu.home > .menu-buttons {
-    grid-column: 2;
-    grid-row: 1 / span 6;
-    gap: 7px;
-  }
-  .menu.home .title {
-    font-size: 48px;
-  }
-  .menu.home .subtitle {
-    margin: 0;
-  }
-  .menu.home .menu-buttons > button,
-  .menu.home .bot-play > button {
-    padding: 9px;
-    font-size: 17px;
-  }
-}
 .title {
   font-size: clamp(44px, 13vw, 68px);
   margin: 0;
@@ -208,7 +164,27 @@ input {
 }
 .subtitle {
   color: var(--muted);
-  margin: 0 0 8px;
+  margin: 0;
+}
+/* the game's icon heads every screen of the main menu, smaller on the inner ones */
+.logo {
+  margin: 0;
+  line-height: 0;
+}
+.logo img {
+  width: min(66vw, 34dvh, 280px);
+  aspect-ratio: 1;
+  border-radius: 22%;
+  box-shadow: 0 0 0 1px #3f8a5c99, 0 10px 30px #000d, 0 0 40px #1f8a4766;
+}
+.menu.sub .logo img {
+  width: min(40vw, 20dvh, 160px);
+}
+.menu-title {
+  margin: 0;
+  font-size: 26px;
+  color: var(--green);
+  text-shadow: 0 2px 0 #0b2414, 0 0 18px #1f8a47;
 }
 .field {
   display: flex;
@@ -221,38 +197,94 @@ input {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: min(100%, 400px);
+  margin: 0 auto;
 }
-.menu-buttons > button {
+/* every button of the main menu looks the same, and lets the backdrop show through */
+button.menu-btn {
   padding: 14px;
   font-size: 18px;
+  background: linear-gradient(#1f4a30b8, #12301fb8);
+  border-color: #3f8a5cc0;
+  box-shadow: inset 0 1px 0 #ffffff1a, 0 2px 8px #0008;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
-.bot-play {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.menu .settings {
+  width: 100%;
 }
-.bot-play > button {
-  padding: 14px;
-  font-size: 18px;
+.menu button.toggle {
+  background: #07110b99;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
-/* bot level: three switches under the button, the chosen one lit */
-.levels {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+.menu .field input,
+.menu .join input {
+  background: #07110bcc;
 }
-.levels button {
-  padding: 6px 4px;
-  font-size: 15px;
-  background: transparent;
-  box-shadow: none;
-  border-color: var(--line);
-  color: var(--muted);
+.menu .join .menu-btn {
+  flex: none;
 }
-.levels button[aria-pressed='true'] {
-  background: #12301f;
-  border-color: var(--green);
-  color: var(--text);
+/* small phones: tighter, so the settings screen fits without scrolling */
+@media (max-height: 700px) and (orientation: portrait) {
+  .menu {
+    padding-top: 14px;
+    gap: 10px;
+  }
+  .menu-buttons {
+    gap: 8px;
+  }
+  button.menu-btn {
+    padding: 11px;
+  }
+  .menu .settings {
+    gap: 6px;
+  }
+  .menu button.toggle {
+    padding-block: 9px;
+  }
+}
+/* phones on their side: the icon on the left, buttons on the right */
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu.home {
+    max-width: 780px;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 10px 28px;
+    padding-block: 12px;
+  }
+  .menu.home > * {
+    grid-column: 1;
+  }
+  .menu.home > .menu-buttons {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    gap: 7px;
+  }
+  .menu.home .logo img,
+  .menu.sub .logo img {
+    width: min(38vw, 58dvh, 240px);
+  }
+  .menu.home .msg {
+    grid-row: 3;
+  }
+  button.menu-btn {
+    padding: 10px;
+    font-size: 17px;
+  }
+  .menu .settings {
+    gap: 6px;
+  }
+  .menu button.toggle {
+    padding-block: 7px;
+  }
+  .menu .field input {
+    padding-block: 7px;
+  }
 }
 .join {
   display: flex;
@@ -2072,10 +2104,6 @@ button.toggle[aria-pressed='true'] b {
 .tip-patron.fav-theirs .tp-side {
   color: var(--them);
 }
-.controls .icon.off {
-  color: var(--muted);
-  text-decoration: line-through;
-}
 
 /* ── tutorial coach ─────────────────────────────────────── */
 .coach-spot {
@@ -2243,9 +2271,6 @@ summary > img.ic {
 .controls .icon img.ic {
   width: 28px;
   height: 28px;
-}
-.controls .icon.off {
-  text-decoration: none;
 }
 .controls .end img.ic {
   width: 24px;
