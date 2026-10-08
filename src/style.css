@@ -2030,12 +2030,13 @@ button.menu-btn {
 .settings-sheet .settings {
   width: 100%;
 }
-/* phones on their side: the game's settings switches in two columns */
+/* phones on their side: the game's settings switches and the game menu's buttons in two columns */
 @media (max-height: 500px) and (orientation: landscape) {
   .settings-sheet .tscroll {
     width: min(100%, 560px);
   }
-  .settings-sheet .settings {
+  .settings-sheet .settings,
+  .menu-sheet .sheet-actions.column {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }

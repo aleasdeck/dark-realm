@@ -5,7 +5,8 @@ import type { GameState } from '../engine/types';
  * just the room it plays in (the host sends the state again on reconnect). Both live
  * in localStorage so a crashed or closed tab can come back too; the tab that played
  * also marks its side in sessionStorage, so two tabs of one browser (host and guest)
- * each come back to their own side.
+ * each come back to their own side. Only that tab goes back into the match by itself on a
+ * reload; anywhere else the «Сетевая игра» menu offers «Переподключение».
  */
 
 export type SavedMatch =
@@ -57,13 +58,23 @@ export function forgetMatch(role: SavedMatch['role']) {
   }
 }
 
-/** The match to come back to: this tab's own side first, else the latest one saved. */
-export function savedMatch(): SavedMatch | null {
+/** The player left the match for the menu: a reload of this tab no longer goes back into it. */
+export function leaveTab() {
+  try {
+    sessionStorage.removeItem(TAB);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** The match to come back to: this tab's own side first, else (unless only this tab's will do) the latest one saved. */
+export function savedMatch(thisTab = false): SavedMatch | null {
   const own = tab();
   if (own === 'host' || own === 'guest') {
     const m = read(own);
     if (m) return m;
   }
+  if (thisTab) return null;
   const all = [read('host'), read('guest')].filter((m): m is SavedMatch => !!m);
   return all.sort((a, b) => b.at - a.at)[0] ?? null;
 }

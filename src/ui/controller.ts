@@ -7,6 +7,7 @@ import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '../net/room';
 import { newMatchId, rateGame, type RatingStatus } from '../net/rating';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
+import { forgetBotGame, saveBotGame } from './savedGame';
 import { strikePause } from './moves';
 import { draftPool, recordGame, unlockedPatrons } from './unlocks';
 
@@ -55,6 +56,10 @@ export abstract class Controller {
   abstract dispatch(a: Action): void;
   /** The coin toss has been shown; the game may go on. */
   tossShown() {}
+  /** The player steps out to the menu but keeps the match to come back to. */
+  suspend() {
+    this.dispose();
+  }
   dispose() {
     this.stopRating?.();
     this.listeners = [];
@@ -164,14 +169,16 @@ export class BotController extends Controller {
   private tossing = false;
   private tossTimer = 0;
 
-  /** The `gentle` level plays the short scripted tutorial game. */
+  /** The `gentle` level plays the short scripted tutorial game; a saved game picks up where it was left. */
   constructor(
     private playerName: string,
     readonly level: BotLevel = 'medium',
+    saved?: GameState,
   ) {
     super();
     this.counts = !this.tutorial;
-    this.restart();
+    if (saved) this.begin(saved);
+    else this.restart();
   }
 
   get tutorial() {
@@ -179,11 +186,17 @@ export class BotController extends Controller {
   }
 
   restart() {
-    this.state = this.tutorial
-      ? createTutorialGame(this.playerName)
-      : createGame(randomSeed(), [this.playerName, BOT_NAMES[this.level]], { pool: draftPool(), first: tossCoin() });
-    // The tutorial is dealt the same every time and tosses no coin.
-    this.tossing = this.state.first !== undefined;
+    this.begin(
+      this.tutorial
+        ? createTutorialGame(this.playerName)
+        : createGame(randomSeed(), [this.playerName, BOT_NAMES[this.level]], { pool: draftPool(), first: tossCoin() }),
+    );
+  }
+
+  private begin(state: GameState) {
+    this.state = state;
+    // The tutorial is dealt the same every time and tosses no coin; a saved game tosses again only if the draft hasn't started.
+    this.tossing = state.first !== undefined && state.phase === 'draft' && state.draftStep === 0;
     clearTimeout(this.tossTimer);
     if (this.tossing) this.tossTimer = window.setTimeout(() => this.tossShown(), TOSS_WAIT_MS);
     this.emit();
@@ -208,6 +221,15 @@ export class BotController extends Controller {
     }
     this.emit();
     this.schedule();
+  }
+
+  /** Every position of a game against the bot is kept until the game ends. */
+  protected emit() {
+    if (!this.tutorial && this.state) {
+      if (this.state.phase === 'over') forgetBotGame();
+      else saveBotGame(this.level, this.state);
+    }
+    super.emit();
   }
 
   private schedule() {
@@ -261,6 +283,8 @@ export class HostController extends Controller {
   private tries = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
+  /** Stepping out to the menu keeps the match saved and doesn't say goodbye. */
+  private kept = false;
 
   constructor(
     private playerName: string,
@@ -387,13 +411,18 @@ export class HostController extends Controller {
     }
   }
 
+  suspend() {
+    this.kept = true;
+    this.dispose();
+  }
+
   dispose() {
     this.disposed = true;
     clearTimeout(this.timer);
-    this.link?.send({ type: 'bye' });
+    if (!this.kept) this.link?.send({ type: 'bye' });
     this.link?.close();
     this.room?.close();
-    forgetMatch('host');
+    if (!this.kept) forgetMatch('host');
     super.dispose();
   }
 }
@@ -415,6 +444,8 @@ export class GuestController extends Controller {
   private tries = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
+  /** Stepping out to the menu keeps the match saved and doesn't say goodbye. */
+  private kept = false;
 
   constructor(
     readonly code: string,
@@ -515,12 +546,18 @@ export class GuestController extends Controller {
     if (this.live) this.link?.send({ type: 'action', action: a });
   }
 
+  suspend() {
+    // Only a match the guest has been in is worth coming back to.
+    this.kept = this.joined && !this.hostLeft;
+    this.dispose();
+  }
+
   dispose() {
     this.disposed = true;
     clearTimeout(this.timer);
-    this.link?.send({ type: 'bye' });
+    if (!this.kept) this.link?.send({ type: 'bye' });
     this.link?.close();
-    forgetMatch('guest');
+    if (!this.kept) forgetMatch('guest');
     super.dispose();
   }
 }
