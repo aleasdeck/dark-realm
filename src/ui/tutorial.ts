@@ -72,7 +72,7 @@ const SCRIPT: Step[] = [
   {
     id: 'hand',
     target: '.hand',
-    text: 'Это ваша рука. Нажмите на карту, она увеличится. Нажмите ещё раз, чтобы сыграть её.',
+    text: 'Это ваша рука. Нажмите на карту, она увеличится. Кнопка «Сыграть» под ней разыграет её. Можно и так: задержите палец на карте и перетащите её на стол.',
     done: (s, me) => firstTurnOver(s) || s.players[me].hand.length < 5,
   },
   {
@@ -91,7 +91,7 @@ const SCRIPT: Step[] = [
   {
     id: 'treasury',
     target: '.patrons .patron.chest',
-    text: 'Это Сундук: к нему можно воззвать в любой партии. За 2 ● он уничтожит ненужную карту, а взамен даст «Долговую расписку» на 2 ●. Нажмите на Сундук, затем ещё раз, и выберите, например, «Золото». Если передумаете, «Отмена» вернёт монеты.',
+    text: 'Это Сундук: к нему можно воззвать в любой партии. За 2 ● он уничтожит ненужную карту, а взамен даст «Долговую расписку» на 2 ●. Нажмите на Сундук, затем на кнопку «Воззвать», и выберите, например, «Золото». Если передумаете, «Отмена» вернёт монеты.',
     // No "OK": the player has to call it. It steps aside only if the Chest can't be called.
     done: (s, me) => firstTurnOver(s) || called(s, me, (p) => p === 'treasury') || !patronAvailable(s, me, 'treasury'),
   },
@@ -105,7 +105,7 @@ const SCRIPT: Step[] = [
   {
     id: 'tavern',
     target: '.tavern',
-    text: 'В таверне покупают карты за монеты ●. Купите одну из ярких: «Ржавая решётка» даёт 2 ⚔, «Траурный караван» 3 ●. Нажмите на карту, затем ещё раз. Обычно покупка уходит в сброс, но в обучении она сразу придёт в следующую руку.',
+    text: 'В таверне покупают карты за монеты ●. Купите одну из ярких: «Ржавая решётка» даёт 2 ⚔, «Траурный караван» 3 ●. Нажмите на карту, затем на кнопку «Купить». Обычно покупка уходит в сброс, но в обучении она сразу придёт в следующую руку.',
     // No "OK" here: the player has to buy something. Only if nothing is affordable does it step aside.
     done: (s, me) =>
       firstTurnOver(s) ||
@@ -140,7 +140,7 @@ const SCRIPT: Step[] = [
   {
     id: 'patron-call',
     target: '.patrons .patron.can:not(.chest)',
-    text: 'Теперь воззовите к покровителю. Подсвечены те, чья цена вам по силам: нажмите на покровителя, прочтите, что он даёт, и нажмите ещё раз.',
+    text: 'Теперь воззовите к покровителю. Подсвечены те, чья цена вам по силам: нажмите на покровителя, прочтите, что он даёт, и нажмите «Воззвать».',
     // No "OK": the player has to call one. It steps aside only if nobody can be called.
     done: (s, me) => secondTurnOver(s) || called(s, me, (p) => p !== 'treasury') || !callablePatrons(s, me),
   },
@@ -157,7 +157,7 @@ const EVENTS: Step[] = [
   {
     id: 'tavern-pick',
     target: '.tavern, .controls .end',
-    text: 'Карта даёт выбрать карту в таверне. Подходящие подсвечены: нажмите на карту, затем ещё раз, чтобы выбрать её. Кнопка внизу закончит выбор.',
+    text: 'Карта даёт выбрать карту в таверне. Подходящие подсвечены: нажмите на карту, затем на кнопку под ней, чтобы выбрать её. Кнопка внизу закончит выбор.',
     ok: true,
     when: (s, me) => tavernPicking(s, me),
     done: (s, me) => !tavernPicking(s, me),
@@ -181,7 +181,7 @@ const EVENTS: Step[] = [
   {
     id: 'my-agent',
     target: '.my-table .agents',
-    text: 'Ваш агент остаётся на столе. Каждый ход нажмите на него дважды, чтобы он снова сработал.',
+    text: 'Ваш агент остаётся на столе. Каждый ход нажмите на него и на кнопку «Применить», чтобы он снова сработал.',
     ok: true,
     when: (s, me) => idle(s, me) && s.players[me].agents.some((a) => !a.activated),
     done: (s, me) => !myTurn(s, me) || s.players[me].agents.every((a) => a.activated),
@@ -189,7 +189,7 @@ const EVENTS: Step[] = [
   {
     id: 'attack',
     target: '.opp-agents',
-    text: 'У соперника агент, а у вас есть сила ⚔. Нажмите на агента дважды, чтобы ударить. Агентов с провокацией бьют первыми.',
+    text: 'У соперника агент, а у вас есть сила ⚔. Нажмите на агента, затем «Атаковать». Агентов с провокацией бьют первыми.',
     ok: true,
     when: (s, me) => idle(s, me) && s.players[me].power > 0 && attackable(s, me).length > 0,
     done: (s, me) => !idle(s, me) || s.players[me].power === 0 || s.players[other(me)].agents.length === 0,
@@ -228,7 +228,7 @@ export class Coach {
 }
 
 /** Taps that still work while the hint is up: its target, the coach itself and choice sheets. */
-const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'pick', 'peek', 'peek-pick', 'peek-close', 'confirm', 'cancel', 'close', 'leave', 'exit', 'rematch'];
+const ALWAYS = ['tut-ok', 'tut-skip', 'confirm-focus', 'zoom', 'pick', 'peek', 'peek-pick', 'peek-close', 'confirm', 'cancel', 'close', 'leave', 'exit', 'rematch'];
 
 export function hintAllows(h: Hint | null, el: HTMLElement): boolean {
   if (!h) return true;

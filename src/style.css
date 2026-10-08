@@ -1420,6 +1420,19 @@ button.menu-btn {
   opacity: 0.25;
   translate: 0 -10px;
 }
+/* held cards are dragged, not scrolled or selected (drag.ts) */
+.fan-slot .tile {
+  touch-action: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.fan-slot .tile img {
+  -webkit-user-drag: none;
+}
+.fan-slot.dragged {
+  opacity: 0.25;
+  transition: none;
+}
 @media (hover: hover) {
   .fan-slot:hover {
     translate: 0 -12px;
@@ -2578,7 +2591,6 @@ button.toggle[aria-pressed='true'] b {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  cursor: pointer;
   filter: drop-shadow(0 12px 24px #000);
 }
 .zoom .card.big {
@@ -2599,10 +2611,14 @@ button.toggle[aria-pressed='true'] b {
   color: var(--muted);
   white-space: nowrap;
 }
-.zoom.can .zoom-act {
+/* the only way to act on a selected card: a real button under it */
+button.zoom-act {
+  font-size: 16px;
+  padding: 9px 22px;
   background: linear-gradient(#3fb468, #237a43);
   border-color: var(--green-glow);
   color: #04120a;
+  box-shadow: 0 2px 0 #000, 0 0 14px #4fd17a66;
 }
 .patron-zoom .tip-patron {
   width: min(280px, 86vw);
@@ -2777,6 +2793,36 @@ button.toggle[aria-pressed='true'] b {
   z-index: 14;
   overflow: hidden;
 }
+/* ── a hand card carried to the table (drag.ts) ── */
+.drag-card {
+  position: fixed;
+  z-index: 16;
+  pointer-events: none;
+  will-change: left, top;
+}
+.drag-lift {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 14px 18px #000d);
+}
+.drag-lift > .tile {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.game.drag-on .my-table {
+  border-color: var(--line2);
+  box-shadow: inset 0 0 0 1px #4fd17a55, 0 0 12px #4fd17a33;
+  transition:
+    box-shadow 0.12s,
+    background 0.12s;
+}
+.game.drag-on .my-table.drop-hot {
+  border-color: var(--green-glow);
+  background: #143222d0;
+  box-shadow: inset 0 0 0 1px var(--green-glow), 0 0 22px var(--green);
+}
+
 .mv-ghost {
   position: absolute;
   perspective: 700px;

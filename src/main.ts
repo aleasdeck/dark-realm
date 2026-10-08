@@ -34,6 +34,7 @@ import { themedScroll } from './ui/scroll';
 import { fullscreenSupported, isFullscreen, launchedFromIcon, onFullscreenChange, setFullscreen, showInstallHint } from './ui/fullscreen';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
+import { initDrag, restoreDrag } from './ui/drag';
 import { initFit } from './ui/fit';
 import { hideLoading, loadAll } from './ui/loading';
 import { savedBotGame } from './ui/savedGame';
@@ -334,6 +335,7 @@ function rulesHtml() {
     <li><b>Агенты</b> остаются на поле и действуют каждый ход. Агентов с провокацией надо сразить первыми, а в конце хода остаток силы сам бьёт по ним и только потом становится престижем.</li>
     <li><b>Контракты</b> срабатывают сразу при покупке и не попадают в колоду. Колода Сундука Бездны целиком из контрактов.</li>
     <li><b>Морок</b> (проклятие) надо разыграть раньше остальных карт в руке.</li>
+    <li>Нажмите на карту, и она увеличится. Кнопка под ней разыграет её. Ещё можно задержать палец на карте в руке и перетащить её на свой стол.</li>
     <li>Нажмите на счётчик колоды или сброса, своего или соперника, чтобы посмотреть эти карты. Порядок колоды скрыт.</li>
     <li>За ход можно один раз воззвать к покровителю. Он становится благосклонен к вам, а если благоволил сопернику, то нейтрален. Ворон нейтрален только в начале игры: после вызова он сразу на вашей стороне.</li>
     <li>Победа: 40 ✦ и перевес после хода соперника, или сразу: 80 ✦ либо благосклонность всех 4 покровителей.</li>
@@ -464,6 +466,7 @@ function render() {
     savePlayed(app);
     app.innerHTML = boardHtml(s, me, { myTurn, idle, focus, pick }) + overlays(s);
     restorePlayed(app);
+    restoreDrag();
     animateChange(app, snap, prev, s, me);
     if (view) showZoom(view.html, view.label, view.can);
     // The enlarged card says what to do itself, so the coach steps aside for it.
@@ -679,7 +682,7 @@ const focusKey = (f: Focus) => (f.kind === 'card' ? `card:${f.uid}` : `patron:${
 
 /**
  * The selected card slides out of its place enlarged, without dimming the table;
- * a second tap on it (or on its source) confirms the action.
+ * the button under it performs the action.
  */
 function showZoom(html: string, label: string, can: boolean) {
   const f = focus!;
@@ -688,9 +691,11 @@ function showZoom(html: string, label: string, can: boolean) {
   );
   const zoom = document.createElement('div');
   zoom.className = `zoom${can ? ' can' : ''}${f.kind === 'patron' ? ' patron-zoom' : ''}`;
-  zoom.dataset.act = 'confirm-focus';
+  // Tapping the enlarged card itself does nothing: only its button acts.
+  zoom.dataset.act = 'zoom';
   if (f.kind === 'card') zoom.dataset.zoomUid = String(f.uid);
-  zoom.innerHTML = `${html}${label ? `<div class="zoom-act">${richText(label)}</div>` : ''}`;
+  const act = can ? `<button class="zoom-act" data-act="confirm-focus">${richText(label)}</button>` : `<div class="zoom-act">${richText(label)}</div>`;
+  zoom.innerHTML = `${html}${label ? act : ''}`;
   app.appendChild(zoom);
   if (!src) return;
   const r = src.getBoundingClientRect();
@@ -699,9 +704,10 @@ function showZoom(html: string, label: string, can: boolean) {
   const vw = innerWidth;
   const vh = innerHeight;
   const x = Math.max(8, Math.min(vw - w - 8, r.left + r.width / 2 - w / 2));
-  // Cards in the lower half grow upward out of their place, the rest grow downward.
+  // Cards in the lower half rise above their place, so a second tap on the card doesn't land on
+  // the button; the rest grow downward out of their place.
   const below = r.top + r.height / 2 > vh / 2;
-  const y = Math.max(8, Math.min(vh - h - 8, below ? r.bottom - h : r.top));
+  const y = Math.max(8, Math.min(vh - h - 8, below ? r.top - h - 6 : r.top));
   zoom.style.left = `${x}px`;
   zoom.style.top = `${y}px`;
   const key = focusKey(f);
@@ -718,11 +724,14 @@ function showZoom(html: string, label: string, can: boolean) {
   );
 }
 
-/** First tap selects, a second tap on the same card or patron performs its action. */
+/** A tap selects a card or patron; a second tap on it puts it back. Its button performs the action. */
 function tapFocus(next: Focus) {
   const s = ctrl!.state!;
   const me = ctrl!.me;
-  if (focus && focusKey(focus) === focusKey(next)) return confirmFocus();
+  if (focus && focusKey(focus) === focusKey(next)) {
+    focus = null;
+    return render();
+  }
   focus = next;
   const view = focusView(s, me, next, idleNow(s), tavernPick(s, me, selected));
   if (view) play('click');
@@ -912,6 +921,26 @@ document.addEventListener('keydown', (ev) => {
 
 // The played-cards columns scroll one card per wheel notch.
 initPlayed(app);
+
+// A hand card picked up with a short hold is played by dropping it on your table.
+initDrag(app, {
+  canPlay(uid, el) {
+    const s = ctrl?.state;
+    if (!s || s.phase !== 'play' || autoPlay || !hintAllows(hint, el)) return false;
+    const view = focusView(s, ctrl!.me, { kind: 'card', uid }, idleNow(s), tavernPick(s, ctrl!.me, selected));
+    return !!view?.can && view.action?.t === 'play';
+  },
+  lift() {
+    hideTooltip();
+    if (!focus) return;
+    focus = null;
+    render();
+  },
+  drop(uid) {
+    play('click');
+    ctrl?.dispatch({ t: 'play', uid });
+  },
+});
 
 // Card and patron details on hover (mouse) or long press (touch).
 initTooltips((el) => {
