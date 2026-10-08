@@ -35,6 +35,7 @@ import {
 } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { icon, withIcon } from './ui/icons';
+import { fullscreenSupported, isFullscreen, launchedFromIcon, onFullscreenChange, setFullscreen, showInstallHint } from './ui/fullscreen';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { hideLoading, loadAll } from './ui/loading';
@@ -253,15 +254,20 @@ async function loadRating() {
   board.querySelector('.me')?.scrollIntoView({ block: 'nearest' });
 }
 
-/** Music, sounds and animations, each switched on or off; the same sheet opens from the main menu and in a game. */
+/** Music, sounds, animations and full screen, each switched on or off; the same sheet opens from the main menu and in a game. */
 const SETTINGS = [
   { key: 'music', label: 'Музыка', icon: 'set_music', on: musicOn, set: setMusic },
   { key: 'sound', label: 'Звуки', icon: 'set_sound', on: soundOn, set: setSound },
   { key: 'motion', label: 'Анимации', icon: 'set_motion', on: motionOn, set: setMotion },
+  // Where the browser cannot go full screen (iPhone), the switch tells how to put the game on the home screen.
+  { key: 'fullscreen', label: 'Весь экран', icon: 'fullscreen', on: isFullscreen, set: (on: boolean) => (fullscreenSupported() ? setFullscreen(on) : showInstallHint()) },
 ];
 
+// Full screen also ends from the browser (Back, Esc), so open switches follow it.
+onFullscreenChange(() => document.querySelectorAll('.settings').forEach((el) => (el.innerHTML = settingsRows())));
+
 function settingsRows() {
-  return SETTINGS.map(
+  return SETTINGS.filter((o) => o.key !== 'fullscreen' || !launchedFromIcon()).map(
     (o) => `<button class="toggle" data-set="${o.key}" aria-pressed="${o.on()}"><span class="t-label">${icon(o.icon)}<span>${o.label}</span></span><b>${o.on() ? 'Вкл' : 'Выкл'}</b></button>`,
   ).join('');
 }

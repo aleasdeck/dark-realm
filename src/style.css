@@ -200,6 +200,14 @@ input {
   width: min(100%, 400px);
   margin: 0 auto;
 }
+/* settings: «Правила» and «Назад» share a row, so the screen fits small phones with all the switches */
+.menu[data-view='settings'] .menu-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.menu[data-view='settings'] .menu-buttons > :not(.menu-btn) {
+  grid-column: 1 / -1;
+}
 /* every button of the main menu looks the same, and lets the backdrop show through */
 button.menu-btn {
   padding: 14px;
@@ -284,6 +292,17 @@ button.menu-btn {
   }
   .menu .field input {
     padding-block: 7px;
+  }
+  /* the name's caption sits beside its field */
+  .menu .field {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+  .menu .field input {
+    flex: 1;
+    min-width: 0;
   }
 }
 .nick-text {
@@ -1926,6 +1945,24 @@ button.menu-btn {
   color: var(--muted);
   margin: 0;
   font-size: 14px;
+}
+/* phones on their side: the game's settings switches in two columns, so the sheet fits without scrolling */
+@media (max-height: 500px) and (orientation: landscape) {
+  .settings-sheet .settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: min(100%, 560px);
+  }
+}
+.install-hint p,
+.install-hint ol {
+  margin: 0;
+  max-width: 420px;
+  text-align: left;
+  line-height: 1.4;
+}
+.install-hint ol {
+  padding-left: 22px;
 }
 .sheet-body {
   display: flex;
