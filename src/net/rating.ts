@@ -1,4 +1,5 @@
-import type { GameState, PlayerIdx } from '../engine/types';
+import { draftedBy } from '../engine/engine';
+import type { GameState, PatronId, PlayerIdx } from '../engine/types';
 
 /*
  * The rating table of network games. It lives in a Google Sheet behind a small web app
@@ -35,6 +36,8 @@ export interface RatedPlayer {
   rating: number;
   wins: number;
   losses: number;
+  /** The patron the player most often picks first; '' or missing before any. */
+  deck?: string;
 }
 
 /** Where a finished network game stands in the rating, as the end of the game shows it. */
@@ -49,6 +52,8 @@ interface Report {
   opp: string;
   won: boolean;
   turns: number;
+  /** The patron this player picked first in the draft. */
+  pick: PatronId | '';
   at: number;
 }
 
@@ -150,7 +155,8 @@ export function rateGame(s: GameState, me: PlayerIdx, update: (r: RatingStatus) 
   const opp = s.players[me === 0 ? 1 : 0].name;
   if (sameName(name, DEFAULT_NAME)) return update({ kind: 'noname' }), null;
   if (sameName(opp, DEFAULT_NAME)) return update({ kind: 'oppnoname' }), null;
-  const r: Report = { match: s.match, name, key: ratingKey(), opp, won: s.winner === me, turns: s.turn, at: Date.now() };
+  const pick = s.patrons.find((pid) => draftedBy(s, pid) === me) ?? '';
+  const r: Report = { match: s.match, name, key: ratingKey(), opp, won: s.winner === me, turns: s.turn, pick, at: Date.now() };
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let polls = 0;

@@ -8,19 +8,21 @@
  * A game counts only when both players report it, with the same match id and opposite
  * results; one side alone can't add a win. A name belongs to the device that first played
  * under it (its secret key is kept here as a hash), so nobody else can play under it.
- * Ratings are Elo, starting at 1000.
+ * Ratings are Elo, starting at 1000. Each player's favourite deck is the patron they most
+ * often pick first in the draft, counted over their counted games.
  *
  * Sheets (created on first use):
  *   Рейтинг: one row per name. Clearing a row's «Ключ» frees the name for a new device.
+ *            «Первые пики» counts each patron picked first, e.g. "crows:3, rats:1".
  *   Партии:  the counted games. Delete a row and run «Рейтинг → Пересчитать рейтинг»
  *            to take a game back.
  *   Заявки:  games reported by one side, waiting for the other.
  */
 
 const SHEETS = {
-  players: ['Рейтинг', ['Имя', 'Рейтинг', 'Победы', 'Поражения', 'Партий', 'Последняя партия', 'Ключ']],
-  games: ['Партии', ['Дата', 'Победитель', 'Проигравший', 'Рейтинг победителя', 'Рейтинг проигравшего', 'Изменение', 'Ходов', 'Партия']],
-  reports: ['Заявки', ['Время', 'Партия', 'Имя', 'Соперник', 'Итог', 'Ходов']],
+  players: ['Рейтинг', ['Имя', 'Рейтинг', 'Победы', 'Поражения', 'Партий', 'Последняя партия', 'Ключ', 'Первые пики']],
+  games: ['Партии', ['Дата', 'Победитель', 'Проигравший', 'Рейтинг победителя', 'Рейтинг проигравшего', 'Изменение', 'Ходов', 'Партия', 'Пик победителя', 'Пик проигравшего']],
+  reports: ['Заявки', ['Время', 'Партия', 'Имя', 'Соперник', 'Итог', 'Ходов', 'Первый пик']],
 };
 const START = 1000;
 const K = 32;
@@ -58,7 +60,7 @@ function onOpen() {
 
 // ── reports ─────────────────────────────────────────────
 
-/** One side's word on a finished game: { match, name, key, opp, won, turns }. */
+/** One side's word on a finished game: { match, name, key, opp, won, turns, pick }. */
 function report(b) {
   const match = String(b.match || '');
   const name = clean(b.name);
@@ -69,6 +71,8 @@ function report(b) {
   }
   if (same(name, DEFAULT_NAME) || same(opp, DEFAULT_NAME)) return { ok: false, error: 'no-name' };
   const turns = Math.max(0, Math.min(9999, Math.floor(Number(b.turns) || 0)));
+  // The patron this player picked first in the draft (its id); older games send none.
+  const pick = /^[a-z_]{2,24}$/.test(String(b.pick || '')) ? String(b.pick) : '';
 
   const players = sheet('players');
   const rows = players.getDataRange().getValues();
@@ -79,7 +83,7 @@ function report(b) {
     if (owner && owner !== hash) return { ok: false, error: 'name-taken' };
     if (!owner) players.getRange(at + 1, 7).setValue(hash);
   } else {
-    players.appendRow([name, START, 0, 0, 0, '', hash]);
+    players.appendRow([name, START, 0, 0, 0, '', hash, '']);
   }
 
   if (findGame(match)) return matchStatus(match, name);
@@ -88,8 +92,8 @@ function report(b) {
   dropStale(reports);
   const list = reports.getDataRange().getValues();
   const mine = list.findIndex((r, i) => i > 0 && String(r[1]) === match && same(r[2], name));
-  if (mine < 0) reports.appendRow([new Date(), match, name, opp, b.won ? 'победа' : 'поражение', turns]);
-  else reports.getRange(mine + 1, 4, 1, 3).setValues([[opp, b.won ? 'победа' : 'поражение', turns]]);
+  if (mine < 0) reports.appendRow([new Date(), match, name, opp, b.won ? 'победа' : 'поражение', turns, pick]);
+  else reports.getRange(mine + 1, 4, 1, 4).setValues([[opp, b.won ? 'победа' : 'поражение', turns, pick]]);
 
   const theirs = list.find((r, i) => i > 0 && String(r[1]) === match && same(r[2], opp));
   if (!theirs) return { ok: true, status: 'pending' };
@@ -98,7 +102,8 @@ function report(b) {
 
   const winner = b.won ? name : opp;
   const loser = b.won ? opp : name;
-  record(winner, loser, Math.max(turns, Number(theirs[5]) || 0), match);
+  const theirPick = String(theirs[6] || '');
+  record(winner, loser, Math.max(turns, Number(theirs[5]) || 0), match, b.won ? pick : theirPick, b.won ? theirPick : pick);
   removeReports(reports, match);
   return matchStatus(match, name);
 }
@@ -146,7 +151,7 @@ function eloDelta(winner, loser) {
 }
 
 /** Counts a confirmed game: both players' rows and a row in Партии. */
-function record(winner, loser, turns, match) {
+function record(winner, loser, turns, match, winnerPick, loserPick) {
   const players = sheet('players');
   const rows = players.getDataRange().getValues();
   const wi = rows.findIndex((r, i) => i > 0 && same(r[0], winner));
@@ -158,7 +163,9 @@ function record(winner, loser, turns, match) {
   const now = new Date();
   players.getRange(wi + 1, 2, 1, 5).setValues([[(Number(w[1]) || START) + d, (Number(w[2]) || 0) + 1, Number(w[3]) || 0, (Number(w[4]) || 0) + 1, now]]);
   players.getRange(li + 1, 2, 1, 5).setValues([[(Number(l[1]) || START) - d, Number(l[2]) || 0, (Number(l[3]) || 0) + 1, (Number(l[4]) || 0) + 1, now]]);
-  sheet('games').appendRow([now, w[0], l[0], (Number(w[1]) || START) + d, (Number(l[1]) || START) - d, d, turns, match]);
+  if (winnerPick) players.getRange(wi + 1, 8).setValue(writePicks(addPick(readPicks(w[7]), winnerPick)));
+  if (loserPick) players.getRange(li + 1, 8).setValue(writePicks(addPick(readPicks(l[7]), loserPick)));
+  sheet('games').appendRow([now, w[0], l[0], (Number(w[1]) || START) + d, (Number(l[1]) || START) - d, d, turns, match, winnerPick, loserPick]);
 }
 
 /** Plays every game in Партии again from 1000, after a game was deleted or edited by hand. */
@@ -166,7 +173,7 @@ function recalc() {
   const players = sheet('players');
   const rows = players.getDataRange().getValues();
   const byName = {};
-  for (let i = 1; i < rows.length; i++) byName[String(rows[i][0]).toLowerCase()] = { rating: START, wins: 0, losses: 0, last: '' };
+  for (let i = 1; i < rows.length; i++) byName[String(rows[i][0]).toLowerCase()] = { rating: START, wins: 0, losses: 0, last: '', picks: {} };
   const games = sheet('games');
   const list = games.getDataRange().getValues();
   for (let i = 1; i < list.length; i++) {
@@ -180,11 +187,14 @@ function recalc() {
     w.wins++;
     l.losses++;
     w.last = l.last = g[0];
+    if (g[8]) addPick(w.picks, String(g[8]));
+    if (g[9]) addPick(l.picks, String(g[9]));
     games.getRange(i + 1, 4, 1, 3).setValues([[w.rating, l.rating, d]]);
   }
   for (let i = 1; i < rows.length; i++) {
     const p = byName[String(rows[i][0]).toLowerCase()];
     players.getRange(i + 1, 2, 1, 5).setValues([[p.rating, p.wins, p.losses, p.wins + p.losses, p.last]]);
+    players.getRange(i + 1, 8).setValue(writePicks(p.picks));
   }
 }
 
@@ -195,9 +205,42 @@ function top() {
     .getValues()
     .slice(1)
     .filter((r) => Number(r[4]) > 0)
-    .map((r) => ({ name: String(r[0]), rating: Number(r[1]), wins: Number(r[2]), losses: Number(r[3]) }))
+    .map((r) => ({ name: String(r[0]), rating: Number(r[1]), wins: Number(r[2]), losses: Number(r[3]), deck: favourite(readPicks(r[7])) }))
     .sort((a, b) => b.rating - a.rating || b.wins - a.wins)
     .slice(0, TOP);
+}
+
+// ── first picks ─────────────────────────────────────────
+
+/** "crows:3, rats:1" → { crows: 3, rats: 1 } */
+function readPicks(cell) {
+  const counts = {};
+  String(cell || '')
+    .split(',')
+    .forEach((part) => {
+      const [id, n] = part.split(':').map((x) => x.trim());
+      if (/^[a-z_]{2,24}$/.test(id) && Number(n) > 0) counts[id] = Number(n);
+    });
+  return counts;
+}
+
+function writePicks(counts) {
+  return Object.keys(counts)
+    .sort((a, b) => counts[b] - counts[a])
+    .map((id) => `${id}:${counts[id]}`)
+    .join(', ');
+}
+
+function addPick(counts, id) {
+  counts[id] = (counts[id] || 0) + 1;
+  return counts;
+}
+
+/** The patron picked first most often; '' before any. */
+function favourite(counts) {
+  let best = '';
+  for (const id of Object.keys(counts)) if (!best || counts[id] > counts[best]) best = id;
+  return best;
 }
 
 // ── helpers ─────────────────────────────────────────────
@@ -211,6 +254,9 @@ function sheet(id) {
     s = book.insertSheet(title);
     s.appendRow(head);
     s.setFrozenRows(1);
+  } else if (head.some((h, i) => s.getDataRange().getValues()[0][i] !== h)) {
+    // A table made by an older version of this script: name its new columns.
+    s.getRange(1, 1, 1, head.length).setValues([head]);
   }
   return s;
 }

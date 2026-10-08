@@ -342,14 +342,14 @@ button.menu-btn {
 .rating-head,
 .rating-list li {
   display: grid;
-  grid-template-columns: 2em 1fr 4.6em 3.4em;
+  grid-template-columns: 22px minmax(0, 1fr) 40px 50px 30px 30px;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 5px;
+  padding: 6px;
 }
 .rating-head {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   border-bottom: 1px solid var(--line2);
 }
 .rating-list {
@@ -368,8 +368,30 @@ button.menu-btn {
   border-radius: 6px;
 }
 .r-place,
-.r-wl {
+.r-loss {
   color: var(--muted);
+}
+.r-deck {
+  display: flex;
+  justify-content: center;
+}
+.rating-head .r-deck {
+  font-size: 10px;
+}
+.r-deck img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  margin-block: -4px;
+}
+.rating-head .r-win,
+.rating-head .r-loss {
+  display: flex;
+  justify-content: flex-end;
+}
+.rating-head img.ic {
+  width: 20px;
+  height: 20px;
 }
 .r-name {
   text-align: left;
@@ -388,8 +410,20 @@ button.menu-btn {
   font-weight: 700;
   color: var(--green);
 }
-.r-wl {
+.r-win,
+.r-loss {
   text-align: right;
+}
+/* narrow phones: smaller rows, so names keep room */
+@media (max-width: 360px) {
+  .rating-head,
+  .rating-list li {
+    gap: 4px;
+    padding-inline: 4px;
+  }
+  .rating-list li {
+    font-size: 14px;
+  }
 }
 .rating-note {
   margin: 0;
