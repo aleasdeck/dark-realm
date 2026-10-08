@@ -18,9 +18,10 @@
   --k-contract: #d8455a;
   --k-curse: #a99bc2;
   --them: #ff6b5e;
-  --title-font: 'Philosopher', Georgia, serif;
-  --text-font: 'PT Sans', system-ui, sans-serif;
-  --narrow-font: 'PT Sans Narrow', 'PT Sans', system-ui, sans-serif;
+  /* fonts.css: 'DR Digits' gives every font the same Piazzolla numbers */
+  --title-font: 'DR Digits', 'Alegreya SC', Georgia, serif;
+  --text-font: 'DR Digits', 'Spectral', Georgia, serif;
+  --narrow-font: 'DR Digits', 'Yanone Kaffeesatz', system-ui, sans-serif;
   /* tile width: fits five in a row and scales with the screen height */
   /* five tiles across the tavern frame, which leaves the block names a gutter on its left */
   --tw: min(calc((min(100vw, 860px) - 70px) / 5), 12.5dvh, 124px);
@@ -1217,7 +1218,7 @@ button.menu-btn {
 }
 .t-name {
   font-family: var(--narrow-font);
-  font-weight: 700;
+  font-weight: 600;
   font-size: clamp(10px, calc(var(--tw) * 0.13), 14px);
   line-height: 1.05;
   color: var(--glow);
@@ -1225,6 +1226,9 @@ button.menu-btn {
   margin-top: 2px;
   max-height: 2.1em;
   overflow: hidden;
+  /* fitNames() in src/ui/fit.ts shrinks a name until its words fit whole; breaking a word is the last resort */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .t-fx {
   margin-top: auto;
