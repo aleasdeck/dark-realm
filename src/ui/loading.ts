@@ -7,7 +7,7 @@ import { warmBot } from './controller';
  * and only then does the menu open, so nothing in the game loads or pops in later.
  */
 
-const FONTS = ['Philosopher', 'PT Sans', 'PT Sans Narrow'].flatMap((f) => [`400 16px "${f}"`, `700 16px "${f}"`]);
+const FONTS = ['Alegreya SC', 'Spectral', 'Yanone Kaffeesatz', 'DR Digits'].flatMap((f) => [`400 16px "${f}"`, `700 16px "${f}"`]);
 
 /** Every character the game writes in these fonts: the fonts come in parts (Cyrillic, Latin), and each part loads for the letters it covers. */
 const SAMPLE = (() => {
