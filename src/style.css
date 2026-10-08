@@ -201,6 +201,15 @@ input {
   width: min(100%, 400px);
   margin: 0 auto;
 }
+/* settings: «Правила» and «Назад» share a row, so the screen fits small phones with all the switches */
+.menu[data-view='settings'] .menu-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.menu[data-view='settings'] .menu-buttons > :not(.menu-btn) {
+  grid-column: 1 / -1;
+}
 /* every button of the main menu looks the same, and lets the backdrop show through */
 button.menu-btn {
   padding: 14px;
@@ -242,7 +251,7 @@ button.menu-btn {
     gap: 6px;
   }
   .menu button.toggle {
-    padding-block: 9px;
+    padding-block: 8px;
   }
 }
 /* phones on their side: the icon on the left, buttons on the right */
@@ -285,6 +294,17 @@ button.menu-btn {
   }
   .menu .field input {
     padding-block: 7px;
+  }
+  /* the name's caption sits beside its field */
+  .menu .field {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+  .menu .field input {
+    flex: 1;
+    min-width: 0;
   }
 }
 .nick-text {
@@ -397,6 +417,19 @@ button.menu-btn {
   .menu.home[data-view='rating'] > .menu-buttons {
     grid-row: 1 / span 4;
     align-self: stretch;
+  }  .menu.home[data-view='settings'] {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr);
+  }
+  .menu.home[data-view='settings'] .logo {
+    grid-row: 2;
+  }
+  .menu.home[data-view='settings'] .menu-title {
+    grid-row: 3;
+  }
+  .menu.home[data-view='settings'] > .menu-buttons {
+    grid-row: 1 / span 4;
+    max-height: 100%;
   }
 }
 .join {
@@ -1930,6 +1963,92 @@ button.menu-btn {
   color: var(--muted);
   margin: 0;
   font-size: 14px;
+}
+/* a list with the game's own scroll bar (src/ui/scroll.ts): the browser's bar is hidden, a green thumb shows the place */
+.tscroll {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: inherit;
+}
+.tscroll-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: inherit;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.tscroll-body::-webkit-scrollbar {
+  display: none;
+}
+.tscroll.scrolls .tscroll-body {
+  padding-right: 12px;
+}
+.tscroll-thumb {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 1px;
+  width: 5px;
+  border-radius: 3px;
+  background: linear-gradient(#8dffad, #3f8a5c);
+  box-shadow: 0 0 6px #4fd17a99, inset 0 0 0 1px #04120a66;
+  pointer-events: none;
+}
+.tscroll.scrolls .tscroll-thumb {
+  display: block;
+}
+/* the groove the thumb runs in */
+.tscroll.scrolls::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 3px;
+  width: 1px;
+  background: #3f8a5c66;
+  pointer-events: none;
+}
+/* the main menu's settings: the switches scroll when the screen is short, «Назад» stays below them */
+.menu[data-view='settings'] {
+  height: 100dvh;
+}
+.menu[data-view='settings'] .menu-buttons {
+  min-height: 0;
+}
+/* the game's settings sheet: the switches scroll, «Готово» stays */
+.settings-sheet {
+  overflow: hidden;
+}
+.settings-sheet .tscroll {
+  width: min(100%, 320px);
+}
+.settings-sheet .settings {
+  width: 100%;
+}
+/* phones on their side: the game's settings switches in two columns */
+@media (max-height: 500px) and (orientation: landscape) {
+  .settings-sheet .tscroll {
+    width: min(100%, 560px);
+  }
+  .settings-sheet .settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.install-hint p,
+.install-hint ol {
+  margin: 0;
+  max-width: 420px;
+  text-align: left;
+  line-height: 1.4;
+}
+.install-hint ol {
+  padding-left: 22px;
 }
 .sheet-body {
   display: flex;

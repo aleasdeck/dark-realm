@@ -30,6 +30,8 @@ import {
 } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { icon, withIcon } from './ui/icons';
+import { themedScroll } from './ui/scroll';
+import { fullscreenSupported, isFullscreen, launchedFromIcon, onFullscreenChange, setFullscreen, showInstallHint } from './ui/fullscreen';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { initFit } from './ui/fit';
@@ -156,8 +158,8 @@ function menuBody(view: MenuView): string {
     case 'rating':
       return `<div class="rating-board">${ratingUrl() ? '<p class="wait">Загружаем…</p>' : '<p class="wait">Таблица рейтинга ещё не подключена.</p>'}</div>`;
     case 'settings':
-      return `<label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}" autocomplete="nickname"></label>
-        <div class="settings">${settingsRows()}</div>
+      return `${scrolling(`<label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}" autocomplete="nickname"></label>
+        <div class="settings">${settingsRows()}</div>`)}
         ${menuButton('rules', 'rules', 'Правила')}`;
   }
 }
@@ -218,6 +220,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     }),
   );
   if (view === 'rating' && ratingUrl()) loadRating();
+  themedScroll(app);
 }
 
 /** Fills the rating screen once the table arrives, if the player is still on it. */
@@ -249,15 +252,20 @@ async function loadRating() {
   board.querySelector('.me')?.scrollIntoView({ block: 'nearest' });
 }
 
-/** Music, sounds and animations, each switched on or off; the same sheet opens from the main menu and in a game. */
+/** Music, sounds, animations and full screen, each switched on or off; the same sheet opens from the main menu and in a game. */
 const SETTINGS = [
   { key: 'music', label: 'Музыка', icon: 'set_music', on: musicOn, set: setMusic },
   { key: 'sound', label: 'Звуки', icon: 'set_sound', on: soundOn, set: setSound },
   { key: 'motion', label: 'Анимации', icon: 'set_motion', on: motionOn, set: setMotion },
+  // Where the browser cannot go full screen (iPhone), the switch tells how to put the game on the home screen.
+  { key: 'fullscreen', label: 'Весь экран', icon: 'fullscreen', on: isFullscreen, set: (on: boolean) => (fullscreenSupported() ? setFullscreen(on) : showInstallHint()) },
 ];
 
+// Full screen also ends from the browser (Back, Esc), so open switches follow it.
+onFullscreenChange(() => document.querySelectorAll('.settings').forEach((el) => (el.innerHTML = settingsRows())));
+
 function settingsRows() {
-  return SETTINGS.map(
+  return SETTINGS.filter((o) => o.key !== 'fullscreen' || !launchedFromIcon()).map(
     (o) => `<button class="toggle" data-set="${o.key}" aria-pressed="${o.on()}"><span class="t-label">${icon(o.icon)}<span>${o.label}</span></span><b>${o.on() ? 'Вкл' : 'Выкл'}</b></button>`,
   ).join('');
 }
@@ -265,7 +273,7 @@ function settingsRows() {
 function showSettings() {
   const box = document.createElement('div');
   box.className = 'overlay sheet-wrap';
-  box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2><div class="settings">${settingsRows()}</div>
+  box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2>${scrolling(`<div class="settings">${settingsRows()}</div>`)}
     <div class="sheet-actions"><button data-close>${withIcon('confirm', 'Готово')}</button></div></div>`;
   box.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
@@ -279,6 +287,12 @@ function showSettings() {
     if (t === box || t.closest('[data-close]')) box.remove();
   });
   document.body.appendChild(box);
+  themedScroll(box);
+}
+
+/** Wraps a list that may not fit a small screen, so it scrolls with the game's scroll bar (src/ui/scroll.ts). */
+function scrolling(html: string) {
+  return `<div class="tscroll"><div class="tscroll-body">${html}</div></div>`;
 }
 
 function rulesHtml() {
