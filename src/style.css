@@ -1049,7 +1049,7 @@ button.menu-btn {
   gap: 5px;
 }
 /* a bare emblem without a plaque: it glows while you can call it and is dimmed otherwise;
-   the colour of the name says whose side the patron is on */
+   the name in the patron's colour fades with it */
 .patron {
   display: flex;
   flex-direction: column;
@@ -1100,11 +1100,65 @@ button.menu-btn {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.patron.fav-mine .p-name {
-  color: var(--you);
+.patrons .p-name {
+  color: var(--glow);
+  filter: brightness(0.55) saturate(0.6);
+  transition: filter 0.35s;
 }
-.patron.fav-theirs .p-name {
-  color: var(--them);
+.patron.can .p-name {
+  filter: none;
+}
+/* whose side the patron is on: a soft light from that player's edge of the frame,
+   the opponent's from the top, yours from the bottom */
+.patrons .patron {
+  position: relative;
+  isolation: isolate;
+}
+.patron.fav-mine {
+  --side: var(--you);
+}
+.patron.fav-theirs {
+  --side: var(--them);
+}
+.patron.fav-mine::before,
+.patron.fav-theirs::before,
+.patron.fav-mine::after,
+.patron.fav-theirs::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+  z-index: -1;
+}
+/* a thin line at that edge, with a faint glow spreading from it toward the patron */
+.patron.fav-mine::before,
+.patron.fav-theirs::before {
+  translate: -50% 0;
+  width: 90%;
+  height: 55%;
+  opacity: 0.3;
+}
+.patron.fav-mine::before {
+  bottom: -3px;
+  background: radial-gradient(ellipse 50% 100% at 50% 100%, var(--side), transparent);
+}
+.patron.fav-theirs::before {
+  top: -3px;
+  background: radial-gradient(ellipse 50% 100% at 50% 0%, var(--side), transparent);
+}
+.patron.fav-mine::after,
+.patron.fav-theirs::after {
+  translate: -50% 0;
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--side), transparent);
+  box-shadow: 0 0 4px var(--side);
+}
+.patron.fav-mine::after {
+  bottom: -3px;
+}
+.patron.fav-theirs::after {
+  top: -3px;
 }
 /* the treasury is a clearly larger medallion between the two sides; it has no name under it, so it takes that height too */
 .patron.chest {
