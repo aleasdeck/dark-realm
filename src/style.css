@@ -1084,7 +1084,7 @@ button.menu-btn {
   transition: filter 0.35s;
 }
 .patron.can .p-track img {
-  filter: drop-shadow(0 0 2px var(--glow)) drop-shadow(0 0 6px var(--glow)) drop-shadow(0 0 12px var(--glow));
+  filter: drop-shadow(0 0 2px var(--glow));
 }
 .patron.focused:not(.can) .p-track img {
   filter: brightness(0.8) drop-shadow(0 0 3px var(--glow));
@@ -1118,7 +1118,7 @@ button.menu-btn {
   filter: brightness(0.42) saturate(0.5) drop-shadow(0 2px 3px #000);
 }
 .patrons .patron.chest.can .p-track img {
-  filter: drop-shadow(0 0 3px var(--glow)) drop-shadow(0 0 8px var(--glow)) drop-shadow(0 0 16px var(--glow));
+  filter: drop-shadow(0 0 3px var(--glow));
 }
 .patrons .patron.chest.focused:not(.can) .p-track img {
   filter: brightness(0.8) drop-shadow(0 0 3px var(--glow));
