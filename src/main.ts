@@ -32,6 +32,7 @@ import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { icon, withIcon } from './ui/icons';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
+import { initFit } from './ui/fit';
 import { hideLoading, loadAll } from './ui/loading';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
@@ -873,6 +874,8 @@ window.addEventListener('resize', () => {
   hideTooltip();
   if (focus) render();
 });
+
+initFit();
 
 // Results of network games that didn't reach the rating table before.
 flushReports();

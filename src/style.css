@@ -21,7 +21,7 @@
   /* fonts.css: 'DR Digits' gives every font the same Piazzolla numbers */
   --title-font: 'DR Digits', 'Alegreya SC', Georgia, serif;
   --text-font: 'DR Digits', 'Spectral', Georgia, serif;
-  --narrow-font: 'DR Digits', 'Fira Sans Extra Condensed', system-ui, sans-serif;
+  --narrow-font: 'DR Digits', 'Yanone Kaffeesatz', system-ui, sans-serif;
   /* tile width: fits five in a row and scales with the screen height */
   /* five tiles across the tavern frame, which leaves the block names a gutter on its left */
   --tw: min(calc((min(100vw, 860px) - 70px) / 5), 12.5dvh, 124px);
@@ -1199,7 +1199,7 @@ button.menu-btn {
 }
 .t-name {
   font-family: var(--narrow-font);
-  font-weight: 700;
+  font-weight: 600;
   font-size: clamp(10px, calc(var(--tw) * 0.13), 14px);
   line-height: 1.05;
   color: var(--glow);
@@ -1207,7 +1207,7 @@ button.menu-btn {
   margin-top: 2px;
   max-height: 2.1em;
   overflow: hidden;
-  /* a long word breaks inside the tile at a syllable (soft hyphens from hyphenate()), never past its edges */
+  /* fitNames() shrinks a name whose longest word is wider than the tile; soft hyphens are the last resort */
   max-width: 100%;
   hyphens: manual;
   overflow-wrap: anywhere;

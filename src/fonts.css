@@ -1,9 +1,9 @@
 /*
- * Game fonts: Alegreya SC for titles and buttons, Spectral for text, Fira Sans Extra Condensed for
- * the small tavern tiles, and every digit from Piazzolla. All are SIL OFL 1.1 and come from
- * @fontsource. size-adjust evens out their lowercase heights: Spectral is scaled up to read like the
- * old PT Sans, and Fira Sans Extra Condensed down to the old PT Sans Narrow, so long card names
- * still fit the narrow tiles.
+ * Game fonts: Alegreya SC for titles and buttons, Spectral for text, Yanone Kaffeesatz for the small
+ * tavern tiles, and every digit from Piazzolla. All are SIL OFL 1.1 and come from @fontsource.
+ * Spectral is scaled up (size-adjust) to read like the old PT Sans. Yanone Kaffeesatz has the old
+ * PT Sans Narrow's lowercase height but is about a fifth narrower, so card names fit the tiles; the
+ * few that still don't are shrunk by fitNames() in src/ui/fit.ts.
  */
 
 @font-face {
@@ -107,42 +107,56 @@
 }
 
 @font-face {
-  font-family: 'Fira Sans Extra Condensed';
+  font-family: 'Yanone Kaffeesatz';
   font-style: normal;
   font-display: swap;
   font-weight: 400;
-  size-adjust: 92%;
-  src: url('@fontsource/fira-sans-extra-condensed/files/fira-sans-extra-condensed-cyrillic-400-normal.woff2') format('woff2');
+  src: url('@fontsource/yanone-kaffeesatz/files/yanone-kaffeesatz-cyrillic-400-normal.woff2') format('woff2');
   unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;
 }
 
 @font-face {
-  font-family: 'Fira Sans Extra Condensed';
+  font-family: 'Yanone Kaffeesatz';
   font-style: normal;
   font-display: swap;
   font-weight: 400;
-  size-adjust: 92%;
-  src: url('@fontsource/fira-sans-extra-condensed/files/fira-sans-extra-condensed-latin-400-normal.woff2') format('woff2');
+  src: url('@fontsource/yanone-kaffeesatz/files/yanone-kaffeesatz-latin-400-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 
 @font-face {
-  font-family: 'Fira Sans Extra Condensed';
+  font-family: 'Yanone Kaffeesatz';
   font-style: normal;
   font-display: swap;
-  font-weight: 700;
-  size-adjust: 92%;
-  src: url('@fontsource/fira-sans-extra-condensed/files/fira-sans-extra-condensed-cyrillic-700-normal.woff2') format('woff2');
+  font-weight: 600;
+  src: url('@fontsource/yanone-kaffeesatz/files/yanone-kaffeesatz-cyrillic-600-normal.woff2') format('woff2');
   unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;
 }
 
 @font-face {
-  font-family: 'Fira Sans Extra Condensed';
+  font-family: 'Yanone Kaffeesatz';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/yanone-kaffeesatz/files/yanone-kaffeesatz-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+@font-face {
+  font-family: 'Yanone Kaffeesatz';
   font-style: normal;
   font-display: swap;
   font-weight: 700;
-  size-adjust: 92%;
-  src: url('@fontsource/fira-sans-extra-condensed/files/fira-sans-extra-condensed-latin-700-normal.woff2') format('woff2');
+  src: url('@fontsource/yanone-kaffeesatz/files/yanone-kaffeesatz-cyrillic-700-normal.woff2') format('woff2');
+  unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;
+}
+
+@font-face {
+  font-family: 'Yanone Kaffeesatz';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/yanone-kaffeesatz/files/yanone-kaffeesatz-latin-700-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 
