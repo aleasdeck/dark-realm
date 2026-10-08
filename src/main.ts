@@ -1,9 +1,4 @@
-import '@fontsource/philosopher/400.css';
-import '@fontsource/philosopher/700.css';
-import '@fontsource/pt-sans/400.css';
-import '@fontsource/pt-sans/700.css';
-import '@fontsource/pt-sans-narrow/400.css';
-import '@fontsource/pt-sans-narrow/700.css';
+import './fonts.css';
 import './style.css';
 import logoUrl from './assets/app/logo.webp';
 import { BOT_LEVELS, type BotLevel } from './engine/bot';
