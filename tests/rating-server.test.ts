@@ -5,7 +5,7 @@ const KEY_A = 'a'.repeat(32);
 const KEY_B = 'b'.repeat(32);
 const KEY_C = 'c'.repeat(32);
 
-const report = (match: string, name: string, key: string, opp: string, won: boolean, turns = 12) => ({ match, name, key, opp, won, turns });
+const report = (match: string, name: string, key: string, opp: string, won: boolean, turns = 12, pick?: string) => ({ match, name, key, opp, won, turns, pick });
 
 describe('rating web app (server/rating.gs)', () => {
   let gs: RatingScript;
@@ -20,8 +20,8 @@ describe('rating web app (server/rating.gs)', () => {
     expect(gs.post(report('match-0001', 'Боря', KEY_B, 'Аня', false))).toEqual({ ok: true, status: 'done', rating: 984, delta: -16 });
     expect(gs.get({ match: 'match-0001', name: 'аня' })).toEqual({ ok: true, status: 'done', rating: 1016, delta: 16 });
     expect(gs.get().players).toEqual([
-      { name: 'Аня', rating: 1016, wins: 1, losses: 0 },
-      { name: 'Боря', rating: 984, wins: 0, losses: 1 },
+      { name: 'Аня', rating: 1016, wins: 1, losses: 0, deck: '' },
+      { name: 'Боря', rating: 984, wins: 0, losses: 1, deck: '' },
     ]);
     expect(gs.book.get('Заявки')!.rows).toHaveLength(1);
     expect(gs.book.get('Партии')!.rows).toHaveLength(2);
@@ -77,8 +77,42 @@ describe('rating web app (server/rating.gs)', () => {
     gs.book.get('Партии')!.rows.splice(1, 2);
     gs.recalc();
     expect(gs.get().players).toEqual([
-      { name: 'Аня', rating: 1016, wins: 1, losses: 0 },
-      { name: 'Боря', rating: 984, wins: 0, losses: 1 },
+      { name: 'Аня', rating: 1016, wins: 1, losses: 0, deck: '' },
+      { name: 'Боря', rating: 984, wins: 0, losses: 1, deck: '' },
     ]);
+  });
+
+  it('names the patron each player picks first most often', () => {
+    const picks = [
+      ['crows', 'rats'],
+      ['crows', 'wolves'],
+      ['owls', 'wolves'],
+    ];
+    picks.forEach(([a, b], i) => {
+      gs.post(report(`match-000${i}`, 'Аня', KEY_A, 'Боря', i !== 2, 12, a));
+      gs.post(report(`match-000${i}`, 'Боря', KEY_B, 'Аня', i === 2, 12, b));
+    });
+    expect(gs.get().players.map((p: { name: string; deck: string }) => [p.name, p.deck])).toEqual([
+      ['Аня', 'crows'],
+      ['Боря', 'wolves'],
+    ]);
+    expect(gs.book.get('Рейтинг')!.rows[1][7]).toBe('crows:2, owls:1');
+    expect(gs.book.get('Партии')!.rows[3].slice(8)).toEqual(['wolves', 'owls']);
+    // A pick that isn't a patron id is dropped; recounting rebuilds the counts from Партии.
+    gs.post(report('match-0009', 'Аня', KEY_A, 'Боря', true, 12, '=evil()'));
+    gs.post(report('match-0009', 'Боря', KEY_B, 'Аня', false, 12));
+    gs.book.get('Рейтинг')!.rows[1][7] = '';
+    gs.recalc();
+    expect(gs.book.get('Рейтинг')!.rows[1][7]).toBe('crows:2, owls:1');
+  });
+
+  it('adds the new columns to a table made by the first version', () => {
+    gs.post(report('match-0001', 'Аня', KEY_A, 'Боря', true));
+    const sheet = gs.book.get('Рейтинг')!;
+    sheet.rows[0] = sheet.rows[0].slice(0, 7);
+    sheet.rows[1] = sheet.rows[1].slice(0, 7);
+    gs.post(report('match-0001', 'Боря', KEY_B, 'Аня', false, 12, 'rats'));
+    expect(sheet.rows[0][7]).toBe('Первые пики');
+    expect(gs.get().players.map((p: { deck: string }) => p.deck)).toEqual(['', 'rats']);
   });
 });

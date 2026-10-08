@@ -239,6 +239,13 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   themedScroll(app);
 }
 
+/** The emblem of a player's favourite deck in the rating; nothing for an unknown patron or none yet. */
+function deckEmblem(id: string | undefined): string {
+  if (!id || !(id in PATRONS) || id === 'treasury') return '';
+  const pid = id as PatronId;
+  return `<img src="${patronEmblem(pid)}" alt="${esc(PATRONS[pid].name)}" title="${esc(PATRONS[pid].name)}">`;
+}
+
 /** Fills the rating screen once the table arrives, if the player is still on it. */
 async function loadRating() {
   const board = app.querySelector<HTMLElement>('.rating-board')!;
@@ -254,7 +261,7 @@ async function loadRating() {
   const rows = players
     .map(
       (p, i) => `<li class="${sameName(p.name, name) ? 'me' : ''}"><span class="r-place">${i + 1}</span><span class="r-name">${esc(p.name)}</span>
-        <span class="r-score">${p.rating}</span><span class="r-wl">${p.wins}–${p.losses}</span></li>`,
+        <span class="r-deck">${deckEmblem(p.deck)}</span><span class="r-score">${p.rating}</span><span class="r-win">${p.wins}</span><span class="r-loss">${p.losses}</span></li>`,
     )
     .join('');
   const note = sameName(name, DEFAULT_NAME)
@@ -262,7 +269,7 @@ async function loadRating() {
     : 'Сетевые партии против людей. Партия засчитывается, когда результат пришлют оба игрока.';
   board.innerHTML = `${
     rows
-      ? `<div class="rating-head"><span class="r-place">#</span><span class="r-name">Игрок</span><span class="r-score">Рейтинг</span><span class="r-wl">П–П</span></div><ol class="rating-list">${rows}</ol>`
+      ? `<div class="rating-head"><span class="r-place">#</span><span class="r-name">Игрок</span><span class="r-deck">Колода</span><span class="r-score">Рейтинг</span><span class="r-win" title="Победы">${icon('win', 'П')}</span><span class="r-loss" title="Поражения">${icon('lose', 'Пр')}</span></div><ol class="rating-list">${rows}</ol>`
       : '<p class="wait">В рейтинге пока никого нет. Сыграйте сетевую партию!</p>'
   }<p class="rating-note">${note}</p>`;
   board.querySelector('.me')?.scrollIntoView({ block: 'nearest' });
