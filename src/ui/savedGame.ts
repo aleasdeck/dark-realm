@@ -3,7 +3,7 @@ import type { GameState } from '../engine/types';
 
 /*
  * The last unfinished game against the bot, kept in localStorage after every move, so
- * the main menu can offer «Продолжить игру» after a reload or a closed tab. One game at
+ * the «Играть» menu can offer «Продолжить игру» after a reload or a closed tab. One game at
  * a time: a new one takes its place, and a finished one is forgotten. The tutorial isn't kept.
  */
 

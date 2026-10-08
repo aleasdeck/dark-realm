@@ -142,21 +142,27 @@ const menuButton = (go: string, ic: string, label: string) => `<button class="me
 function menuBody(view: MenuView): string {
   switch (view) {
     case 'home':
-      // An unfinished game comes first, one tap away.
       return (
-        (savedBotGame() ? menuButton('continue', 'play_bot', 'Продолжить игру') : '') +
-        (savedMatch() ? menuButton('reconnect', 'join', 'Переподключение') : '') +
         menuButton('play', 'play_all', 'Играть') +
         menuButton('net', 'combo', 'Сетевая игра') +
         menuButton('rating', 'win', 'Рейтинг') +
         menuButton('settings', 'settings', 'Настройки')
       );
     case 'play':
-      return menuButton('tutorial', 'tutorial', 'Туториал') + menuButton('bot', 'play_bot', 'Против бота');
+      // An unfinished game comes first, one tap away.
+      return (
+        (savedBotGame() ? menuButton('continue', 'rematch', 'Продолжить игру') : '') +
+        menuButton('tutorial', 'tutorial', 'Туториал') +
+        menuButton('bot', 'play_bot', 'Против бота')
+      );
     case 'bot':
       return BOT_LEVELS.map((v) => menuButton(`level-${v}`, LEVEL_ICONS[v], LEVEL_NAMES[v])).join('');
     case 'net':
-      return menuButton('host', 'host', 'Создать комнату') + menuButton('join', 'join', 'Присоединиться');
+      return (
+        (savedMatch() ? menuButton('reconnect', 'combo', 'Переподключение') : '') +
+        menuButton('host', 'host', 'Создать комнату') +
+        menuButton('join', 'join', 'Присоединиться')
+      );
     case 'join':
       return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter">${withIcon('join', 'Войти')}</button></div>`;
     case 'nick':
@@ -180,8 +186,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     view = 'nick';
   }
   const v = MENU_VIEWS[view];
-  const more = view === 'home' && (savedBotGame() || savedMatch()) ? ' more' : '';
-  app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}${more}" data-view="${view}">
+  app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
     ${view === 'home' ? '<p class="subtitle">Карточная дуэль покровителей тёмного мира</p>' : `<h2 class="menu-title">${v.title}</h2>`}
     <div class="menu-buttons">${menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
@@ -223,7 +228,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
         return menu('', nickNext);
       }
       if (go === 'continue') return continueBotGame();
-      if (go === 'reconnect') return resume(false) || menu('Партия уже закончилась.');
+      if (go === 'reconnect') return resume(false) || menu('Партия уже закончилась.', 'net');
       if (go === 'tutorial') return startGame(new BotController(n, 'gentle'));
       if (go.startsWith('level-')) return startGame(new BotController(n, go.slice(6) as BotLevel));
       if (go === 'host') return host(n);
@@ -369,7 +374,7 @@ function forgetNetMatches() {
 /** The game against the bot left unfinished, where it was. */
 function continueBotGame() {
   const g = savedBotGame();
-  if (!g) return menu('Партия уже закончилась.');
+  if (!g) return menu('Партия уже закончилась.', 'play');
   startGame(new BotController(playerName(), g.level, g.state));
 }
 

@@ -6,7 +6,7 @@ import type { GameState } from '../engine/types';
  * in localStorage so a crashed or closed tab can come back too; the tab that played
  * also marks its side in sessionStorage, so two tabs of one browser (host and guest)
  * each come back to their own side. Only that tab goes back into the match by itself on a
- * reload; anywhere else the main menu offers «Переподключение».
+ * reload; anywhere else the «Сетевая игра» menu offers «Переподключение».
  */
 
 export type SavedMatch =
