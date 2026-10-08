@@ -34,6 +34,7 @@ import { themedScroll } from './ui/scroll';
 import { fullscreenSupported, isFullscreen, launchedFromIcon, onFullscreenChange, setFullscreen, showInstallHint } from './ui/fullscreen';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
+import { initDrag, restoreDrag } from './ui/drag';
 import { initFit } from './ui/fit';
 import { hideLoading, loadAll } from './ui/loading';
 import { savedBotGame } from './ui/savedGame';
@@ -334,6 +335,7 @@ function rulesHtml() {
     <li><b>Агенты</b> остаются на поле и действуют каждый ход. Агентов с провокацией надо сразить первыми, а в конце хода остаток силы сам бьёт по ним и только потом становится престижем.</li>
     <li><b>Контракты</b> срабатывают сразу при покупке и не попадают в колоду. Колода Сундука Бездны целиком из контрактов.</li>
     <li><b>Морок</b> (проклятие) надо разыграть раньше остальных карт в руке.</li>
+    <li>Чтобы сыграть карту, нажмите на неё дважды или задержите на ней палец и перетащите на свой стол.</li>
     <li>Нажмите на счётчик колоды или сброса, своего или соперника, чтобы посмотреть эти карты. Порядок колоды скрыт.</li>
     <li>За ход можно один раз воззвать к покровителю. Он становится благосклонен к вам, а если благоволил сопернику, то нейтрален. Ворон нейтрален только в начале игры: после вызова он сразу на вашей стороне.</li>
     <li>Победа: 40 ✦ и перевес после хода соперника, или сразу: 80 ✦ либо благосклонность всех 4 покровителей.</li>
@@ -464,6 +466,7 @@ function render() {
     savePlayed(app);
     app.innerHTML = boardHtml(s, me, { myTurn, idle, focus, pick }) + overlays(s);
     restorePlayed(app);
+    restoreDrag();
     animateChange(app, snap, prev, s, me);
     if (view) showZoom(view.html, view.label, view.can);
     // The enlarged card says what to do itself, so the coach steps aside for it.
@@ -912,6 +915,26 @@ document.addEventListener('keydown', (ev) => {
 
 // The played-cards columns scroll one card per wheel notch.
 initPlayed(app);
+
+// A hand card picked up with a short hold is played by dropping it on your table.
+initDrag(app, {
+  canPlay(uid, el) {
+    const s = ctrl?.state;
+    if (!s || s.phase !== 'play' || autoPlay || !hintAllows(hint, el)) return false;
+    const view = focusView(s, ctrl!.me, { kind: 'card', uid }, idleNow(s), tavernPick(s, ctrl!.me, selected));
+    return !!view?.can && view.action?.t === 'play';
+  },
+  lift() {
+    hideTooltip();
+    if (!focus) return;
+    focus = null;
+    render();
+  },
+  drop(uid) {
+    play('click');
+    ctrl?.dispatch({ t: 'play', uid });
+  },
+});
 
 // Card and patron details on hover (mouse) or long press (touch).
 initTooltips((el) => {

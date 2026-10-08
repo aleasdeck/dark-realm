@@ -1,6 +1,7 @@
 import { actingPlayer } from '../engine/engine';
 import type { AgentInPlay, GameState, PlayerIdx } from '../engine/types';
 import { cardMoves, STRIKE_GAP, agentHits, strikePause, type Move, type Place } from './moves';
+import { draggedCard } from './drag';
 import { richText, tileHtml } from './render';
 
 /**
@@ -100,6 +101,9 @@ export function snapshot(root: HTMLElement): Snapshot | null {
   const zoom = root.querySelector<HTMLElement>('.zoom[data-zoom-uid]');
   const big = zoom?.firstElementChild as HTMLElement | null;
   if (zoom && big) cards.set(Number(zoom.dataset.zoomUid), { el: big, box: boxOf(big) });
+  // So does a card dragged out of the hand and dropped on the table.
+  const carried = draggedCard();
+  if (carried) cards.set(carried.uid, { el: carried.el, box: boxOf(carried.el) });
   return { cards, backs: [...game.querySelectorAll('.opp-hand .back')].map(boxOf) };
 }
 
