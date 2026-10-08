@@ -1207,9 +1207,8 @@ button.menu-btn {
   margin-top: 2px;
   max-height: 2.1em;
   overflow: hidden;
-  /* fitNames() shrinks a name whose longest word is wider than the tile; soft hyphens are the last resort */
+  /* fitNames() in src/ui/fit.ts shrinks a name until its words fit whole; breaking a word is the last resort */
   max-width: 100%;
-  hyphens: manual;
   overflow-wrap: anywhere;
 }
 .t-fx {

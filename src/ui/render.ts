@@ -3,7 +3,7 @@ import { customCardArt, customEmblem } from '../art/custom';
 import { cardDef, PATRONS } from '../engine/cards';
 import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable, prestigeGoal } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
-import { esc, hyphenate, paintIcons, richText } from './rich';
+import { esc, paintIcons, richText } from './rich';
 import { icon } from './icons';
 import type { Action, AgentInPlay, Card, CardDef, Effect, GameState, PatronId, Pending, PlayerIdx } from '../engine/types';
 
@@ -136,7 +136,7 @@ export function tileHtml(id: string, o: CardOpts & { agent?: AgentInPlay } = {})
     ${def.type === 'curse' ? '' : `<span class="t-cost">${def.cost}</span>`}
     ${typeBadge(def)}
     ${hpBadge(def, o.agent)}
-    <span class="t-name">${hyphenate(esc(def.name))}</span>
+    <span class="t-name">${esc(def.name)}</span>
     <span class="t-fx">${shortFx(def)}</span>
   </div>`;
 }
