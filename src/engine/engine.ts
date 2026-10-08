@@ -10,13 +10,14 @@ import {
   TAVERN_SIZE,
 } from './cards';
 import { rngNext } from './rng';
-import { effectText } from './text';
+import { cards as nCards, effectText, ICON } from './text';
 import type {
   GameEvent,
   Action,
   AgentInPlay,
   Card,
   Effect,
+  EffectSource,
   GameState,
   Pending,
   PatronId,
@@ -128,10 +129,57 @@ function emit(s: GameState, e: GameEvent) {
   (s.events ??= []).push(e);
 }
 
+/** Journal lines that start with this are what the move above them led to, shown indented under it. */
+export const LOG_SUB = '  ';
+const LOG_MAX = 600;
+
 function log(s: GameState, msg: string) {
   s.log.push(msg);
-  if (s.log.length > 200) s.log.splice(0, s.log.length - 200);
+  if (s.log.length > LOG_MAX) s.log.splice(0, s.log.length - LOG_MAX);
+  open = null;
 }
+
+/** A consequence of the move above it in the journal. */
+const sub = (s: GameState, msg: string) => log(s, LOG_SUB + msg);
+
+/**
+ * The journal line the effects of one card are being added to ("… «Карта»: +2 ●, +1 ⚔"), by its source key.
+ * Any other line closes it. Reset by every applyAction, so the journal depends on the moves alone.
+ */
+let open: { key: string; bare: boolean; skip?: number } | null = null;
+/** The queued effect being resolved now, for the journal. */
+let resolving: QueuedEffect | null = null;
+
+const srcKey = (f: EffectSource | null) => (f ? `${f.src ?? ''}|${f.card ?? ''}|${f.tag ?? ''}` : '');
+
+/** Starts a line the following effects of `f` add to (a card play, a purchase, a patron call). */
+function head(s: GameState, msg: string, f: EffectSource | null = null) {
+  log(s, msg);
+  open = { key: srcKey(f), bare: true };
+}
+
+/** Writes what an effect gave: on the line of its card when that is the last one, otherwise on a new indented line. */
+function gave(s: GameState, text: string) {
+  const f = resolving;
+  const key = srcKey(f);
+  if (open && open.key === key && open.skip) {
+    open.skip--;
+    return;
+  }
+  if (open && open.key === key) {
+    s.log[s.log.length - 1] += (open.bare ? ': ' : ', ') + text;
+    open.bare = false;
+    return;
+  }
+  const card = f?.card && `«${name(f.card)}»`;
+  const lead = !card ? '' : f!.tag === 'combo' ? `Комбо ${card}: ` : f!.tag === 'trigger' ? `${card} срабатывает: ` : `${card}: `;
+  sub(s, lead + text);
+  open = { key, bare: false };
+}
+
+/** "«А», «Б»" */
+const names = (list: Card[]) => list.map((c) => `«${name(c.id)}»`).join(', ');
+const { coin: COIN, power: POW, prestige: PRE } = ICON;
 
 function refillDeck(s: GameState, p: PlayerState) {
   if (p.deck.length === 0 && p.cooldown.length > 0) {
@@ -175,7 +223,7 @@ function knockOut(s: GameState, owner: PlayerIdx, uid: number) {
   if (!a) return;
   release(s, owner, a);
   const card: Card = { uid: a.uid, id: a.id };
-  log(s, `${p.name}: агент «${name(a.id)}» сражён`);
+  sub(s, `${p.name} теряет агента «${name(a.id)}»`);
   emit(s, { k: 'knockout', p: owner, card: a.id });
   if (cardDef(a.id).type === 'contractAgent') s.tavernDeck.push(card);
   else toCooldown(s, owner, card);
@@ -208,7 +256,7 @@ function fire(s: GameState, pi: PlayerIdx, on: TriggerOn, card?: Card) {
     const tr = cardDef(c.id).trigger;
     if (!tr || tr.on !== on) continue;
     if (card && c.uid === card.uid && !tr.self) continue;
-    for (const e of tr.fx) now.push({ e, player: pi, src: c.uid });
+    for (const e of tr.fx) now.push({ e, player: pi, src: c.uid, card: c.id, tag: 'trigger' });
   }
   s.queue.unshift(...now);
 }
@@ -303,46 +351,55 @@ export function mustPlayCurse(p: PlayerState, id: string): boolean {
 }
 
 function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
+  const from: EffectSource | undefined = resolving ? { src: resolving.src, card: resolving.card, tag: resolving.tag } : undefined;
   const p = s.players[pi];
   const opp = s.players[other(pi)];
   switch (e.k) {
     case 'coin':
       p.coin += e.n;
-      return;
+      return gave(s, `+${e.n} ${COIN}`);
     case 'power':
       p.power += e.n;
-      return;
+      return gave(s, `+${e.n} ${POW}`);
     case 'prestige':
       p.prestige += e.n;
-      return;
-    case 'oppLosePrestige':
-      opp.prestige = Math.max(0, opp.prestige - e.n);
-      return;
-    case 'draw':
+      return gave(s, `+${e.n} ${PRE}`);
+    case 'oppLosePrestige': {
+      const lost = Math.min(opp.prestige, e.n);
+      opp.prestige -= lost;
+      return gave(s, `${opp.name} теряет ${lost} ${PRE}`);
+    }
+    case 'draw': {
+      const had = p.hand.length;
       drawCards(s, p, e.n);
-      return;
+      return gave(s, `берёт ${nCards(p.hand.length - had)}`);
+    }
     case 'oppDiscard':
       opp.pendingDiscard += e.n;
-      return;
+      return gave(s, `${opp.name} сбросит ${nCards(e.n)} в начале хода`);
     case 'patronCall':
       s.patronCalls += e.n;
-      return;
-    case 'create':
+      return gave(s, `+${e.n} призыв покровителя`);
+    case 'create': {
       for (let i = 0; i < e.n; i++) {
         const c = mk(s, e.card);
         if (e.to === 'oppCooldown') opp.cooldown.push(c);
         else if (e.to === 'hand') p.hand.push(c);
         else toCooldown(s, pi, c);
       }
-      return;
+      const where = e.to === 'oppCooldown' ? `в сброс соперника` : e.to === 'hand' ? 'в руку' : 'в свой сброс';
+      return gave(s, `«${name(e.card)}»${e.n > 1 ? ` ×${e.n}` : ''} ${where}`);
+    }
     case 'knockoutAll':
+      gave(s, 'сражает всех агентов на столе');
       for (const a of [...opp.agents]) knockOut(s, other(pi), a.uid);
       for (const a of [...p.agents]) knockOut(s, pi, a.uid);
       return;
     case 'setback': {
       const b = (opp.boon ??= { coin: 0, power: 0, draw: 0 });
       b[e.res] += e.n;
-      return;
+      const what = e.res === 'draw' ? `возьмёт ${nCards(e.n)}` : `получит +${e.n} ${e.res === 'coin' ? COIN : POW}`;
+      return gave(s, `${opp.name} ${what} в начале хода`);
     }
     case 'confine':
       return ask(s, {
@@ -391,6 +448,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
         min: 1,
         max: 1,
         data: e.options,
+        from,
       });
     case 'acquire':
       return ask(s, {
@@ -479,19 +537,21 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
 function runQueue(s: GameState) {
   while (!s.pending && s.queue.length > 0 && s.phase === 'play') {
     const q = s.queue.shift()!;
+    resolving = q;
     execEffect(s, q.e, q.player, q.src);
+    resolving = null;
   }
 }
 
-function enqueue(s: GameState, pi: PlayerIdx, effects: Effect[] | undefined, src?: number) {
+function enqueue(s: GameState, pi: PlayerIdx, effects: Effect[] | undefined, c?: Card, tag?: EffectSource['tag']) {
   if (!effects) return;
-  for (const e of effects) s.queue.push({ e, player: pi, src });
+  for (const e of effects) s.queue.push({ e, player: pi, ...(c && { src: c.uid, card: c.id }), ...(tag && { tag }) });
 }
 
 /** Records a play for combo purposes and queues the card effect plus any combos it unlocks. */
 function registerPlay(s: GameState, pi: PlayerIdx, c: Card) {
   const def = cardDef(c.id);
-  enqueue(s, pi, def.play, c.uid);
+  enqueue(s, pi, def.play, c);
   if (def.patron === 'neutral' || def.patron === 'treasury') return;
   s.turnPlays.push({ id: c.id, uid: c.uid, patron: def.patron, fired: [] });
   const count = s.turnPlays.filter((t) => t.patron === def.patron).length;
@@ -502,7 +562,7 @@ function registerPlay(s: GameState, pi: PlayerIdx, c: Card) {
     for (const tier of [2, 3, 4] as const) {
       if (combo[tier] && tier <= count && !tp.fired.includes(tier)) {
         tp.fired.push(tier);
-        enqueue(s, pi, combo[tier], tp.uid);
+        enqueue(s, pi, combo[tier], tp.uid === undefined ? undefined : { uid: tp.uid, id: tp.id }, 'combo');
       }
     }
   }
@@ -516,7 +576,7 @@ function druidChimera(s: GameState, pi: PlayerIdx, count: number) {
   if (count < need || s.chimeraTurn === s.turn) return;
   s.chimeraTurn = s.turn;
   toCooldown(s, pi, mk(s, 'druid_chimera'));
-  log(s, `${s.players[pi].name}: Олень дарует «Химеру»`);
+  sub(s, `${PATRONS.druid.name} дарует «${name('druid_chimera')}»`);
 }
 
 function resolvePending(s: GameState, picks: number[]) {
@@ -533,27 +593,35 @@ function resolvePending(s: GameState, picks: number[]) {
     case 'choice': {
       const branches = pend.data as Effect[][];
       const branch = branches[uniq[0]];
-      s.queue.unshift(...branch.map((e) => ({ e, player: pi })));
+      // The chosen branch is told as it was offered, and its effects don't repeat it.
+      const label = pend.options.find((o) => o.ref === uniq[0])!.label;
+      head(s, `${LOG_SUB}выбирает: ${label.charAt(0).toLowerCase()}${label.slice(1)}`, pend.from ?? null);
+      open!.bare = false;
+      open!.skip = branch.length;
+      s.queue.unshift(...branch.map((e) => ({ e, player: pi, ...pend.from })));
       break;
     }
     case 'acquire':
       for (const uid of uniq) {
         const c = removeByUid(s.tavern, uid)!;
-        gainCard(s, pi, c);
-        log(s, `${p.name} получает «${name(c.id)}»`);
+        head(s, `${LOG_SUB}получает из таверны «${name(c.id)}»`, { src: c.uid, card: c.id });
         emit(s, { k: 'gain', p: pi, card: c.id });
+        gainCard(s, pi, c);
       }
       refillTavern(s);
       break;
-    case 'toss':
-      for (const uid of uniq) toCooldown(s, pi, removeByUid(p.deck, uid)!);
+    case 'toss': {
+      const tossed = uniq.map((uid) => removeByUid(p.deck, uid)!);
+      if (tossed.length) sub(s, `сбрасывает с верха колоды ${names(tossed)}`);
+      for (const c of tossed) toCooldown(s, pi, c);
       break;
+    }
     case 'destroy':
     case 'treasury':
       for (const uid of uniq) {
         const c = removeByUid(p.played, uid) ?? removeByUid(p.hand, uid);
         if (!c) continue;
-        log(s, `${p.name} уничтожает «${name(c.id)}»`);
+        sub(s, `уничтожает «${name(c.id)}»${pend.kind === 'treasury' ? `, взамен «${name('writ')}» в свой сброс` : ''}`);
         emit(s, { k: 'destroy', p: pi, card: c.id });
       }
       if (pend.kind === 'treasury') toCooldown(s, pi, mk(s, 'writ'));
@@ -566,7 +634,7 @@ function resolvePending(s: GameState, picks: number[]) {
         if (!c) continue;
         const gain = Math.max(0, cardDef(c.id).cost - 1);
         p.prestige += gain;
-        log(s, `${p.name} жертвует «${name(c.id)}» Крысе: +${gain} ✦`);
+        sub(s, `жертвует «${name(c.id)}»: +${gain} ${PRE}`);
         emit(s, { k: 'destroy', p: pi, card: c.id });
       }
       break;
@@ -578,56 +646,77 @@ function resolvePending(s: GameState, picks: number[]) {
     case 'pelin':
       for (const uid of uniq) {
         const c = removeByUid(p.cooldown, uid);
-        if (c) p.deck.unshift(c);
+        if (!c) continue;
+        p.deck.unshift(c);
+        sub(s, `кладёт «${name(c.id)}» из сброса наверх колоды`);
       }
       break;
-    case 'replaceTavern':
-      for (const uid of uniq) s.tavernDeck.push(removeByUid(s.tavern, uid)!);
+    case 'replaceTavern': {
+      const out = uniq.map((uid) => removeByUid(s.tavern, uid)!);
+      s.tavernDeck.push(...out);
+      const was = new Set(s.tavern.map((c) => c.uid));
       refillTavern(s);
-      break;
-    case 'heal': {
-      const a = p.agents.find((x) => x.uid === uniq[0]);
-      if (a) a.dmg = Math.max(0, a.dmg - (pend.data as number));
+      if (out.length) sub(s, `убирает из таверны ${names(out)}; приходят ${names(s.tavern.filter((c) => !was.has(c.uid)))}`);
       break;
     }
-    case 'donate':
+    case 'heal': {
+      const a = p.agents.find((x) => x.uid === uniq[0]);
+      if (!a) break;
+      const before = a.dmg;
+      a.dmg = Math.max(0, a.dmg - (pend.data as number));
+      sub(s, `исцеляет «${name(a.id)}» на ${before - a.dmg}`);
+      break;
+    }
+    case 'donate': {
+      const gone = uniq.map((uid) => p.hand.find((c) => c.uid === uid)!);
+      if (gone.length) sub(s, `сбрасывает ${names(gone)} и берёт ${nCards(gone.length)}`);
       for (const uid of uniq) discardFromHand(s, pi, uid);
       drawCards(s, p, uniq.length);
       break;
+    }
     case 'confine': {
       const holder = p.agents.find((a) => a.uid === pend.data);
       const opp = s.players[other(pi)];
+      const taken: Card[] = [];
       for (const uid of uniq) {
         const c = removeByUid(opp.cooldown, uid)!;
+        taken.push(c);
         // The agent may have left play before its effect resolved: then nothing is confined.
         if (!holder) opp.cooldown.push(c);
         else (holder.confined ??= []).push(c);
       }
-      if (holder && uniq.length) log(s, `${p.name} заточает ${uniq.length} карт(ы) соперника`);
+      if (holder && taken.length) sub(s, `заточает под «${name(holder.id)}» ${names(taken)} из сброса соперника`);
       break;
     }
     case 'reprieve': {
       const opp = s.players[other(pi)];
-      for (const uid of uniq) opp.cooldown.push(removeByUid(opp.deck, uid)!);
+      for (const uid of uniq) {
+        const c = removeByUid(opp.deck, uid)!;
+        opp.cooldown.push(c);
+        sub(s, `отправляет «${name(c.id)}» с верха колоды соперника в его сброс`);
+      }
       break;
     }
     case 'bargain':
       for (const uid of uniq) {
         const c = removeByUid(s.tavern, uid)!;
+        sub(s, `получает из таверны «${name(c.id)}», ${s.players[other(pi)].name} тоже`);
         gainCard(s, pi, c);
         s.players[other(pi)].cooldown.push(mk(s, c.id));
-        log(s, `${p.name} получает «${name(c.id)}», соперник тоже`);
         emit(s, { k: 'gain', p: pi, card: c.id });
       }
       refillTavern(s);
       break;
     case 'selfDiscard':
     case 'discard':
-      for (const uid of uniq) discardFromHand(s, pi, uid);
       if (uniq.length) {
-        log(s, `${p.name} сбрасывает ${uniq.length} карт(ы)`);
+        const gone = names(uniq.map((uid) => p.hand.find((c) => c.uid === uid)!));
+        // A discard forced at the start of a turn is a move of its own; the patron's price belongs to the call.
+        if (pend.kind === 'discard') log(s, `${p.name} сбрасывает ${gone}`);
+        else sub(s, `сбрасывает ${gone}`);
         emit(s, { k: 'discard', p: pi, n: uniq.length });
       }
+      for (const uid of uniq) discardFromHand(s, pi, uid);
       break;
   }
   runQueue(s);
@@ -697,6 +786,9 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
   s.patronCalls--;
   s.patronsUsed.push(pid);
   log(s, `${p.name} взывает к покровителю «${PATRONS[pid].name}»`);
+  const line = s.log.length - 1;
+  const hand = p.hand.length;
+  const added = s.nextUid;
   emit(s, { k: 'patron', p: pi, patron: pid });
   // What the favor was before this call: several patrons pay out according to it.
   const was = s.favor[pid];
@@ -804,6 +896,14 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       }
       break;
   }
+  // What the call cost and gave goes on its journal line: "…: −3 ●, +2 ⚔".
+  const delta = (n: number, icon: string) => (n > 0 ? [`+${n} ${icon}`] : n < 0 ? [`−${-n} ${icon}`] : []);
+  const parts = [...delta(p.coin - undo.coin, COIN), ...delta(p.power - undo.power, POW)];
+  if (p.hand.length > hand) parts.push(`берёт ${nCards(p.hand.length - hand)}`);
+  for (const [pl, where] of [[p, 'в свой сброс'], [opp, 'в сброс соперника']] as const) {
+    for (const c of pl.cooldown) if (c.uid >= added) parts.push(`«${name(c.id)}» ${where}`);
+  }
+  if (parts.length && s.log.length - 1 === line) s.log[line] += `: ${parts.join(', ')}`;
   // A call that only opened a choice of known cards can still be taken back.
   if (s.pending && CANCELABLE.includes(pid)) s.pending.undo = undo;
 }
@@ -871,7 +971,7 @@ function tauntsAbsorbPower(s: GameState, pi: PlayerIdx) {
     const dmg = Math.min(p.power, hpLeft(a));
     p.power -= dmg;
     a.dmg += dmg;
-    log(s, `${p.name}: остаток силы бьёт «${name(a.id)}»: −${dmg}`);
+    log(s, `${p.name}: остаток силы бьёт «${name(a.id)}»: −${dmg}${hpLeft(a) > 0 ? ` (осталось ${hpLeft(a)})` : ''}`);
     emit(s, { k: 'attack', p: pi, card: a.id, n: dmg });
     if (hpLeft(a) <= 0) knockOut(s, foe, a.uid);
   }
@@ -915,7 +1015,7 @@ function endTurn(s: GameState) {
   s.queue = [];
   p.prestige += p.power;
   if (p.power > 0) {
-    log(s, `${p.name}: ${p.power} ⚔ → ✦`);
+    log(s, `${p.name}: остаток ${p.power} ${POW} → +${p.power} ${PRE}`);
     emit(s, { k: 'prestige', p: pi, n: p.power });
   }
   p.power = 0;
@@ -946,12 +1046,18 @@ function endTurn(s: GameState) {
     log(s, `${n.name} получает «${name(FAKE_COIN)}»`);
     emit(s, { k: 'gain', p: next, card: FAKE_COIN });
   }
-  if (s.favor.hunding === next) n.coin += 1; // Kenjar pays whoever kept his favor through the turn
+  if (s.favor.hunding === next) {
+    n.coin += 1; // Kenjar pays whoever kept his favor through the turn
+    log(s, `${n.name}: ${PATRONS.hunding.name} даёт +1 ${COIN}`);
+  }
   if (n.boon) {
-    n.coin += n.boon.coin;
-    n.power += n.boon.power;
-    drawCards(s, n, n.boon.draw);
+    const b = n.boon;
+    n.coin += b.coin;
+    n.power += b.power;
+    drawCards(s, n, b.draw);
     delete n.boon;
+    const got = [...(b.coin ? [`+${b.coin} ${COIN}`] : []), ...(b.power ? [`+${b.power} ${POW}`] : []), ...(b.draw ? [`берёт ${nCards(b.draw)}`] : [])];
+    if (got.length) log(s, `${n.name} получает расплату: ${got.join(', ')}`);
   }
   if (n.pendingDiscard > 0) {
     const k = n.pendingDiscard;
@@ -996,6 +1102,8 @@ export function mayDraft(s: GameState, pi: PlayerIdx, pid: PatronId): boolean {
 export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameState {
   const s = structuredClone(state) as GameState;
   s.events = [];
+  open = null;
+  resolving = null;
   if (a.t === 'concede') {
     if (s.phase === 'over') throw new RuleError('Игра окончена');
     finish(s, other(pi), 'соперник сдался');
@@ -1048,7 +1156,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
         p.played.push(c);
       }
       moved = c.id;
-      log(s, `${p.name} разыгрывает «${def.name}»`);
+      head(s, `${p.name} разыгрывает ${def.type === 'agent' ? 'агента ' : ''}«${def.name}»`, { src: c.uid, card: c.id });
       emit(s, { k: 'play', p: pi, card: c.id });
       registerPlay(s, pi, c);
       if (def.type === 'agent') fire(s, pi, 'agentPlay', c);
@@ -1059,7 +1167,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       if (!ag || ag.activated) throw new RuleError('Агент уже действовал');
       ag.activated = true;
       moved = ag.id;
-      log(s, `${p.name} применяет агента «${name(ag.id)}»`);
+      head(s, `${p.name} применяет агента «${name(ag.id)}»`, { src: ag.uid, card: ag.id });
       emit(s, { k: 'activate', p: pi, card: ag.id });
       registerPlay(s, pi, ag);
       fire(s, pi, 'agentPlay', ag);
@@ -1072,7 +1180,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       const dmg = Math.min(p.power, hpLeft(target));
       p.power -= dmg;
       target.dmg += dmg;
-      log(s, `${p.name} атакует «${name(target.id)}»: −${dmg}`);
+      log(s, `${p.name} атакует агента «${name(target.id)}»: −${dmg}${hpLeft(target) > 0 ? ` (осталось ${hpLeft(target)})` : ''}`);
       emit(s, { k: 'attack', p: pi, card: target.id, n: dmg });
       if (hpLeft(target) <= 0) knockOut(s, other(pi), target.uid);
       break;
@@ -1084,7 +1192,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       if (p.coin < def.cost) throw new RuleError('Не хватает монет');
       p.coin -= def.cost;
       removeByUid(s.tavern, c.uid);
-      log(s, `${p.name} покупает «${def.name}»`);
+      head(s, `${p.name} покупает ${def.type.startsWith('contract') ? 'контракт ' : ''}«${def.name}» за ${def.cost} ${COIN}`, { src: c.uid, card: c.id });
       emit(s, { k: 'buy', p: pi, card: c.id });
       if (pi === 0 && s.buyOnTop && !def.type.startsWith('contract')) {
         // Tutorial: the purchase comes straight into the next hand.

@@ -166,6 +166,18 @@ export interface Pending {
   undo?: PatronUndo;
   /** A card play that opened this choice can still be taken back: the game as it was before it. */
   revert?: PlayUndo;
+  /** The card whose effect opened the choice, so the journal can tell what the chosen branch gave. */
+  from?: EffectSource;
+}
+
+/** Where a queued effect came from, for the journal. */
+export interface EffectSource {
+  /** uid of the card the effect came from. */
+  src?: number;
+  /** Its card id, which outlives the card being destroyed before the effect resolves. */
+  card?: string;
+  /** A combo of an earlier card, or a "while in play" reaction. */
+  tag?: 'combo' | 'trigger';
 }
 
 export interface PlayUndo {
@@ -183,11 +195,9 @@ export interface PatronUndo {
   favor: PlayerIdx | null;
 }
 
-export interface QueuedEffect {
+export interface QueuedEffect extends EffectSource {
   e: Effect;
   player: PlayerIdx;
-  /** uid of the card the effect came from. */
-  src?: number;
 }
 
 export interface TurnPlay {
@@ -197,7 +207,7 @@ export interface TurnPlay {
   fired: number[];
 }
 
-/** What happened during the last applied action, for sounds and the opponent feed. */
+/** What happened during the last applied action, for sounds and animations. */
 export type GameEvent =
   | { k: 'draft'; p: PlayerIdx; patron: PatronId }
   | { k: 'play' | 'activate' | 'buy' | 'gain' | 'destroy'; p: PlayerIdx; card: string }

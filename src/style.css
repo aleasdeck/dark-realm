@@ -2230,7 +2230,7 @@ button.toggle[aria-pressed='true'] b {
 }
 .log-view .log {
   width: 100%;
-  max-height: 60dvh;
+  max-height: min(66dvh, calc(100dvh - 190px));
   overflow-y: auto;
   font-size: 14px;
   line-height: 1.5;
@@ -2240,12 +2240,55 @@ button.toggle[aria-pressed='true'] b {
   border-radius: 8px;
   padding: 8px 12px;
 }
-.log-view .log div:nth-child(odd) {
+/* a move, with whose it was in that side's colour; what it led to sits indented under it */
+.log-view .log .log-move {
+  margin-top: 3px;
+}
+.log-view .log .log-who {
+  font-weight: 700;
+}
+.log-view .log .log-me .log-who {
+  color: var(--you);
+}
+.log-view .log .log-opp .log-who {
+  color: var(--them);
+}
+.log-view .log div.log-sub {
+  padding-left: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.log-view .log b {
+  font-weight: 700;
+}
+/* a card's name: tapping it opens the card */
+.log-view .log .log-card {
+  display: inline;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: left;
+  cursor: pointer;
+}
+.log-view .log-sub .log-card {
+  color: #d9bb6c;
+}
+.log-view > .hint {
+  margin: -4px 0 8px;
+  font-size: 13px;
   color: var(--muted);
 }
 /* each turn opens with its number and the player, as a heading over that turn's moves */
 .log-view .log div.log-turn {
-  margin-top: 6px;
+  margin-top: 8px;
   padding-top: 4px;
   border-top: 1px solid var(--line);
   color: var(--gold);
@@ -2432,7 +2475,7 @@ button.toggle[aria-pressed='true'] b {
   }
 }
 
-/* ── opponent turn: banner, move feed, "thinking" dots ── */
+/* ── opponent turn: banner, "thinking" dots ── */
 .fx-layer {
   position: fixed;
   inset: 0;
@@ -2545,63 +2588,6 @@ button.toggle[aria-pressed='true'] b {
   }
 }
 
-/* sits over the hand, which is idle while the opponent moves */
-.feed {
-  position: absolute;
-  bottom: calc(max(6px, env(safe-area-inset-bottom)) + 112px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(94vw, 440px);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 5px;
-}
-.feed-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px 5px 5px;
-  min-height: 40px;
-  background: #1a0b0bf0;
-  border: 1px solid var(--them);
-  border-radius: 8px;
-  box-shadow: 0 4px 14px #000a;
-  font-size: 14px;
-  line-height: 1.2;
-  animation: feed-in 0.25s ease-out;
-  transition: opacity 0.4s, transform 0.4s;
-}
-.feed-item.out {
-  opacity: 0;
-  transform: translateY(6px);
-}
-.feed-item img {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border-radius: 4px;
-}
-.feed-item b {
-  color: var(--gold);
-  font-weight: 700;
-}
-.feed-item em {
-  font-style: normal;
-  font-weight: 700;
-}
-.feed-item .bad {
-  color: var(--them);
-}
-.feed-item .pre {
-  color: var(--prestige);
-}
-@keyframes feed-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.97);
-  }
-}
 /* the opponent's bar breathes while they move */
 .opp-bar.active {
   animation: their-turn 1.6s ease-in-out infinite;
@@ -2611,14 +2597,6 @@ button.toggle[aria-pressed='true'] b {
     box-shadow: 0 0 22px #ff3b2fbb;
   }
 }
-/* landscape: the feed stays over the middle of the fields, clear of the patron column */
-@media (orientation: landscape) and (max-height: 560px) {
-  .feed {
-    left: calc(50% - 50px);
-    width: min(60vw, 420px);
-  }
-}
-
 /* ── selected card: slides out enlarged, a second tap confirms ── */
 .zoom {
   position: fixed;
@@ -3155,4 +3133,13 @@ summary > img.ic {
 }
 .toss-coin.painted .moon img.ic {
   filter: drop-shadow(0 0 18px #ff6b5e55);
+}
+/* landscape: the journal takes the height the hint line would */
+@media (orientation: landscape) and (max-height: 560px) {
+  .log-view > .hint {
+    display: none;
+  }
+  .log-view .log {
+    max-height: calc(100dvh - 150px);
+  }
 }

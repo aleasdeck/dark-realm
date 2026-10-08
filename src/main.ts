@@ -36,6 +36,7 @@ import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { initDrag, restoreDrag } from './ui/drag';
 import { initFit } from './ui/fit';
+import { journalHtml } from './ui/journal';
 import { hideLoading, loadAll } from './ui/loading';
 import { savedBotGame } from './ui/savedGame';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
@@ -438,6 +439,9 @@ function render() {
   }
   const me = ctrl.me;
   const prev = lastState;
+  // The journal keeps its place while a card from it is open; otherwise it shows the latest moves.
+  const oldLog = app.querySelector('.log-view .log');
+  const logAt = oldLog && oldLog.scrollTop + oldLog.clientHeight < oldLog.scrollHeight - 8 ? oldLog.scrollTop : null;
   // Where the cards were, read before the board is redrawn, so the moved ones can fly.
   const snap = prev !== s ? snapshot(app) : null;
   onStateChange(prev, s, me);
@@ -475,7 +479,7 @@ function render() {
   if (!focus) animatedFocus = '';
   refreshTooltip();
   const log = app.querySelector('.log-view .log');
-  if (log) log.scrollTop = log.scrollHeight;
+  if (log) log.scrollTop = logAt ?? log.scrollHeight;
   continueAutoPlay(s);
 }
 
@@ -625,7 +629,8 @@ function overlays(s: GameState): string {
   if (modal?.kind === 'log') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
       <h2>Журнал партии</h2>
-      <div class="log">${s.log.map((l) => `<div${l.startsWith('Ход ') ? ' class="log-turn"' : ''}>${richText(l)}</div>`).join('')}</div>
+      <p class="hint">Нажмите на название карты, чтобы прочитать её</p>
+      <div class="log">${journalHtml(s, me)}</div>
       <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
@@ -647,7 +652,7 @@ function overlays(s: GameState): string {
     if (cards.length) html += pileSheet(`${modal.side === 'me' ? 'Вы разыграли' : 'Соперник разыграл'} за ход (${cards.length})`, cards);
     else modal = null;
   }
-  if (peek && (modal?.kind === 'pile' || modal?.kind === 'played' || (peek.ref !== undefined && s.pending?.player === me))) html += peekHtml(s.pending, peek);
+  if (peek && (modal?.kind === 'pile' || modal?.kind === 'played' || modal?.kind === 'log' || (peek.ref !== undefined && s.pending?.player === me))) html += peekHtml(s.pending, peek);
   else peek = null;
   return html;
 }
