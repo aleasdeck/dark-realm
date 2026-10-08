@@ -259,7 +259,16 @@ function fly(f: Flight) {
 
   let path: Keyframe[];
   let morphAt = 0.5;
-  if (!to) {
+  if (!to && f.show) {
+    // Comes to the middle of the table, shows itself and burns away there.
+    path = [
+      { transform: at(f.from), filter: 'none', opacity: 1, offset: 0 },
+      { transform: 'none', filter: 'none', opacity: 1, offset: 0.3, easing: 'linear' },
+      { transform: 'scale(1.03)', filter: 'none', opacity: 1, offset: 0.62 },
+      { transform: 'scale(1.12)', filter: 'brightness(1.8) sepia(.8) hue-rotate(-25deg)', opacity: 1, offset: 0.8 },
+      { transform: 'translateY(-14px) scale(.9)', filter: 'brightness(.4) sepia(1) hue-rotate(-40deg)', opacity: 0, offset: 1 },
+    ];
+  } else if (!to) {
     // Burns away where it is.
     path = [
       { transform: 'none', filter: 'none', opacity: 1 },
@@ -416,6 +425,8 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
   const pause = strikePause(hits.length);
   const dealt = prev.phase === 'draft';
   const resolvedContracts = new Set(next.events?.filter((e) => e.k === 'buy').map((e) => (e as { card: string }).card));
+  // Cards played from hand that left the game at once (a contract like the Fake Coin).
+  const playedNow = new Set(next.events?.filter((e) => e.k === 'play').map((e) => (e as { card: string }).card));
 
   interface End {
     box: Box;
@@ -504,11 +515,13 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
     if (from.zone === 'tavern' && to.zone === 'tdeck' && resolvedContracts.has(m.id)) dst = null;
     if (!src && !dst) return;
     const start: End = src ?? { box: show ? { ...show, w: show.w * 0.3, h: show.h * 0.3 } : dst!.box, look: tileLook(m.id) };
+    const resolved = from.zone === 'hand' && from.p === actor && to.zone === 'gone' && playedNow.has(m.id);
     const showcase =
-      theirs &&
-      show &&
-      to.p === actor &&
-      ((from.zone === 'hand' && (to.zone === 'played' || to.zone === 'agents')) || from.zone === 'tavern' || from.zone === 'gone');
+      !!show &&
+      (resolved ||
+        (theirs &&
+          to.p === actor &&
+          ((from.zone === 'hand' && (to.zone === 'played' || to.zone === 'agents')) || from.zone === 'tavern' || from.zone === 'gone')));
     const knocked = from.zone === 'agents' && to.zone !== 'agents';
 
     let delay = 0;
@@ -524,10 +537,11 @@ export function animateChange(root: HTMLElement, snap: Snapshot | null, prev: Ga
     delay += pause;
     if (showcase) dur = SHOW_MS;
     if (knocked) dur = 760;
-    if (!dst) dur = 620;
+    // Burns away; one shown in the middle of the table gets the time to be seen first.
+    if (!dst) dur = showcase ? SHOW_MS : 620;
 
     // Face down from start to finish (a draw into the opponent's hand, a reshuffle).
-    const hidden = !!start.faceDown && (!dst || !!dst.faceDown);
+    const hidden = !showcase && !!start.faceDown && (!dst || !!dst.faceDown);
     let look: HTMLElement;
     let end: HTMLElement | undefined;
     if (hidden) look = backLook();

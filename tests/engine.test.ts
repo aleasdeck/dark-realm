@@ -76,7 +76,9 @@ describe('engine', () => {
     expect(s.events).toContainEqual({ k: 'gain', p: 1, card: 'fake_coin' });
     s = applyAction(s, 1, { t: 'play', uid: fake.uid });
     expect(s.players[1].coin).toBe(1);
-    expect(s.players[1].played.map((c) => c.uid)).toContain(fake.uid);
+    // Like a contract, it resolves and is gone: not among the played cards, not in hand.
+    expect(s.players[1].played.some((c) => c.uid === fake.uid)).toBe(false);
+    expect(s.players[1].hand.some((c) => c.uid === fake.uid)).toBe(false);
     s = applyAction(s, 1, { t: 'end' });
     const p = s.players[1];
     const owned = [...p.deck, ...p.hand, ...p.played, ...p.cooldown, ...p.agents];
