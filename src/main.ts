@@ -158,8 +158,8 @@ function menuBody(view: MenuView): string {
     case 'rating':
       return `<div class="rating-board">${ratingUrl() ? '<p class="wait">Загружаем…</p>' : '<p class="wait">Таблица рейтинга ещё не подключена.</p>'}</div>`;
     case 'settings':
-      return `<label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}" autocomplete="nickname"></label>
-        <div class="settings">${settingsRows()}</div>
+      return `${scrolling(`<label class="field">Ваше имя <input id="name" maxlength="24" value="${esc(playerName())}" autocomplete="nickname"></label>
+        <div class="settings">${settingsRows()}</div>`)}
         ${menuButton('rules', 'rules', 'Правила')}`;
   }
 }
@@ -175,7 +175,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
     ${view === 'home' ? '<p class="subtitle">Карточная дуэль покровителей тёмного мира</p>' : `<h2 class="menu-title">${v.title}</h2>`}
-    <div class="menu-buttons">${view === 'settings' ? scrolling(menuBody(view)) : menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
+    <div class="menu-buttons">${menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
   </div>`;
   const nameInput = app.querySelector<HTMLInputElement>('#name');
