@@ -10,7 +10,7 @@ import type { GameState } from '../engine/types';
  */
 
 export type SavedMatch =
-  | { role: 'host'; code: string; name: string; client: string | null; state: GameState; at: number }
+  | { role: 'host'; code: string; name: string; client: string | null; state: GameState; seq?: number; at: number }
   | { role: 'guest'; code: string; name: string; at: number };
 
 const KEY = { host: 'dr-net-host', guest: 'dr-net-guest' } as const;

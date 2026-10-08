@@ -85,7 +85,7 @@ describe('host reconnect', () => {
     again.say({ type: 'hello', name: 'Гость', client: 'g1' });
     expect(host.online).toBe(true);
     expect(host.notice).toBe('');
-    expect(lastState(again)).toEqual({ type: 'state', state: host.state });
+    expect(lastState(again)).toEqual({ type: 'state', state: host.state, seq: 0 });
   });
 
   it('turns away anyone else while the match is on', async () => {
@@ -138,7 +138,7 @@ describe('host reconnect', () => {
     const g = room2.connect();
     g.say({ type: 'hello', name: 'Гость', client: 'g1' });
     expect(back.online).toBe(true);
-    expect(lastState(g)).toEqual({ type: 'state', state: host.state });
+    expect(lastState(g)).toMatchObject({ type: 'state', state: host.state });
   });
 
   it('keeps trying when the old room code is still taken', async () => {

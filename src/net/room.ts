@@ -1,5 +1,5 @@
 import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
-import type { Action, GameState, PatronId } from '../engine/types';
+import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 
 /*
  * Serverless rooms: the host registers a PeerJS id derived from the room code
@@ -8,15 +8,24 @@ import type { Action, GameState, PatronId } from '../engine/types';
  *
  * Both sides ping each other, so a link that silently died (a reloaded or
  * crashed page, a phone that dropped off the network) is noticed within
- * seconds. The host keeps its room open for the whole match, and the guest
+ * seconds. Moves travel on their own, not as whole states (see src/net/sync.ts). The host keeps its room open for the whole match, and the guest
  * comes back to it by connecting again and saying hello with the same client id.
  */
 
 export type NetMessage =
-  /** `patrons`: the locked patrons the guest has opened, added to the draft by the host. */
-  | { type: 'hello'; name: string; client?: string; patrons?: PatronId[] }
-  | { type: 'state'; state: GameState }
-  | { type: 'action'; action: Action }
+  /**
+   * `patrons`: the locked patrons the guest has opened, added to the draft by the host.
+   * `v`: the move protocol the guest speaks (LOCKSTEP); without it the host sends a whole state after every move.
+   */
+  | { type: 'hello'; name: string; client?: string; patrons?: PatronId[]; v?: number }
+  /** The whole game; `seq` counts the moves made in it so far. */
+  | { type: 'state'; state: GameState; seq?: number }
+  /** A guest's move; `seq` is the move count of the state the guest made it in. */
+  | { type: 'action'; action: Action; seq?: number }
+  /** A move the host has applied, either player's: the move count after it and the state's fingerprint. */
+  | { type: 'move'; by: PlayerIdx; action: Action; seq: number; hash: number }
+  /** The guest's copy of the game went astray: the host sends the whole state. */
+  | { type: 'sync' }
   | { type: 'error'; message: string }
   /** The host turns this connection away; the guest gives up and goes back to the menu. */
   | { type: 'reject'; message: string }
