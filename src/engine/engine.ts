@@ -1152,9 +1152,10 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       const def = cardDef(c.id);
       if (def.type === 'agent') {
         p.agents.push({ ...c, dmg: 0, activated: true });
-      } else {
+      } else if (def.type !== 'contractAction') {
         p.played.push(c);
       }
+      // A contract played from hand (the Fake Coin) resolves like a bought one and leaves the game.
       moved = c.id;
       head(s, `${p.name} разыгрывает ${def.type === 'agent' ? 'агента ' : ''}«${def.name}»`, { src: c.uid, card: c.id });
       emit(s, { k: 'play', p: pi, card: c.id });
