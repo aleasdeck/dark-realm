@@ -1048,12 +1048,12 @@ button.menu-btn {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
 }
-/* a bare emblem without a plaque; a coloured halo round it says whose side the patron is on */
+/* a bare emblem without a plaque: it glows while you can call it and is dimmed otherwise;
+   the colour of the name says whose side the patron is on */
 .patron {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* room for the gold "can call" ring between the emblem and the name */
   gap: 6px;
   min-width: 0;
   cursor: pointer;
@@ -1066,10 +1066,6 @@ button.menu-btn {
   position: relative;
   width: calc(var(--emb) * 1.5);
   height: calc(var(--emb) * 1.5);
-  border-radius: 50%;
-  transition:
-    background 0.35s,
-    box-shadow 0.35s;
 }
 .p-track img {
   display: block;
@@ -1077,46 +1073,38 @@ button.menu-btn {
   height: 100%;
   border-radius: 50%;
 }
-/* a hand-drawn emblem is dark on a transparent backdrop: a rim of the patron's glow keeps it readable on the dark table */
-.p-track img:not([src^='data:']),
+/* a hand-drawn emblem is dark on a transparent backdrop: a rim of the patron's glow keeps it readable */
 .draft-tile img:not([src^='data:']),
 .tp-head img:not([src^='data:']) {
   filter: drop-shadow(0 0 2px var(--glow));
 }
-.patron.fav-mine .p-track {
-  background: radial-gradient(circle, #2f9a55 0%, #1a5a32 70%);
-  box-shadow:
-    0 0 0 2px var(--you),
-    0 0 12px var(--you);
+/* the glow follows the emblem's own outline, so there is no ring round it */
+.patrons .p-track img {
+  filter: brightness(0.42) saturate(0.5);
+  transition: filter 0.35s;
 }
-.patron.fav-theirs .p-track {
-  background: radial-gradient(circle, #a83a30 0%, #5e1c18 70%);
-  box-shadow:
-    0 0 0 2px var(--them),
-    0 0 12px var(--them);
+.patron.can .p-track img {
+  filter: drop-shadow(0 0 2px var(--gold)) drop-shadow(0 0 6px var(--gold)) drop-shadow(0 0 14px #f0c86099);
+}
+.patron.focused:not(.can) .p-track img {
+  filter: brightness(0.8) drop-shadow(0 0 3px var(--glow));
 }
 .p-name {
   font-family: var(--title-font);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.1;
-  color: var(--glow);
+  color: var(--text);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* gold, so "can call now" never reads as green "on your side"; offset so it rings the side halo */
-.patron.can .p-track {
-  outline: 2px solid var(--gold);
-  outline-offset: 3px;
+.patron.fav-mine .p-name {
+  color: var(--you);
 }
-.patron.can:not(.fav-mine, .fav-theirs) .p-track {
-  box-shadow: 0 0 12px #f0c860aa;
-}
-.patron.focused .p-track {
-  outline: 2px solid var(--glow);
-  outline-offset: 3px;
+.patron.fav-theirs .p-name {
+  color: var(--them);
 }
 /* the treasury is a clearly larger medallion between the two sides; it has no name under it, so it takes that height too */
 .patron.chest {
@@ -1126,16 +1114,14 @@ button.menu-btn {
   width: var(--disc);
   height: var(--disc);
 }
-.chest .p-track img {
-  filter: drop-shadow(0 2px 3px #000);
+.patrons .chest .p-track img {
+  filter: brightness(0.42) saturate(0.5) drop-shadow(0 2px 3px #000);
 }
-.patron.chest.can .p-track {
-  outline: none;
-  box-shadow: 0 0 10px #f0c860cc;
+.patrons .patron.chest.can .p-track img {
+  filter: drop-shadow(0 0 3px var(--gold)) drop-shadow(0 0 8px var(--gold)) drop-shadow(0 0 18px #f0c86099);
 }
-.patron.chest.focused .p-track {
-  outline: 2px solid var(--glow);
-  outline-offset: 0;
+.patrons .patron.chest.focused:not(.can) .p-track img {
+  filter: brightness(0.8) drop-shadow(0 0 3px var(--glow));
 }
 
 .tavern {
