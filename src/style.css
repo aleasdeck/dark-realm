@@ -1479,6 +1479,12 @@ button.menu-btn {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.controls .pick-cancel {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
 
 /* the opponent's name over their hand shows only when the phone is held sideways (see below) */
 .oh-name {

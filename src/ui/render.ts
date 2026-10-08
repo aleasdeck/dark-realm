@@ -1,7 +1,7 @@
 import { artUrl, patronEmblemUrl, type Subject } from '../art';
 import { customCardArt, customEmblem } from '../art/custom';
 import { cardDef, PATRONS } from '../engine/cards';
-import { attackable, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable, prestigeGoal } from '../engine/engine';
+import { attackable, canCancel, draftedBy, hpLeft, mustPlayCurse, other, patronAvailable, prestigeGoal } from '../engine/engine';
 import { cardLines, PATRON_RULES, TYPE_NAMES } from '../engine/text';
 import { esc, paintIcons, richText } from './rich';
 import { icon } from './icons';
@@ -363,7 +363,12 @@ export function boardHtml(
     <footer class="controls">
       <button class="icon" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
       <button class="icon" data-act="log" aria-label="Журнал партии">${icon('log', '📜')}</button>
-      <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">${icon('play_all', '▶▶')}</button>
+      ${
+        // A card's tavern pick can be taken back: «Отмена» stands in for «play all», which can't be used then anyway.
+        pick && canCancel(s, me)
+          ? `<button class="ghost pick-cancel" data-act="cancel">${endLabel('cancel', 'Отмена')}</button>`
+          : `<button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">${icon('play_all', '▶▶')}</button>`
+      }
       ${pick ? pickButton(pick) : `<button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? endLabel('end_turn', 'Конец хода') : endLabel('opponent_turn', 'Ход соперника')}</button>`}
     </footer>
   </div>`;

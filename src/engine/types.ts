@@ -164,6 +164,16 @@ export interface Pending {
   data?: unknown;
   /** A patron call that opened this choice can still be called off: what it took, to give back. */
   undo?: PatronUndo;
+  /** A card play that opened this choice can still be taken back: the game as it was before it. */
+  revert?: PlayUndo;
+}
+
+export interface PlayUndo {
+  /** The card played from hand or the agent used. */
+  card: string;
+  act: 'play' | 'activate';
+  /** The game before the move, without its log and events. */
+  state: GameState;
 }
 
 export interface PatronUndo {
@@ -194,6 +204,8 @@ export type GameEvent =
   | { k: 'attack'; p: PlayerIdx; card: string; n: number }
   | { k: 'knockout'; p: PlayerIdx; card: string }
   | { k: 'patron' | 'cancel'; p: PlayerIdx; patron: PatronId }
+  /** A card play or an agent's use taken back from its choice. */
+  | { k: 'unplay'; p: PlayerIdx; card: string; act: 'play' | 'activate' }
   | { k: 'discard'; p: PlayerIdx; n: number }
   | { k: 'prestige'; p: PlayerIdx; n: number }
   | { k: 'turn'; p: PlayerIdx }
@@ -252,7 +264,7 @@ export type Action =
   | { t: 'buy'; uid: number }
   | { t: 'patron'; patron: PatronId }
   | { t: 'choose'; picks: number[] }
-  /** Calls off the patron whose choice is open: nothing is spent. */
+  /** Calls off the patron or takes back the card whose choice is open: nothing is spent. */
   | { t: 'cancel' }
   | { t: 'end' }
   | { t: 'concede' };

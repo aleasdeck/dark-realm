@@ -607,7 +607,7 @@ function overlays(s: GameState): string {
         })
         .join('');
       const ok = selected.size >= p.min && selected.size <= p.max;
-      // A patron call that only opened this choice can be called off: nothing is spent.
+      // A patron call or a card that only opened this choice can be called off: nothing is spent.
       const cancel = canCancel(s, me) ? `<button class="ghost" data-act="cancel">${withIcon('cancel', 'Отмена')}</button>` : '';
       const done =
         single && p.min > 0
@@ -848,6 +848,8 @@ app.addEventListener('click', (ev) => {
     case 'confirm':
       return ctrl.dispatch({ t: 'choose', picks: [...selected] });
     case 'cancel':
+      // A card taken back goes to the hand: «play all» stops rather than play it again.
+      autoPlay = false;
       return ctrl.dispatch({ t: 'cancel' });
     case 'inspect':
       return tapFocus({ kind: 'card', uid });
