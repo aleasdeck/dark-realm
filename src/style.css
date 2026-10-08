@@ -2591,7 +2591,6 @@ button.toggle[aria-pressed='true'] b {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  cursor: pointer;
   filter: drop-shadow(0 12px 24px #000);
 }
 .zoom .card.big {
@@ -2612,10 +2611,14 @@ button.toggle[aria-pressed='true'] b {
   color: var(--muted);
   white-space: nowrap;
 }
-.zoom.can .zoom-act {
+/* the only way to act on a selected card: a real button under it */
+button.zoom-act {
+  font-size: 16px;
+  padding: 9px 22px;
   background: linear-gradient(#3fb468, #237a43);
   border-color: var(--green-glow);
   color: #04120a;
+  box-shadow: 0 2px 0 #000, 0 0 14px #4fd17a66;
 }
 .patron-zoom .tip-patron {
   width: min(280px, 86vw);

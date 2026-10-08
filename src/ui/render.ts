@@ -372,17 +372,17 @@ export function boardHtml(
 export interface FocusView {
   /** Enlarged card or patron panel. */
   html: string;
-  /** Text on the confirm strip under it; empty when there is nothing to do. */
+  /** Text on the button under it, or why there is none; empty when there is nothing to say. */
   label: string;
-  /** Whether a second tap performs the action. */
+  /** Whether the button under it performs the action. */
   can: boolean;
   action: Action | null;
-  /** During a tavern refresh a second tap marks or unmarks this card instead of an action. */
+  /** During a tavern refresh the button marks or unmarks this card instead of an action. */
   mark?: number;
 }
 
 /**
- * What a selected card or patron shows when it slides out enlarged, and what a second tap does.
+ * What a selected card or patron shows when it slides out enlarged, and what its button does.
  * Returns null once the target has left the table.
  */
 export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, pick: TavernPick | null = null): FocusView | null {
@@ -393,7 +393,7 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, 
     const can = patronAvailable(s, me, t.patron);
     return {
       html: patronTipHtml(s, me, t.patron),
-      label: pick ? waitPick : can ? 'Нажмите ещё раз: воззвать' : 'Сейчас воззвать нельзя',
+      label: pick ? waitPick : can ? 'Воззвать' : 'Сейчас воззвать нельзя',
       can,
       action: { t: 'patron', patron: t.patron },
     };
@@ -422,29 +422,29 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, 
     if (kind === 'replaceTavern') {
       const marked = pick.marked.has(uid);
       if (!marked && pick.marked.size >= pick.pending.max) return view(card.id, `Отмечено уже ${pick.marked.size}`, false, null);
-      return { ...view(card.id, marked ? 'Нажмите ещё раз: оставить' : 'Нажмите ещё раз: заменить', true, null), mark: uid };
+      return { ...view(card.id, marked ? 'Оставить' : 'Заменить', true, null), mark: uid };
     }
-    const label = kind === 'bargain' ? 'Ещё раз: взять, соперник получит копию' : 'Нажмите ещё раз: взять бесплатно';
+    const label = kind === 'bargain' ? 'Взять, соперник получит копию' : 'Взять бесплатно';
     return view(card.id, label, true, { t: 'choose', picks: [uid] });
   }
   if (inHand) {
     const curseFirst = mustPlayCurse(you, inHand.id);
-    const label = !idle ? 'Сейчас не ваш ход' : curseFirst ? 'Сначала разыграйте «Морок»' : 'Нажмите ещё раз: сыграть';
+    const label = !idle ? 'Сейчас не ваш ход' : curseFirst ? 'Сначала разыграйте «Морок»' : 'Сыграть';
     return view(inHand.id, label, idle && !curseFirst, { t: 'play', uid });
   }
   if (inTavern) {
     const cost = cardDef(inTavern.id).cost;
     const ok = idle && you.coin >= cost;
-    return view(inTavern.id, ok ? `Нажмите ещё раз: купить за ${cost} ●` : `Нужно ${cost} ●, у вас ${you.coin}`, ok, { t: 'buy', uid });
+    return view(inTavern.id, ok ? `Купить за ${cost} ●` : `Нужно ${cost} ●, у вас ${you.coin}`, ok, { t: 'buy', uid });
   }
   if (mine) {
     const ok = idle && !mine.activated;
-    return view(mine.id, mine.activated ? 'Уже действовал в этот ход' : ok ? 'Нажмите ещё раз: применить' : 'Сейчас не ваш ход', ok, { t: 'activate', uid }, mine);
+    return view(mine.id, mine.activated ? 'Уже действовал в этот ход' : ok ? 'Применить' : 'Сейчас не ваш ход', ok, { t: 'activate', uid }, mine);
   }
   if (theirs) {
     const can = idle && you.power > 0 && attackable(s, me).some((a) => a.uid === uid);
     const dmg = Math.min(you.power, hpLeft(theirs));
-    const label = can ? `Нажмите ещё раз: атаковать, −${dmg} ⚔` : you.power > 0 && idle ? 'Сначала агенты с провокацией' : 'Нужна сила для атаки';
+    const label = can ? `Атаковать, −${dmg} ⚔` : you.power > 0 && idle ? 'Сначала агенты с провокацией' : 'Нужна сила для атаки';
     return view(theirs.id, label, can, { t: 'attack', uid }, theirs);
   }
   if (played) return view(played.id, '', false, null);
