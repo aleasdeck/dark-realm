@@ -30,6 +30,7 @@ import {
 } from './ui/render';
 import { hideTooltip, initTooltips, refreshTooltip } from './ui/tooltip';
 import { icon, withIcon } from './ui/icons';
+import { themedScroll } from './ui/scroll';
 import { fullscreenSupported, isFullscreen, launchedFromIcon, onFullscreenChange, setFullscreen, showInstallHint } from './ui/fullscreen';
 import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from './ui/motion';
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
@@ -174,7 +175,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
     ${view === 'home' ? '<p class="subtitle">Карточная дуэль покровителей тёмного мира</p>' : `<h2 class="menu-title">${v.title}</h2>`}
-    <div class="menu-buttons">${menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
+    <div class="menu-buttons">${view === 'settings' ? scrolling(menuBody(view)) : menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
     ${message ? `<p class="msg">${esc(message)}</p>` : ''}
   </div>`;
   const nameInput = app.querySelector<HTMLInputElement>('#name');
@@ -219,6 +220,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     }),
   );
   if (view === 'rating' && ratingUrl()) loadRating();
+  themedScroll(app);
 }
 
 /** Fills the rating screen once the table arrives, if the player is still on it. */
@@ -271,7 +273,7 @@ function settingsRows() {
 function showSettings() {
   const box = document.createElement('div');
   box.className = 'overlay sheet-wrap';
-  box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2><div class="settings">${settingsRows()}</div>
+  box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2>${scrolling(`<div class="settings">${settingsRows()}</div>`)}
     <div class="sheet-actions"><button data-close>${withIcon('confirm', 'Готово')}</button></div></div>`;
   box.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
@@ -285,6 +287,12 @@ function showSettings() {
     if (t === box || t.closest('[data-close]')) box.remove();
   });
   document.body.appendChild(box);
+  themedScroll(box);
+}
+
+/** Wraps a list that may not fit a small screen, so it scrolls with the game's scroll bar (src/ui/scroll.ts). */
+function scrolling(html: string) {
+  return `<div class="tscroll"><div class="tscroll-body">${html}</div></div>`;
 }
 
 function rulesHtml() {
