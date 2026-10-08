@@ -16,7 +16,8 @@ function plural(n: number, one: string, few: string, many: string): string {
 export const ICON = { coin: '●', power: '⚔', prestige: '✦' } as const;
 const { coin: COIN, power: POW, prestige: PRE } = ICON;
 
-const cards = (n: number) => `${n} ${plural(n, 'карту', 'карты', 'карт')}`;
+/** "1 карту", "3 карты", "5 карт". */
+export const cards = (n: number) => `${n} ${plural(n, 'карту', 'карты', 'карт')}`;
 
 export function effectText(e: Effect): string {
   switch (e.k) {
