@@ -7,6 +7,7 @@ import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '../net/room';
 import { newMatchId, rateGame, type RatingStatus } from '../net/rating';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
+import { LOCKSTEP, stateHash } from '../net/sync';
 import { forgetBotGame, saveBotGame } from './savedGame';
 import { strikePause } from './moves';
 import { draftPool, recordGame, unlockedPatrons } from './unlocks';
@@ -269,6 +270,7 @@ const HELLO_MS = 15000;
  * The room's host runs the game. The room stays open for the whole match: a guest who
  * drops out comes back by connecting again, and only the guest who joined gets in.
  * The match is saved after every move, so a reloaded host page opens the same room again.
+ * The guest gets the whole state when it joins and then each move on its own.
  */
 export class HostController extends Controller {
   readonly me: PlayerIdx = 0;
@@ -277,6 +279,10 @@ export class HostController extends Controller {
   ready = false;
   /** The guest's connection, while they are in the room. */
   private link: Link | null = null;
+  /** The guest plays the moves on its own copy of the game; an older guest gets the whole state each time. */
+  private lockstep = false;
+  /** Moves made in this match so far. */
+  private seq = 0;
   /** The guest who joined this match. */
   private client: string | null = null;
   private room: HostedRoom | null = null;
@@ -290,12 +296,13 @@ export class HostController extends Controller {
     private playerName: string,
     readonly code: string,
     private openRoom: OpenRoom,
-    saved?: { client: string | null; state: GameState },
+    saved?: { client: string | null; state: GameState; seq?: number },
   ) {
     super();
     if (saved) {
       this.state = saved.state;
       this.client = saved.client;
+      this.seq = saved.seq ?? 0;
     }
     this.notice = saved ? 'Восстанавливаем комнату…' : 'Открываем комнату…';
     this.open();
@@ -363,18 +370,29 @@ export class HostController extends Controller {
       // The same guest on a new connection: the old one is stale.
       if (this.link !== link) this.link?.close();
       this.link = link;
+      this.lockstep = (m.v ?? 0) >= LOCKSTEP;
       this.notice = '';
-      this.broadcast();
+      this.sendState();
+      this.save();
+      this.emit();
       return;
     }
     if (link !== this.link) return;
     if (m.type === 'action' && this.state) {
+      // A move made in a state the host has moved on from: the guest's copy is behind, so it gets the real one.
+      if (m.seq !== undefined && m.seq !== this.seq) return this.sendState();
+      let next: GameState;
       try {
-        this.state = applyAction(this.state, 1, m.action);
-        this.broadcast();
+        next = applyAction(this.state, 1, m.action);
       } catch (e) {
         link.send({ type: 'error', message: e instanceof Error ? e.message : 'Ошибка' });
+        // The guest has already played it on its copy: that copy goes back to the host's.
+        if (this.lockstep) this.sendState();
+        return;
       }
+      this.commit(next, 1, m.action);
+    } else if (m.type === 'sync') {
+      this.sendState();
     } else if (m.type === 'bye') {
       link.close();
       this.link = null;
@@ -389,21 +407,33 @@ export class HostController extends Controller {
     this.emit();
   }
 
-  private broadcast() {
+  private sendState() {
+    if (this.state) this.link?.send({ type: 'state', state: this.state, seq: this.seq });
+  }
+
+  /** A move is made: the guest hears of it, and the match is saved as it now stands. */
+  private commit(s: GameState, by: PlayerIdx, action: Action) {
+    this.state = s;
+    this.seq++;
+    if (this.lockstep) this.link?.send({ type: 'move', by, action, seq: this.seq, hash: stateHash(s) });
+    else this.sendState();
+    this.save();
+    this.emit();
+  }
+
+  private save() {
     const s = this.state;
     if (!s) return;
-    this.link?.send({ type: 'state', state: s });
     if (s.phase === 'over') forgetMatch('host');
-    else saveMatch({ role: 'host', code: this.code, name: this.playerName, client: this.client, state: s, at: Date.now() });
-    this.emit();
+    else saveMatch({ role: 'host', code: this.code, name: this.playerName, client: this.client, state: s, seq: this.seq, at: Date.now() });
   }
 
   dispatch(a: Action) {
     if (!this.state) return;
     try {
-      this.state = applyAction(this.state, this.me, a);
+      const next = applyAction(this.state, this.me, a);
       this.error = '';
-      this.broadcast();
+      this.commit(next, this.me, a);
     } catch (e) {
       if (!(e instanceof RuleError)) throw e;
       this.error = e.message;
@@ -427,9 +457,19 @@ export class HostController extends Controller {
   }
 }
 
+/** A move the guest has made on its copy and sent, not yet confirmed by the host. */
+interface Unconfirmed {
+  action: Action;
+  /** The move count of the state it was made in. */
+  seq: number;
+}
+
 /**
- * The guest plays on the host's state. A lost link is tried again until the host is back,
- * and a reloaded guest page comes back to the room it played in.
+ * The guest plays on its own copy of the host's game: its moves show at once, without
+ * waiting for the host, and the host's moves arrive one by one and are played on the copy
+ * too. The host's word is final: a fingerprint that doesn't match, or a move the host
+ * turned down, brings the whole state over again. A lost link is tried again until the
+ * host is back, and a reloaded guest page comes back to the room it played in.
  */
 export class GuestController extends Controller {
   readonly me: PlayerIdx = 1;
@@ -441,6 +481,17 @@ export class GuestController extends Controller {
   private joined: boolean;
   /** The host left the match on purpose: there is nothing to come back to. */
   private hostLeft = false;
+  /** The game as the host last confirmed it, and how many moves it holds. */
+  private confirmed: GameState | null = null;
+  private seq = 0;
+  /** The guest's own moves on top of `confirmed` that the host hasn't confirmed yet; `state` shows them made. */
+  private unconfirmed: Unconfirmed[] = [];
+  /** The host speaks in moves; an older host sends the whole state after each one, so the guest waits for it. */
+  private lockstep = false;
+  /** The guest asked for the whole state and ignores moves until it comes. */
+  private syncing = false;
+  /** The next whole state is the first on a new link: moves made before the link was lost are sent again. */
+  private fresh = false;
   private tries = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
@@ -487,20 +538,26 @@ export class GuestController extends Controller {
     if (this.disposed) return link.close();
     this.link = link;
     this.tries = 0;
-    link.send({ type: 'hello', name: this.playerName, client: clientId(), patrons: unlockedPatrons() });
+    this.fresh = true;
+    this.syncing = false;
+    link.send({ type: 'hello', name: this.playerName, client: clientId(), patrons: unlockedPatrons(), v: LOCKSTEP });
     if (!this.state) this.notice = 'Ждём начала игры…';
     this.emit();
   }
 
   private onMessage(link: Link, m: NetMessage) {
     if (m.type === 'state') {
-      this.state = m.state;
+      this.resync(link, m.state, m.seq);
       this.live = true;
       this.joined = true;
       this.notice = '';
-      this.error = '';
-      if (m.state.phase === 'over') forgetMatch('guest');
-      else saveMatch({ role: 'guest', code: this.code, name: this.playerName, at: Date.now() });
+      // An older host's state means the move went through; a host speaking in moves sends
+      // the state after an error too, and the error should stay up.
+      if (!this.lockstep) this.error = '';
+      this.keep();
+    } else if (m.type === 'move') {
+      if (!this.onMove(link, m)) return;
+      this.keep();
     } else if (m.type === 'error') {
       this.error = m.message;
     } else if (m.type === 'reject') {
@@ -518,6 +575,70 @@ export class GuestController extends Controller {
       this.notice = 'Хозяин комнаты покинул партию.';
     }
     this.emit();
+  }
+
+  /**
+   * The host's whole state. On a new link the guest's unconfirmed moves the host never got
+   * are made again on it and sent again; otherwise the host's state stands as it is. When
+   * it shows what the table already shows, the table is left alone, so nothing plays twice.
+   */
+  private resync(link: Link, state: GameState, seq: number | undefined) {
+    this.lockstep = seq !== undefined;
+    this.syncing = false;
+    this.confirmed = state;
+    this.seq = seq ?? 0;
+    let shown = state;
+    const resend = this.fresh && this.lockstep ? this.unconfirmed.filter((u) => u.seq >= this.seq) : [];
+    this.fresh = false;
+    this.unconfirmed = [];
+    for (const u of resend) {
+      try {
+        shown = applyAction(shown, this.me, u.action);
+      } catch {
+        break;
+      }
+      const sent = { action: u.action, seq: this.seq + this.unconfirmed.length };
+      this.unconfirmed.push(sent);
+      link.send({ type: 'action', ...sent });
+    }
+    if (!this.state || stateHash(shown) !== stateHash(this.state)) this.state = shown;
+  }
+
+  /** A move the host made or confirmed; false when nothing changed on the table. */
+  private onMove(link: Link, m: Extract<NetMessage, { type: 'move' }>): boolean {
+    if (this.syncing) return false;
+    const ask = () => {
+      this.syncing = true;
+      link.send({ type: 'sync' });
+      return false;
+    };
+    if (!this.confirmed || m.seq !== this.seq + 1) return ask();
+    let next: GameState;
+    try {
+      next = applyAction(this.confirmed, m.by, m.action);
+    } catch {
+      return ask();
+    }
+    const hash = stateHash(next);
+    if (hash !== m.hash) return ask();
+    this.confirmed = next;
+    this.seq = m.seq;
+    const own = this.unconfirmed[0];
+    if (m.by === this.me && own && JSON.stringify(own.action) === JSON.stringify(m.action)) {
+      // The guest's own move, as it already shows on the table.
+      this.unconfirmed.shift();
+      if (this.unconfirmed.length || (this.state && stateHash(this.state) === hash)) return false;
+    }
+    // The host's move: the table moves on to it.
+    this.unconfirmed = [];
+    this.state = next;
+    return true;
+  }
+
+  /** The guest saves just the room it plays in, while the match is on. */
+  private keep() {
+    if (this.state?.phase === 'over') forgetMatch('guest');
+    else saveMatch({ role: 'guest', code: this.code, name: this.playerName, at: Date.now() });
   }
 
   private lost() {
@@ -543,7 +664,22 @@ export class GuestController extends Controller {
   }
 
   dispatch(a: Action) {
-    if (this.live) this.link?.send({ type: 'action', action: a });
+    if (!this.live || !this.link) return;
+    // An older host: the move goes to it and shows when its state comes back.
+    if (!this.lockstep || !this.state) return this.link.send({ type: 'action', action: a });
+    try {
+      this.state = applyAction(this.state, this.me, a);
+      this.error = '';
+    } catch (e) {
+      if (!(e instanceof RuleError)) throw e;
+      this.error = e.message;
+      return this.emit();
+    }
+    const sent = { action: a, seq: this.seq + this.unconfirmed.length };
+    this.unconfirmed.push(sent);
+    this.link.send({ type: 'action', ...sent });
+    this.keep();
+    this.emit();
   }
 
   suspend() {
