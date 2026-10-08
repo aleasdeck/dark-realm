@@ -1108,11 +1108,10 @@ button.menu-btn {
 .patron.can .p-name {
   filter: none;
 }
-/* whose side the patron is on: a soft light from that player's edge of the frame,
-   the opponent's from the top, yours from the bottom */
+/* whose side the patron is on: a thin line at that player's edge, the opponent's at the top,
+   yours at the bottom; held sideways it always stands on the left and only its colour tells */
 .patrons .patron {
   position: relative;
-  isolation: isolate;
 }
 .patron.fav-mine {
   --side: var(--you);
@@ -1120,39 +1119,19 @@ button.menu-btn {
 .patron.fav-theirs {
   --side: var(--them);
 }
-.patron.fav-mine::before,
-.patron.fav-theirs::before,
 .patron.fav-mine::after,
 .patron.fav-theirs::after {
   content: '';
   position: absolute;
   left: 50%;
-  pointer-events: none;
-  z-index: -1;
-}
-/* a thin line at that edge, with a faint glow spreading from it toward the patron */
-.patron.fav-mine::before,
-.patron.fav-theirs::before {
   translate: -50% 0;
-  width: 90%;
-  height: 55%;
-  opacity: 0.3;
-}
-.patron.fav-mine::before {
-  bottom: -3px;
-  background: radial-gradient(ellipse 50% 100% at 50% 100%, var(--side), transparent);
-}
-.patron.fav-theirs::before {
-  top: -3px;
-  background: radial-gradient(ellipse 50% 100% at 50% 0%, var(--side), transparent);
-}
-.patron.fav-mine::after,
-.patron.fav-theirs::after {
-  translate: -50% 0;
-  width: 60%;
-  height: 1px;
+  width: 70%;
+  height: 2px;
+  border-radius: 2px;
   background: linear-gradient(90deg, transparent, var(--side), transparent);
-  box-shadow: 0 0 4px var(--side);
+  box-shadow: 0 0 6px var(--side);
+  opacity: 0.85;
+  pointer-events: none;
 }
 .patron.fav-mine::after {
   bottom: -3px;
@@ -1647,6 +1626,17 @@ button.menu-btn {
   .patron.chest {
     --emb: inherit;
     gap: 4px;
+  }
+  .patron.fav-mine::after,
+  .patron.fav-theirs::after {
+    top: 50%;
+    bottom: auto;
+    /* just left of the emblem */
+    left: calc(50% - var(--emb) * 0.75 - 7px);
+    translate: 0 -50%;
+    width: 2px;
+    height: 70%;
+    background: linear-gradient(180deg, transparent, var(--side), transparent);
   }
   /* your hand fills the corner left of your bar and the controls; the cards run off the bottom
      edge of the screen, showing the cost and the art (a tap enlarges the card anyway) */
