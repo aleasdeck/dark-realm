@@ -21,6 +21,7 @@ import type {
   Pending,
   PatronId,
   PatronUndo,
+  PendingKind,
   PlayerIdx,
   PlayerState,
   QueuedEffect,
@@ -810,9 +811,9 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
 /** Patrons whose choice shows nothing hidden, so backing out of it gives nothing away. */
 const CANCELABLE: PatronId[] = ['treasury', 'hlaalu', 'pelin', 'psijic'];
 
-/** Whether `pi` may call off the patron whose choice is open now. */
+/** Whether `pi` may call off the patron or take back the card whose choice is open now. */
 export function canCancel(s: GameState, pi: PlayerIdx): boolean {
-  return s.phase === 'play' && s.pending?.player === pi && !!s.pending.undo;
+  return s.phase === 'play' && s.pending?.player === pi && !!(s.pending.undo || s.pending.revert);
 }
 
 /** Calls off the patron: what it took comes back, and the call for this turn is not used. */
@@ -828,6 +829,34 @@ function cancelPatron(s: GameState, pi: PlayerIdx) {
   s.pending = null;
   log(s, `${p.name} передумывает взывать к «${PATRONS[undo.patron].name}»`);
   emit(s, { k: 'cancel', p: pi, patron: undo.patron });
+}
+
+/** Choices that show cards nobody has seen: backing out of them would be a free peek. */
+const REVEALING: PendingKind[] = ['toss', 'reprieve'];
+
+const uids = (cards: Card[]) => cards.map((c) => c.uid).join();
+
+/**
+ * Whether the choice open now can still lead back to `before`: since then no card was drawn,
+ * no deck shuffled or looked at and no new card came into the tavern.
+ */
+function nothingRevealed(before: GameState, s: GameState): boolean {
+  const p = s.pending;
+  if (!p || p.player !== s.current || p.undo || REVEALING.includes(p.kind) || s.rng !== before.rng) return false;
+  if (uids(s.tavern) !== uids(before.tavern)) return false;
+  return ([0, 1] as const).every((pi) => uids(s.players[pi].deck) === uids(before.players[pi].deck));
+}
+
+/** Takes back the card whose choice is open: the game goes back to how it was before the card was played. */
+function takeBack(s: GameState, pi: PlayerIdx) {
+  const r = s.pending?.revert;
+  if (!r || !canCancel(s, pi)) throw new RuleError('Этот выбор отменить нельзя');
+  const { log: lines, events } = s;
+  for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
+  Object.assign(s, r.state, { log: lines, events });
+  const what = r.act === 'play' ? 'разыгрывать' : 'применять агента';
+  log(s, `${s.players[pi].name} передумывает ${what} «${name(r.card)}»`);
+  emit(s, { k: 'unplay', p: pi, card: r.card, act: r.act });
 }
 
 // ── turn flow ────────────────────────────────────────────
@@ -989,16 +1018,22 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
 
   if (s.pending) {
     if (a.t === 'cancel') {
-      cancelPatron(s, pi);
+      if (s.pending.revert) takeBack(s, pi);
+      else cancelPatron(s, pi);
       return s;
     }
     if (a.t !== 'choose') throw new RuleError('Сначала сделайте выбор');
+    // The card's next choice can still take it back, as long as nothing hidden came to light.
+    const revert = s.pending.revert;
     resolvePending(s, a.picks);
+    if (revert && nothingRevealed(revert.state, s)) s.pending!.revert = revert;
     checkInstantWin(s);
     return s;
   }
   if (!idle(s, pi)) throw new RuleError('Подождите');
   const p = s.players[pi];
+  // The card played or the agent used: its choice may take the move back.
+  let moved: string | null = null;
 
   switch (a.t) {
     case 'play': {
@@ -1012,6 +1047,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       } else {
         p.played.push(c);
       }
+      moved = c.id;
       log(s, `${p.name} разыгрывает «${def.name}»`);
       emit(s, { k: 'play', p: pi, card: c.id });
       registerPlay(s, pi, c);
@@ -1022,6 +1058,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       const ag = p.agents.find((x) => x.uid === a.uid);
       if (!ag || ag.activated) throw new RuleError('Агент уже действовал');
       ag.activated = true;
+      moved = ag.id;
       log(s, `${p.name} применяет агента «${name(ag.id)}»`);
       emit(s, { k: 'activate', p: pi, card: ag.id });
       registerPlay(s, pi, ag);
@@ -1067,6 +1104,9 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       throw new RuleError('Недопустимое действие');
   }
   runQueue(s);
+  if (moved && nothingRevealed(state, s)) {
+    s.pending!.revert = { card: moved, act: a.t as 'play' | 'activate', state: structuredClone({ ...state, log: [], events: [] }) };
+  }
   checkInstantWin(s);
   return s;
 }
