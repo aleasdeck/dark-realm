@@ -8,7 +8,7 @@ import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { DEFAULT_NAME, flushReports, ratingLine, ratingUrl, sameName, topPlayers, type RatedPlayer } from './net/rating';
-import { forgetMatch, savedMatch } from './net/saved';
+import { forgetMatch, leaveTab, savedMatch } from './net/saved';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
 import { closeCoin, coinFace, showCoin } from './ui/coin';
 import { clearFx, onStateChange } from './ui/feed';
@@ -36,6 +36,7 @@ import { animateChange, clearMotion, motionOn, setMotion, snapshot, still } from
 import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { initFit } from './ui/fit';
 import { hideLoading, loadAll } from './ui/loading';
+import { savedBotGame } from './ui/savedGame';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
 
@@ -96,8 +97,12 @@ function roomLink(code: string) {
 
 // ── screens ──────────────────────────────────────────────
 
-function leaveGame(message = '') {
-  ctrl?.dispose();
+/** Back to the menu; `keep` leaves the match saved, to continue or reconnect from the menu. */
+function leaveGame(message = '', keep = false) {
+  if (keep) {
+    ctrl?.suspend();
+    leaveTab();
+  } else ctrl?.dispose();
   ctrl = null;
   autoPlay = false;
   modal = null;
@@ -137,7 +142,10 @@ const menuButton = (go: string, ic: string, label: string) => `<button class="me
 function menuBody(view: MenuView): string {
   switch (view) {
     case 'home':
+      // An unfinished game comes first, one tap away.
       return (
+        (savedBotGame() ? menuButton('continue', 'play_bot', 'Продолжить игру') : '') +
+        (savedMatch() ? menuButton('reconnect', 'join', 'Переподключение') : '') +
         menuButton('play', 'play_all', 'Играть') +
         menuButton('net', 'combo', 'Сетевая игра') +
         menuButton('rating', 'win', 'Рейтинг') +
@@ -172,7 +180,8 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     view = 'nick';
   }
   const v = MENU_VIEWS[view];
-  app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
+  const more = view === 'home' && (savedBotGame() || savedMatch()) ? ' more' : '';
+  app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}${more}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
     ${view === 'home' ? '<p class="subtitle">Карточная дуэль покровителей тёмного мира</p>' : `<h2 class="menu-title">${v.title}</h2>`}
     <div class="menu-buttons">${menuBody(view)}${view === 'home' ? '' : menuButton('back', 'back', 'Назад')}</div>
@@ -213,6 +222,8 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
         nickAsked = true;
         return menu('', nickNext);
       }
+      if (go === 'continue') return continueBotGame();
+      if (go === 'reconnect') return resume(false) || menu('Партия уже закончилась.');
       if (go === 'tutorial') return startGame(new BotController(n, 'gentle'));
       if (go.startsWith('level-')) return startGame(new BotController(n, go.slice(6) as BotLevel));
       if (go === 'host') return host(n);
@@ -324,6 +335,7 @@ function waiting(text: string, extra = '') {
 }
 
 function host(name: string) {
+  forgetNetMatches();
   startGame(new HostController(name, newRoomCode(), hostRoom));
 }
 
@@ -344,12 +356,29 @@ function roomScreen(code: string) {
 
 function join(name: string, code: string) {
   if (!code) return menu('Введите код комнаты.', 'join');
+  forgetNetMatches();
   startGame(new GuestController(code, name, joinRoom));
 }
 
-/** A network match this page was playing before a reload or a crash picks up where it was. */
-function resume(): boolean {
-  const m = savedMatch();
+/** A new network game: an unfinished one is left for good. */
+function forgetNetMatches() {
+  forgetMatch('host');
+  forgetMatch('guest');
+}
+
+/** The game against the bot left unfinished, where it was. */
+function continueBotGame() {
+  const g = savedBotGame();
+  if (!g) return menu('Партия уже закончилась.');
+  startGame(new BotController(playerName(), g.level, g.state));
+}
+
+/**
+ * A network match picks up where it was: on its own when this tab played it before a reload
+ * or a crash, or from «Переподключение» in the menu.
+ */
+function resume(thisTab = true): boolean {
+  const m = savedMatch(thisTab);
   if (!m) return false;
   // A link to another room means the player is off to a new game.
   const linked = roomFromUrl();
@@ -498,7 +527,7 @@ function draftHtml(s: GameState): string {
       .map((pi) => `<div><b>${coin(pi)}${esc(s.players[pi].name)}</b><span class="picks">${picks(pi)}</span></div>`)
       .join('')}</div>
     <div class="draft-tiles">${tiles}</div>
-    <button class="ghost" data-act="leave">${withIcon('back', 'Выйти')}</button>
+    <button class="ghost" data-act="exit">${withIcon('back', 'Выйти')}</button>
   </div>`;
 }
 
@@ -522,7 +551,7 @@ function netOverlay(s: GameState): string {
   if (ctrl instanceof GuestController && ctrl.offline) {
     return `<div class="overlay"><div class="dialog reconnect"><h2>Нет связи</h2>
       <p class="wait">${esc(ctrl.notice)}</p>
-      <div class="buttons"><button class="ghost" data-act="leave">${withIcon('back', 'В меню')}</button></div></div></div>`;
+      <div class="buttons"><button class="ghost" data-act="exit">${withIcon('back', 'В меню')}</button></div></div></div>`;
   }
   if (ctrl instanceof HostController && !ctrl.online) return `<div class="toast away">${esc(ctrl.notice)}</div>`;
   return '';
@@ -590,6 +619,7 @@ function overlays(s: GameState): string {
         <button data-act="log">${withIcon('log', 'Журнал партии')}</button>
         <button data-act="rules">${withIcon('rules', 'Правила')}</button>
         <button data-act="settings">${withIcon('settings', 'Настройки')}</button>
+        <button data-act="exit">${withIcon('menu', 'Выйти в меню')}</button>
         <button class="danger" data-act="concede">${withIcon('concede', 'Сдаться')}</button>
         <button class="ghost" data-act="close">${withIcon('back', 'Вернуться к игре')}</button>
       </div></div></div>`;
@@ -732,6 +762,7 @@ app.addEventListener('click', (ev) => {
   const act = el.dataset.act!;
   const uid = Number(el.dataset.uid);
   if (act === 'leave') return leaveGame();
+  if (act === 'exit') return leaveGame('', true);
   if (act === 'rematch' && ctrl instanceof BotController) {
     if (ctrl.tutorial) coach = new Coach();
     tossed = false;

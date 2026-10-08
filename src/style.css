@@ -315,6 +315,23 @@ button.menu-btn {
   background: #07110bcc;
   text-align: center;
 }
+/* «Продолжить игру» and «Переподключение» on top of the home screen: a smaller icon and tighter buttons, so it still fits */
+.menu.home.more .logo img {
+  width: min(66vw, 26dvh, 280px);
+}
+@media (max-height: 700px) and (orientation: portrait) {
+  .menu.home.more button.menu-btn {
+    padding-block: 9px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu.home.more .logo img {
+    width: min(38vw, 58dvh, 240px);
+  }
+  .menu.home.more button.menu-btn {
+    padding-block: 8px;
+  }
+}
 /* the rating screen: the table scrolls inside it, the screen itself never does */
 .menu[data-view='rating'] {
   height: 100dvh;
@@ -2030,12 +2047,13 @@ button.menu-btn {
 .settings-sheet .settings {
   width: 100%;
 }
-/* phones on their side: the game's settings switches in two columns */
+/* phones on their side: the game's settings switches and the game menu's buttons in two columns */
 @media (max-height: 500px) and (orientation: landscape) {
   .settings-sheet .tscroll {
     width: min(100%, 560px);
   }
-  .settings-sheet .settings {
+  .settings-sheet .settings,
+  .menu-sheet .sheet-actions.column {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
