@@ -20,8 +20,8 @@
   --them: #ff6b5e;
   /* fonts.css: 'DR Digits' gives every font the same Piazzolla numbers */
   --title-font: 'DR Digits', 'Alegreya SC', Georgia, serif;
-  --text-font: 'DR Digits', 'Alegreya', Georgia, serif;
-  --narrow-font: 'DR Digits', 'Alegreya Sans', system-ui, sans-serif;
+  --text-font: 'DR Digits', 'Spectral', Georgia, serif;
+  --narrow-font: 'DR Digits', 'Fira Sans Extra Condensed', system-ui, sans-serif;
   /* tile width: fits five in a row and scales with the screen height */
   /* five tiles across the tavern frame, which leaves the block names a gutter on its left */
   --tw: min(calc((min(100vw, 860px) - 70px) / 5), 12.5dvh, 124px);
@@ -1207,9 +1207,9 @@ button.menu-btn {
   margin-top: 2px;
   max-height: 2.1em;
   overflow: hidden;
-  /* a long word wraps inside the tile instead of spilling past its edges */
+  /* a long word breaks inside the tile at a syllable (soft hyphens from hyphenate()), never past its edges */
   max-width: 100%;
-  hyphens: auto;
+  hyphens: manual;
   overflow-wrap: anywhere;
 }
 .t-fx {
