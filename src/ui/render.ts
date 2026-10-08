@@ -362,6 +362,7 @@ export function boardHtml(
     <button class="icon corner-menu" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
     <footer class="controls">
       <button class="icon" data-act="menu" aria-label="Меню">${icon('menu', '☰')}</button>
+      <button class="icon" data-act="log" aria-label="Журнал партии">${icon('log', '📜')}</button>
       <button class="icon" data-act="play-all" ${opts.idle && you.hand.length ? '' : 'disabled'} aria-label="Сыграть всё">${icon('play_all', '▶▶')}</button>
       ${pick ? pickButton(pick) : `<button class="end" data-act="end" ${opts.idle ? '' : 'disabled'}>${opts.myTurn ? endLabel('end_turn', 'Конец хода') : endLabel('opponent_turn', 'Ход соперника')}</button>`}
     </footer>

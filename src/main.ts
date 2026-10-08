@@ -567,7 +567,7 @@ function overlays(s: GameState): string {
   if (modal?.kind === 'log') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
       <h2>Журнал партии</h2>
-      <div class="log">${s.log.map((l) => `<div>${richText(l)}</div>`).join('')}</div>
+      <div class="log">${s.log.map((l) => `<div${l.startsWith('Ход ') ? ' class="log-turn"' : ''}>${richText(l)}</div>`).join('')}</div>
       <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
@@ -736,7 +736,7 @@ app.addEventListener('click', (ev) => {
     return render();
   }
   if (!s) return;
-  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'played', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
+  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'log', 'played', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':

@@ -2041,6 +2041,18 @@ button.toggle[aria-pressed='true'] b {
 .log-view .log div:nth-child(odd) {
   color: var(--muted);
 }
+/* each turn opens with its number and the player, as a heading over that turn's moves */
+.log-view .log div.log-turn {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+  color: var(--gold);
+  font-weight: 700;
+}
+.log-view .log div.log-turn:first-child {
+  margin-top: 0;
+  border-top: 0;
+}
 .dialog {
   background: var(--panel2);
   border: 1px solid var(--line2);
