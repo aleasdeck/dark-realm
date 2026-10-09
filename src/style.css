@@ -223,7 +223,8 @@ button.menu-btn {
 .menu .settings {
   width: 100%;
 }
-.menu button.toggle {
+.menu button.toggle,
+.menu .vol-row {
   background: #07110b99;
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -250,7 +251,8 @@ button.menu-btn {
   .menu .settings {
     gap: 6px;
   }
-  .menu button.toggle {
+  .menu button.toggle,
+  .menu .vol-row {
     padding-block: 8px;
   }
 }
@@ -289,7 +291,8 @@ button.menu-btn {
   .menu .settings {
     gap: 6px;
   }
-  .menu button.toggle {
+  .menu button.toggle,
+  .menu .vol-row {
     padding-block: 7px;
   }
   .menu .field input {
@@ -2121,7 +2124,23 @@ button.menu-btn {
   .settings-sheet .settings,
   .menu-sheet .sheet-actions.column {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* half a sheet is too narrow for a caption and a slider: the icon tells which is which */
+  .settings-sheet .vol-row .t-label {
+    min-width: 0;
+  }
+  .settings-sheet .vol-row .t-label > span {
+    display: none;
+  }
+}
+/* the same on the smallest phones on their side, in the main menu */
+@media (max-height: 500px) and (max-width: 700px) and (orientation: landscape) {
+  .menu .vol-row .t-label {
+    min-width: 0;
+  }
+  .menu .vol-row .t-label > span {
+    display: none;
   }
 }
 .install-hint p,
@@ -2192,6 +2211,49 @@ button.toggle[aria-pressed='true'] b {
   background: var(--green);
   border-color: var(--green-glow);
   color: #04120a;
+}
+/* volume: a slider between the caption and the level */
+.vol-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 17px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  line-height: normal;
+  color: var(--text);
+}
+.vol-row .t-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  flex: none;
+  min-width: 6.2em;
+}
+.vol-row .t-label img.ic {
+  width: 26px;
+  height: 26px;
+}
+.vol-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  height: 24px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+.vol-row b {
+  flex: none;
+  min-width: 52px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  /* as tall as the switches' badges, though digits come from a taller font */
+  line-height: 19px;
+  text-align: center;
+  background: #07110b;
+  border: 1px solid var(--line);
 }
 .options {
   display: flex;
