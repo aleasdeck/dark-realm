@@ -114,7 +114,7 @@ export const PATRONS: Record<PatronId, PatronDef> = {
   treasury: {
     id: 'treasury',
     name: 'Сундук Бездны',
-    title: 'Нейтральный покровитель',
+    title: 'Нейтральный владыка',
     palette: { bg1: '#0a0a0a', bg2: '#262019', accent: '#7d6a4d', glow: '#e8c98a' },
   },
 };
@@ -175,7 +175,7 @@ export const CARDS: CardDef[] = [
   { id: 'hlaalu_embassy', name: 'Посольство мёртвых', patron: 'hlaalu', cost: 8, type: 'action', copies: 1, play: [coin(7)], combo: { 2: [acquire(7)] }, art: 'castle', seed: 42 },
   { id: 'hlaalu_oathman', name: 'Присягнувший счетовод', patron: 'hlaalu', cost: 6, type: 'agent', hp: 2, copies: 2, play: [coin(2)], combo: { 2: [acquire(6)] }, art: 'scales', seed: 43 },
 
-  // ── Волк (Saint Pelin): сила и агенты с провокацией ──────
+  // ── Волк (Saint Pelin): сила и наймиты с провокацией ──────
   { id: 'pelin_starter', name: 'Клятва стража', patron: 'pelin', cost: 0, type: 'starter', copies: 0, play: [power(1)], art: 'shield', seed: 51 },
   { id: 'pelin_portcullis', name: 'Ржавая решётка', patron: 'pelin', cost: 2, type: 'action', copies: 3, play: [power(2)], combo: { 2: [coin(1)] }, art: 'gate', seed: 54 },
   { id: 'pelin_reinforce', name: 'Подкрепление из склепа', patron: 'pelin', cost: 3, type: 'action', copies: 1, play: [coin(2)], combo: { 2: [power(2)], 3: [power(1)] }, art: 'ghost', seed: 52 },
@@ -275,7 +275,7 @@ export const CARDS: CardDef[] = [
   { id: 'hunding_herald', name: 'Вестник клинков', patron: 'hunding', cost: 6, type: 'agent', hp: 3, copies: 2, play: [refresh(2)], combo: { 2: [power(1)] }, art: 'banner', seed: 182 },
   { id: 'hunding_fall', name: 'Падение крепости', patron: 'hunding', cost: 6, type: 'action', copies: 2, play: [pick([power(4)], [refresh(3)])], combo: { 2: [power(2)] }, art: 'castle', seed: 183 },
 
-  // ── Олень (Druid King): карты, уходящие в сброс, кормят агентов ──
+  // ── Олень (Druid King): карты, уходящие в сброс, кормят наймитов ──
   { id: 'druid_herbs', name: 'Обрядовые травы', patron: 'druid', cost: 0, type: 'starter', copies: 0, play: [coin(1)], art: 'potion', seed: 191 },
   { id: 'druid_ritual', name: 'Обряд глухой чащи', patron: 'druid', cost: 4, type: 'action', copies: 2, play: [power(2)], combo: { 2: [replaceTavern(1)], 3: [prestige(3)] }, art: 'altar', seed: 192 },
   {
@@ -332,7 +332,7 @@ export const CARDS: CardDef[] = [
   { id: 'mora_seeker', name: 'Ищущий тайн', patron: 'mora', cost: 5, type: 'contractAgent', hp: 2, copies: 1, play: [destroy(1), setback('coin', 3)], combo: { 2: [power(3)] }, art: 'hooded', seed: 222 },
   { id: 'mora_secrets', name: 'Непостижимые тайны', patron: 'mora', cost: 4, type: 'agent', hp: 5, copies: 2, play: [power(5), setback('draw', 1)], combo: { 2: [coin(2)], 3: [coin(2)] }, art: 'tentacle', seed: 223 },
 
-  // ── Бык (Saint Alessia): дешёвые агенты и сражение чужих ──
+  // ── Бык (Saint Alessia): дешёвые наймиты и сражение чужих ──
   { id: 'alessia_rebel', name: 'Мятежник', patron: 'alessia', cost: 0, type: 'agent', hp: 1, copies: 0, starter: true, play: [], combo: { 2: [coin(1)] }, art: 'assassin', seed: 231 },
   { id: 'alessia_defector', name: 'Перебежчик из белой башни', patron: 'alessia', cost: 5, type: 'contractAgent', hp: 1, copies: 1, play: [pick([draw(1)], [knockoutAll])], combo: { 3: [prestige(1)] }, art: 'tower', seed: 232 },
   { id: 'alessia_sergeant', name: 'Сержант Разбитых Цепей', patron: 'alessia', cost: 4, type: 'agent', hp: 1, copies: 1, play: [pick([coin(3)], [power(2)])], art: 'chain', seed: 233 },

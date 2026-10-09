@@ -223,7 +223,7 @@ function knockOut(s: GameState, owner: PlayerIdx, uid: number) {
   if (!a) return;
   release(s, owner, a);
   const card: Card = { uid: a.uid, id: a.id };
-  sub(s, `${p.name} теряет агента «${name(a.id)}»`);
+  sub(s, `${p.name} теряет наймита «${name(a.id)}»`);
   emit(s, { k: 'knockout', p: owner, card: a.id });
   if (cardDef(a.id).type === 'contractAgent') s.tavernDeck.push(card);
   else toCooldown(s, owner, card);
@@ -314,7 +314,7 @@ function startMatch(s: GameState) {
   s.phase = 'play';
   s.current = first;
   s.turn = 1;
-  log(s, `Покровители: ${s.patrons.map((p) => PATRONS[p].name).join(', ')}`);
+  log(s, `Владыки: ${s.patrons.map((p) => PATRONS[p].name).join(', ')}`);
   log(s, `Ход ${s.turn}: ${s.players[first].name}`);
   emit(s, { k: 'turn', p: first });
 }
@@ -379,7 +379,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return gave(s, `${opp.name} сбросит ${nCards(e.n)} в начале хода`);
     case 'patronCall':
       s.patronCalls += e.n;
-      return gave(s, `+${e.n} призыв покровителя`);
+      return gave(s, `+${e.n} призыв владыки`);
     case 'create': {
       for (let i = 0; i < e.n; i++) {
         const c = mk(s, e.card);
@@ -391,7 +391,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return gave(s, `«${name(e.card)}»${e.n > 1 ? ` ×${e.n}` : ''} ${where}`);
     }
     case 'knockoutAll':
-      gave(s, 'сражает всех агентов на столе');
+      gave(s, 'сражает всех наймитов на столе');
       for (const a of [...opp.agents]) knockOut(s, other(pi), a.uid);
       for (const a of [...p.agents]) knockOut(s, pi, a.uid);
       return;
@@ -483,7 +483,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return ask(s, {
         player: pi,
         kind: 'knockout',
-        prompt: e.n === 1 ? 'Сразите агента соперника' : `Сразите до ${e.n} агентов соперника`,
+        prompt: e.n === 1 ? 'Сразите наймита соперника' : `Сразите до ${e.n} наймитов соперника`,
         options: opp.agents.map((a) => cardOption(a)),
         // "Up to": the player may knock out fewer agents, or none.
         min: 0,
@@ -495,7 +495,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return ask(s, {
         player: pi,
         kind: 'returnTop',
-        prompt: `Верните до ${e.n} ${e.agentsOnly ? 'агентов' : 'карт'} из сброса наверх колоды`,
+        prompt: `Верните до ${e.n} ${e.agentsOnly ? 'наймитов' : 'карт'} из сброса наверх колоды`,
         options: pool.map((c) => cardOption(c)),
         min: 0,
         max: e.n,
@@ -515,7 +515,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return ask(s, {
         player: pi,
         kind: 'heal',
-        prompt: `Исцелите агента на ${e.n}`,
+        prompt: `Исцелите наймита на ${e.n}`,
         options: hurt.map((a) => cardOption(a, ` (${hpLeft(a)}/${cardDef(a.id).hp})`)),
         min: 1,
         max: 1,
@@ -779,13 +779,13 @@ export function patronAvailable(s: GameState, pi: PlayerIdx, pid: PatronId): boo
 }
 
 function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
-  if (!patronAvailable(s, pi, pid)) throw new RuleError('Покровитель недоступен');
+  if (!patronAvailable(s, pi, pid)) throw new RuleError('Владыка недоступен');
   const p = s.players[pi];
   const opp = s.players[other(pi)];
   const undo: PatronUndo = { patron: pid, coin: p.coin, power: p.power, favor: s.favor[pid] ?? null };
   s.patronCalls--;
   s.patronsUsed.push(pid);
-  log(s, `${p.name} взывает к покровителю «${PATRONS[pid].name}»`);
+  log(s, `${p.name} призывает владыку «${PATRONS[pid].name}»`);
   const line = s.log.length - 1;
   const hand = p.hand.length;
   const added = s.nextUid;
@@ -831,7 +831,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'pelin',
-        prompt: 'Волк: верните агента наверх колоды',
+        prompt: 'Волк: верните наймита наверх колоды',
         options: p.cooldown.filter((c) => cardDef(c.id).type === 'agent').map((c) => cardOption(c)),
         min: 1,
         max: 1,
@@ -842,7 +842,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
       ask(s, {
         player: pi,
         kind: 'psijic',
-        prompt: 'Сова: сразите агента соперника',
+        prompt: 'Сова: сразите наймита соперника',
         options: opp.agents.map((a) => cardOption(a)),
         min: 1,
         max: 1,
@@ -927,7 +927,7 @@ function cancelPatron(s: GameState, pi: PlayerIdx) {
   s.patronCalls++;
   s.patronsUsed.splice(s.patronsUsed.lastIndexOf(undo.patron), 1);
   s.pending = null;
-  log(s, `${p.name} передумывает взывать к «${PATRONS[undo.patron].name}»`);
+  log(s, `${p.name} передумывает призывать «${PATRONS[undo.patron].name}»`);
   emit(s, { k: 'cancel', p: pi, patron: undo.patron });
 }
 
@@ -954,7 +954,7 @@ function takeBack(s: GameState, pi: PlayerIdx) {
   const { log: lines, events } = s;
   for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
   Object.assign(s, r.state, { log: lines, events });
-  const what = r.act === 'play' ? 'разыгрывать' : 'применять агента';
+  const what = r.act === 'play' ? 'разыгрывать' : 'применять наймита';
   log(s, `${s.players[pi].name} передумывает ${what} «${name(r.card)}»`);
   emit(s, { k: 'unplay', p: pi, card: r.card, act: r.act });
 }
@@ -990,7 +990,7 @@ function checkInstantWin(s: GameState): boolean {
   const drafted = s.patrons.filter((x) => x !== 'treasury');
   const pi = s.current;
   if (drafted.length > 0 && drafted.every((x) => s.favor[x] === pi)) {
-    finish(s, pi, 'благосклонность всех покровителей');
+    finish(s, pi, 'благосклонность всех владык');
     return true;
   }
   return false;
@@ -1113,11 +1113,11 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
   if (actingPlayer(s) !== pi) throw new RuleError('Сейчас не ваш ход');
 
   if (s.phase === 'draft') {
-    if (a.t !== 'draft' || !s.draftPool.includes(a.patron)) throw new RuleError('Выберите покровителя');
-    if (!mayDraft(s, pi, a.patron)) throw new RuleError('Этот покровитель у вас ещё не открыт');
+    if (a.t !== 'draft' || !s.draftPool.includes(a.patron)) throw new RuleError('Выберите владыку');
+    if (!mayDraft(s, pi, a.patron)) throw new RuleError('Этот владыка у вас ещё не открыт');
     s.draftPool = s.draftPool.filter((x) => x !== a.patron);
     s.patrons.push(a.patron);
-    log(s, `${s.players[pi].name} выбирает покровителя «${PATRONS[a.patron].name}»`);
+    log(s, `${s.players[pi].name} выбирает владыку «${PATRONS[a.patron].name}»`);
     emit(s, { k: 'draft', p: pi, patron: a.patron });
     s.draftStep++;
     if (s.draftStep >= DRAFT_PICKS) startMatch(s);
@@ -1157,7 +1157,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       }
       // A contract played from hand (the Fake Coin) resolves like a bought one and leaves the game.
       moved = c.id;
-      head(s, `${p.name} разыгрывает ${def.type === 'agent' ? 'агента ' : ''}«${def.name}»`, { src: c.uid, card: c.id });
+      head(s, `${p.name} разыгрывает ${def.type === 'agent' ? 'наймита ' : ''}«${def.name}»`, { src: c.uid, card: c.id });
       emit(s, { k: 'play', p: pi, card: c.id });
       registerPlay(s, pi, c);
       if (def.type === 'agent') fire(s, pi, 'agentPlay', c);
@@ -1165,10 +1165,10 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
     }
     case 'activate': {
       const ag = p.agents.find((x) => x.uid === a.uid);
-      if (!ag || ag.activated) throw new RuleError('Агент уже действовал');
+      if (!ag || ag.activated) throw new RuleError('Наймит уже действовал');
       ag.activated = true;
       moved = ag.id;
-      head(s, `${p.name} применяет агента «${name(ag.id)}»`, { src: ag.uid, card: ag.id });
+      head(s, `${p.name} применяет наймита «${name(ag.id)}»`, { src: ag.uid, card: ag.id });
       emit(s, { k: 'activate', p: pi, card: ag.id });
       registerPlay(s, pi, ag);
       fire(s, pi, 'agentPlay', ag);
@@ -1176,12 +1176,12 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
     }
     case 'attack': {
       const target = attackable(s, pi).find((x) => x.uid === a.uid);
-      if (!target) throw new RuleError('Сначала атакуйте агентов с провокацией');
+      if (!target) throw new RuleError('Сначала атакуйте наймитов с провокацией');
       if (p.power <= 0) throw new RuleError('Нет силы для атаки');
       const dmg = Math.min(p.power, hpLeft(target));
       p.power -= dmg;
       target.dmg += dmg;
-      log(s, `${p.name} атакует агента «${name(target.id)}»: −${dmg}${hpLeft(target) > 0 ? ` (осталось ${hpLeft(target)})` : ''}`);
+      log(s, `${p.name} атакует наймита «${name(target.id)}»: −${dmg}${hpLeft(target) > 0 ? ` (осталось ${hpLeft(target)})` : ''}`);
       emit(s, { k: 'attack', p: pi, card: target.id, n: dmg });
       if (hpLeft(target) <= 0) knockOut(s, other(pi), target.uid);
       break;

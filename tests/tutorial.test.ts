@@ -46,7 +46,7 @@ describe('tutorial game', () => {
     expect(s.phase).toBe('over');
     const top = Math.max(...s.players.map((p) => p.prestige));
     expect(top).toBeLessThan(80);
-    expect(s.winReason === 'благосклонность всех покровителей' || top >= TUTORIAL_GOAL).toBe(true);
+    expect(s.winReason === 'благосклонность всех владык' || top >= TUTORIAL_GOAL).toBe(true);
   });
 });
 
