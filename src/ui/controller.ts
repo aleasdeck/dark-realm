@@ -2,8 +2,8 @@ import { botAction, type BotLevel } from '../engine/bot';
 import { actingPlayer, applyAction, createGame, prestigeGoal, RuleError } from '../engine/engine';
 import { LOCKED } from '../engine/cards';
 import { randomSeed } from '../engine/rng';
-import { createTutorialGame } from '../engine/tutorial';
-import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
+import { createTutorialGame, TUTORIAL_OPPONENT } from '../engine/tutorial';
+import type { Action, GameState, PatronId, PlayerIdx, ScriptId } from '../engine/types';
 import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '../net/room';
 import { newMatchId, rateGame, type RatingStatus } from '../net/rating';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
@@ -166,7 +166,7 @@ function think(state: GameState, level: BotLevel): Promise<Action | null> {
 
 /** The bot's name in the game tells which level it plays at. */
 const BOT_NAMES: Record<BotLevel, string> = {
-  gentle: 'Наставник',
+  gentle: TUTORIAL_OPPONENT,
   easy: 'Бот-послушник',
   medium: 'Бот-некромант',
   hard: 'Бот-архилич',
@@ -182,11 +182,12 @@ export class BotController extends Controller {
   private tossing = false;
   private tossTimer = 0;
 
-  /** The `gentle` level plays the short scripted tutorial game; a saved game picks up where it was left. */
+  /** The `gentle` level plays one of the tutorial games, `lesson`; a saved game picks up where it was left. */
   constructor(
     private playerName: string,
     readonly level: BotLevel = 'medium',
     saved?: GameState,
+    readonly lesson: ScriptId = 'basic',
   ) {
     super();
     this.counts = !this.tutorial;
@@ -204,7 +205,7 @@ export class BotController extends Controller {
     if (this.state) this.clock = this.tutorial ? new GameClock() : GameClock.open('bot', false);
     this.begin(
       this.tutorial
-        ? createTutorialGame(this.playerName)
+        ? createTutorialGame(this.playerName, this.lesson)
         : createGame(randomSeed(), [this.playerName, BOT_NAMES[this.level]], { pool: draftPool(), first: tossCoin() }),
     );
   }

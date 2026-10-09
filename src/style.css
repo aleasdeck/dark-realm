@@ -2879,6 +2879,8 @@ button.zoom-act {
   color: var(--text);
 }
 .coach-actions .ghost {
+  white-space: nowrap;
+  font-size: 13px;
   background: none;
   border: none;
   box-shadow: none;
@@ -2889,6 +2891,202 @@ button.zoom-act {
 }
 @media (prefers-reduced-motion: reduce) {
   .coach-spot {
+    animation: none;
+  }
+}
+
+/* who speaks, and the advanced lesson's line on why */
+.coach .coach-who {
+  margin: 0 0 2px;
+  font-family: var(--narrow-font);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #7a3b1c;
+}
+.coach .coach-why {
+  border-left: 3px solid #b8892c;
+  padding-left: 8px;
+  color: #4a3a1e;
+  font-size: 13px;
+}
+/* the lesson's intro screens over the dimmed table */
+.intro-wrap {
+  z-index: 30;
+}
+.dialog.intro {
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+.intro .intro-step {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.intro h2 {
+  margin: 2px 0 10px;
+  color: var(--gold, #f0c860);
+}
+.intro p {
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+.intro-patrons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.intro-patron {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.intro-patron img {
+  width: min(64px, 17vw);
+  aspect-ratio: 1;
+  filter: drop-shadow(0 0 6px var(--glow));
+  animation: intro-flash 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.8s);
+}
+.intro-patron b {
+  font-size: 14px;
+}
+.intro-patron small {
+  color: var(--muted);
+}
+@keyframes intro-flash {
+  0%,
+  30%,
+  100% {
+    filter: drop-shadow(0 0 4px var(--glow));
+    transform: none;
+  }
+  12% {
+    filter: drop-shadow(0 0 16px var(--glow)) brightness(1.25);
+    transform: scale(1.08);
+  }
+}
+.intro-res {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+.intro-res li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.intro-res .res {
+  flex: none;
+  min-width: 34px;
+  justify-content: center;
+  font-size: 24px;
+}
+.intro .intro-quote {
+  font-size: 18px;
+  font-style: italic;
+}
+.intro .intro-who {
+  color: var(--muted);
+  margin-top: -6px;
+}
+/* the lesson won: the vagrant's last word and what the real game adds */
+.lesson-end {
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+.lesson-end .lesson-quote {
+  margin: 8px 0 4px;
+}
+.lesson-end .lesson-points {
+  text-align: left;
+  margin: 0 0 14px;
+  padding-left: 20px;
+  line-height: 1.35;
+}
+.end-dialog.lesson-end .end-ic {
+  width: 64px;
+  height: 64px;
+}
+.end-dialog.lesson-end h2 {
+  font-size: 32px;
+}
+.lesson-end .buttons + .buttons {
+  margin-top: 8px;
+}
+.lesson-end .buttons button {
+  flex: 1 1 auto;
+}
+/* «Пройти ещё раз» and «В меню» share a row even on the narrowest phone */
+.lesson-end .buttons + .buttons {
+  flex-wrap: nowrap;
+}
+.lesson-end .buttons + .buttons button {
+  min-width: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+@media (orientation: portrait) and (max-height: 700px) {
+  .end-dialog.lesson-end .end-ic {
+    width: 44px;
+    height: 44px;
+  }
+  .end-dialog.lesson-end h2 {
+    font-size: 26px;
+    margin: 4px 0;
+  }
+  .lesson-end .lesson-points {
+    margin-bottom: 10px;
+    line-height: 1.25;
+  }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .end-dialog.lesson-end {
+    width: min(780px, 100%);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .lesson-end .lesson-head {
+    flex: 0 1 40%;
+  }
+  .lesson-end .lesson-body {
+    flex: 1 1 60%;
+  }
+  .end-dialog.lesson-end .end-ic {
+    width: 48px;
+    height: 48px;
+  }
+  .end-dialog.lesson-end h2 {
+    font-size: 26px;
+  }
+}
+/* a menu button that waits for a newcomer, and a note under a button */
+button.menu-btn.fresh {
+  animation: fresh-glow 2.4s ease-in-out infinite;
+}
+@keyframes fresh-glow {
+  50% {
+    box-shadow: inset 0 1px 0 #ffffff1a, 0 0 18px #f0c860aa;
+    border-color: #f0c860;
+  }
+}
+button.menu-btn small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-patron img,
+  button.menu-btn.fresh {
     animation: none;
   }
 }

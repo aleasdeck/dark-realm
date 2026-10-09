@@ -2,7 +2,7 @@ import { cardDef } from './cards';
 import { actingPlayer, attackable, hpLeft, other, patronAvailable } from './engine';
 import { hardAction } from './botHard';
 import { rngNext } from './rng';
-import { TUTORIAL_PATRONS } from './tutorial';
+import { BOT_PLAN, LESSONS } from './tutorial';
 import type { Action, Card, Effect, GameState, Pending, PatronId, PlayerIdx } from './types';
 
 /**
@@ -161,6 +161,7 @@ export function botAction(s: GameState, pi: PlayerIdx, level: BotLevel = 'medium
   if (s.phase === 'over' || actingPlayer(s) !== pi) return null;
   if (level === 'hard') return hardAction(s, pi);
   if (level === 'easy') return easyAction(s, pi);
+  if (level === 'gentle' && s.script) return scriptedAction(s, pi);
   return mediumAction(s, pi, level === 'gentle');
 }
 
@@ -188,14 +189,10 @@ function easyAction(s: GameState, pi: PlayerIdx): Action {
 }
 
 /**
- * The medium bot, and with `gentle` the tutorial opponent, which drafts the tutorial patrons and never
- * calls patrons or attacks agents.
+ * The medium bot, and with `gentle` a soft one that never calls patrons or attacks agents.
  */
 export function mediumAction(s: GameState, pi: PlayerIdx, gentle = false): Action {
-  if (s.phase === 'draft') {
-    if (!gentle) return randomDraft(s);
-    return { t: 'draft', patron: TUTORIAL_PATRONS.find((x) => s.draftPool.includes(x)) ?? s.draftPool[0] };
-  }
+  if (s.phase === 'draft') return randomDraft(s);
   if (s.pending) return choose(s, s.pending);
 
   const p = s.players[pi];
@@ -248,5 +245,50 @@ export function mediumAction(s: GameState, pi: PlayerIdx, gentle = false): Actio
     if (targets.length) return { t: 'attack', uid: targets[0].uid };
   }
 
+  return { t: 'end' };
+}
+
+/** Whether `pi` bought anything this turn (or this card), read from the journal since the turn began. */
+function boughtThisTurn(s: GameState, pi: PlayerIdx, id?: string): boolean {
+  const who = `${s.players[pi].name} покупает `;
+  for (let i = s.log.length - 1; i >= 0 && !s.log[i].startsWith(`Ход ${s.turn}:`); i--) {
+    if (s.log[i].startsWith(who) && (!id || s.log[i].includes(`«${cardDef(id).name}»`))) return true;
+  }
+  return false;
+}
+
+/**
+ * The tutorial's vagrant: plays everything and uses his agents, then does what the lesson's plan
+ * says for this turn (src/engine/tutorial.ts), and nothing else.
+ */
+function scriptedAction(s: GameState, pi: PlayerIdx): Action {
+  const lesson = LESSONS[s.script!];
+  if (s.phase === 'draft') return { t: 'draft', patron: lesson.patrons[s.draftStep] };
+  if (s.pending) return choose(s, s.pending);
+  const p = s.players[pi];
+  const card = playFirst(p.hand);
+  if (card) return { t: 'play', uid: card.uid };
+  const ready = p.agents.find((a) => !a.activated);
+  if (ready) return { t: 'activate', uid: ready.uid };
+  for (const step of BOT_PLAN[s.script!][s.turn] ?? []) {
+    if ('patron' in step && patronAvailable(s, pi, step.patron)) return { t: 'patron', patron: step.patron };
+    if ('attack' in step && p.power > 0) {
+      const a = attackable(s, pi).find((x) => x.id === step.attack);
+      if (a) return { t: 'attack', uid: a.uid };
+    }
+    if ('buy' in step) {
+      const fits = (c: Card) => cardDef(c.id).cost <= p.coin && cardDef(c.id).cost > 0;
+      if (step.buy === 'cheap' || step.buy === 'power') {
+        // The cheapest action, or the one with the most power for its price.
+        const power = (c: Card) => cardDef(c.id).play.reduce((n, e) => n + (e.k === 'power' ? e.n : 0), 0);
+        const rank = (c: Card) => (step.buy === 'power' ? power(c) * 10 : 0) - cardDef(c.id).cost;
+        const c = s.tavern.filter((x) => fits(x) && cardDef(x.id).type === 'action').sort((a, b) => rank(b) - rank(a))[0];
+        if (c && !boughtThisTurn(s, pi)) return { t: 'buy', uid: c.uid };
+      } else {
+        const c = s.tavern.find((x) => x.id === step.buy && fits(x));
+        if (c && !boughtThisTurn(s, pi, step.buy)) return { t: 'buy', uid: c.uid };
+      }
+    }
+  }
   return { t: 'end' };
 }

@@ -9,6 +9,7 @@ import {
   STARTING_GOLD,
   TAVERN_SIZE,
 } from './cards';
+import { arrangeDecks, nextTavernCard, stackDraw, turnBegins } from './director';
 import { rngNext } from './rng';
 import { cards as nCards, effectText, ICON } from './text';
 import type {
@@ -26,6 +27,7 @@ import type {
   PlayerIdx,
   PlayerState,
   QueuedEffect,
+  ScriptId,
   TriggerOn,
 } from './types';
 
@@ -62,8 +64,8 @@ export interface GameOptions {
   instant?: number;
   /** Cards that open the tavern, in this order (the tutorial's fixed deal). */
   tavernTop?: string[];
-  /** How many of the first player's purchases go on top of their deck (the tutorial). */
-  buyOnTop?: number;
+  /** A tutorial game, dealt by its director. */
+  script?: ScriptId;
   /** Who moves first, as the coin fell; player 0 when no coin was tossed (the tutorial). */
   first?: PlayerIdx;
   /** Online games: the locked patrons each player has opened; only they may draft them. */
@@ -188,7 +190,10 @@ function refillDeck(s: GameState, p: PlayerState) {
   }
 }
 
-function drawCards(s: GameState, p: PlayerState, n: number) {
+/** `hand` is the new hand at the end of a turn; anything else is a card's or a patron's draw. */
+function drawCards(s: GameState, p: PlayerState, n: number, hand = false) {
+  // A tutorial's director picks which cards come, as a lucky shuffle would.
+  if (s.script && s.phase === 'play') stackDraw(s, s.players.indexOf(p) as PlayerIdx, n, hand, (cards) => shuffle(s, cards));
   for (let i = 0; i < n; i++) {
     refillDeck(s, p);
     const c = p.deck.shift();
@@ -199,7 +204,7 @@ function drawCards(s: GameState, p: PlayerState, n: number) {
 
 function refillTavern(s: GameState) {
   while (s.tavern.length < TAVERN_SIZE && s.tavernDeck.length > 0) {
-    s.tavern.push(s.tavernDeck.shift()!);
+    s.tavern.push(s.tavernDeck.splice(s.script ? nextTavernCard(s) : 0, 1)[0]);
   }
 }
 
@@ -307,6 +312,7 @@ function startMatch(s: GameState) {
     const i = s.tavernDeck.findIndex((c) => c.id === id);
     if (i >= 0) s.tavernDeck.unshift(...s.tavernDeck.splice(i, 1));
   }
+  if (s.script) arrangeDecks(s);
   refillTavern(s);
   drawCards(s, s.players[0], HAND_SIZE);
   drawCards(s, s.players[1], HAND_SIZE);
@@ -1024,7 +1030,7 @@ function endTurn(s: GameState) {
   p.hand = [];
   p.played = [];
   for (const a of p.agents) a.activated = false;
-  drawCards(s, p, HAND_SIZE);
+  drawCards(s, p, HAND_SIZE, true);
 
   if (checkInstantWin(s)) return;
   const goal = prestigeGoal(s);
@@ -1038,6 +1044,7 @@ function endTurn(s: GameState) {
   s.turnPlays = [];
   log(s, `Ход ${s.turn}: ${n.name}`);
   emit(s, { k: 'turn', p: next });
+  if (s.script) turnBegins(s);
   // A player who reached the goal and stayed ahead through the opponent's turn wins.
   if (n.prestige >= goal && n.prestige > p.prestige) return finish(s, next, `${goal}+ ✦`);
   if (s.turn === 2) {
@@ -1195,11 +1202,7 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
       removeByUid(s.tavern, c.uid);
       head(s, `${p.name} покупает ${def.type.startsWith('contract') ? 'контракт ' : ''}«${def.name}» за ${def.cost} ${COIN}`, { src: c.uid, card: c.id });
       emit(s, { k: 'buy', p: pi, card: c.id });
-      if (pi === 0 && s.buyOnTop && !def.type.startsWith('contract')) {
-        // Tutorial: the purchase comes straight into the next hand.
-        s.buyOnTop--;
-        p.deck.unshift(c);
-      } else gainCard(s, pi, c);
+      gainCard(s, pi, c);
       refillTavern(s);
       break;
     }
