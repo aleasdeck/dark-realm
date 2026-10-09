@@ -12,8 +12,8 @@ import { forgetMatch, leaveTab, savedMatch } from './net/saved';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
 import { closeCoin, coinFace, showCoin } from './ui/coin';
 import { clearFx, onStateChange } from './ui/feed';
-import { musicOn, setMusic, unlockMusic } from './ui/music';
-import { play, setSound, soundOn, unlock } from './ui/sound';
+import { musicVolume, preloadMusic, setMusicScene, setMusicVolume, unlockMusic } from './ui/music';
+import { play, setSoundVolume, soundVolume, unlock } from './ui/sound';
 import {
   boardHtml,
   cardHtml,
@@ -189,6 +189,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     view = 'nick';
   }
   const v = MENU_VIEWS[view];
+  setMusicScene('menu');
   app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
     ${view === 'home' ? '<p class="subtitle">Карточная дуэль владык тёмного мира</p>' : `<h2 class="menu-title">${v.title}</h2>`}
@@ -211,7 +212,9 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   codeInput?.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') join(playerName(), normalizeCode(codeInput.value));
   });
-  app.querySelector('.settings')?.addEventListener('click', (ev) => {
+  const menuSettings = app.querySelector('.settings');
+  if (menuSettings) bindVolumes(menuSettings);
+  menuSettings?.addEventListener('click', (ev) => {
     const row = (ev.target as HTMLElement).closest<HTMLElement>('[data-set]');
     if (!row) return;
     const o = SETTINGS.find((x) => x.key === row.dataset.set)!;
@@ -278,10 +281,14 @@ async function loadRating() {
   board.querySelector('.me')?.scrollIntoView({ block: 'nearest' });
 }
 
-/** Music, sounds, animations and full screen, each switched on or off; the same sheet opens from the main menu and in a game. */
+/** Music and sound volumes on sliders; the same sheet opens from the main menu and in a game. */
+const VOLUMES = [
+  { key: 'music', label: 'Музыка', icon: 'set_music', get: musicVolume, set: setMusicVolume },
+  { key: 'sound', label: 'Звуки', icon: 'set_sound', get: soundVolume, set: setSoundVolume },
+];
+
+/** Animations and full screen, each switched on or off. */
 const SETTINGS = [
-  { key: 'music', label: 'Музыка', icon: 'set_music', on: musicOn, set: setMusic },
-  { key: 'sound', label: 'Звуки', icon: 'set_sound', on: soundOn, set: setSound },
   { key: 'motion', label: 'Анимации', icon: 'set_motion', on: motionOn, set: setMotion },
   // Where the browser cannot go full screen (iPhone), the switch tells how to put the game on the home screen.
   { key: 'fullscreen', label: 'Весь экран', icon: 'fullscreen', on: isFullscreen, set: (on: boolean) => (fullscreenSupported() ? setFullscreen(on) : showInstallHint()) },
@@ -290,10 +297,33 @@ const SETTINGS = [
 // Full screen also ends from the browser (Back, Esc), so open switches follow it.
 onFullscreenChange(() => document.querySelectorAll('.settings').forEach((el) => (el.innerHTML = settingsRows())));
 
+const volumeText = (v: number) => (v ? `${v}%` : 'Выкл');
+
 function settingsRows() {
-  return SETTINGS.filter((o) => o.key !== 'fullscreen' || !launchedFromIcon()).map(
+  const sliders = VOLUMES.map(
+    (o) => `<label class="vol-row" data-vol="${o.key}"><span class="t-label">${icon(o.icon)}<span>${o.label}</span></span>
+      <input type="range" min="0" max="100" step="5" value="${o.get()}" aria-label="Громкость: ${o.label}"><b>${volumeText(o.get())}</b></label>`,
+  ).join('');
+  return sliders + SETTINGS.filter((o) => o.key !== 'fullscreen' || !launchedFromIcon()).map(
     (o) => `<button class="toggle" data-set="${o.key}" aria-pressed="${o.on()}"><span class="t-label">${icon(o.icon)}<span>${o.label}</span></span><b>${o.on() ? 'Вкл' : 'Выкл'}</b></button>`,
   ).join('');
+}
+
+/** Volume sliders act while dragged; the effects slider plays a click on release, so the level can be heard. */
+function bindVolumes(root: Element) {
+  root.addEventListener('input', (ev) => {
+    const input = ev.target as HTMLInputElement;
+    const row = input.closest<HTMLElement>('[data-vol]');
+    if (!row) return;
+    const o = VOLUMES.find((x) => x.key === row.dataset.vol)!;
+    unlock();
+    o.set(Number(input.value));
+    row.querySelector('b')!.textContent = volumeText(o.get());
+  });
+  root.addEventListener('change', (ev) => {
+    const row = (ev.target as HTMLElement).closest<HTMLElement>('[data-vol="sound"]');
+    if (row) play('click');
+  });
 }
 
 function showSettings() {
@@ -301,6 +331,7 @@ function showSettings() {
   box.className = 'overlay sheet-wrap';
   box.innerHTML = `<div class="sheet settings-sheet"><h2>Настройки</h2>${scrolling(`<div class="settings">${settingsRows()}</div>`)}
     <div class="sheet-actions"><button data-close>${withIcon('confirm', 'Готово')}</button></div></div>`;
+  bindVolumes(box);
   box.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
     const row = t.closest<HTMLElement>('[data-set]');
@@ -408,6 +439,7 @@ function resume(thisTab = true): boolean {
 }
 
 function startGame(c: Controller) {
+  setMusicScene('game');
   ctrl?.dispose();
   ctrl = c;
   selected = new Set();
@@ -990,4 +1022,5 @@ flushReports();
 void loadAll().then(() => {
   if (!resume()) menu();
   hideLoading();
+  preloadMusic();
 });

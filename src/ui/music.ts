@@ -1,223 +1,126 @@
-import { audioContext } from './sound';
+import menuUrl from '../assets/audio/menu.mp3?url';
+import tavernUrl from '../assets/audio/tavern.mp3?url';
+import { audioContext, decode, readVolume, saveVolume, volumeGain } from './sound';
 
 /**
- * Dark ambient background score, synthesized with Web Audio; no audio files.
- * A low drone, a slow choir-like pad over a D minor progression, sparse bells
- * and a faint heartbeat, all sent through a generated reverb.
+ * Background music: «Склеп» (a choir in a crypt) in the menu and «Притон» (a grim tavern) during a match.
+ * Both are seamless loops rendered by scripts/audio. They load after the menu is up, so the loading
+ * screen stays short, and the two cross-fade when a match starts or ends.
  */
 
-const KEY = 'dark-realm-music';
-const BAR = 8; // seconds per chord
-const VOLUME = 0.16;
+export type Scene = 'menu' | 'game';
 
-// D minor with a raised seventh (C#) and a Neapolitan Eb for the darker turns.
-const PROGRESSION: number[][] = [
-  [50, 53, 57], // Dm
-  [46, 50, 53], // Bb
-  [43, 46, 50], // Gm
-  [45, 49, 52], // A
-  [50, 53, 57], // Dm
-  [51, 55, 58], // Eb
-  [48, 52, 55], // C
-  [45, 49, 52], // A
-];
-const BELLS = [74, 76, 77, 79, 81, 82, 85, 86]; // D harmonic minor, upper register
+/** Loop length of each file in seconds, as rendered; the decoded file can be a little longer (MP3 padding). */
+const TRACKS: Record<Scene, { url: string; loop: number }> = {
+  menu: { url: menuUrl, loop: 96 },
+  game: { url: tavernUrl, loop: 81.6 },
+};
+/** Music sits under the effects: the files are mastered loud, this is the level at 100%. */
+const LEVEL = 0.5;
+/** Samples of silence an MP3 encoder puts in front (LAME), when the browser does not trim them. */
+const MP3_DELAY = 1105;
 
-const midi = (n: number) => 440 * 2 ** ((n - 69) / 12);
-
-let enabled = readEnabled();
+const OLD_KEY = 'dark-realm-music';
+const KEY = 'dark-realm-music-volume';
+let volume = readVolume(KEY, OLD_KEY, 60);
+let scene: Scene = 'menu';
 let out: GainNode | null = null;
-let wet: ConvolverNode | null = null;
-let drone: { stop: (t: number) => void } | null = null;
-let timer = 0;
-let nextBar = 0;
-let bar = 0;
+let playing: { scene: Scene; src: AudioBufferSourceNode; gain: GainNode } | null = null;
+const loading: Partial<Record<Scene, Promise<AudioBuffer | null>>> = {};
+const buffers: Partial<Record<Scene, AudioBuffer>> = {};
 
-function readEnabled(): boolean {
-  try {
-    return localStorage.getItem(KEY) !== 'off';
-  } catch {
-    return true;
-  }
+export function musicVolume() {
+  return volume;
 }
 
-export function musicOn() {
-  return enabled;
+export function setMusicVolume(v: number) {
+  volume = Math.max(0, Math.min(100, Math.round(v)));
+  saveVolume(KEY, volume);
+  const c = audioContext();
+  if (c && out) out.gain.setTargetAtTime(volumeGain(volume) * LEVEL, c.currentTime, 0.05);
+  sync();
 }
 
-export function setMusic(on: boolean) {
-  enabled = on;
-  try {
-    localStorage.setItem(KEY, on ? 'on' : 'off');
-  } catch {
-    /* storage unavailable */
-  }
-  if (on) unlockMusic();
-  else stop();
+/** Which theme should play; switching cross-fades. */
+export function setMusicScene(s: Scene) {
+  scene = s;
+  sync();
 }
 
-/** Starts the score after a user gesture, if it is switched on. */
+/** Starts the music after a user gesture, if it is not turned all the way down. */
 export function unlockMusic() {
-  if (!enabled) return;
   const c = audioContext();
-  if (!c) return;
-  if (c.state === 'suspended') void c.resume();
-  if (!timer) start(c);
+  if (c?.state === 'suspended') void c.resume().then(sync);
+  else sync();
 }
 
-function reverb(c: AudioContext): ConvolverNode {
-  const len = Math.floor(c.sampleRate * 4);
-  const ir = c.createBuffer(2, len, c.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = ir.getChannelData(ch);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+/** Fetches both themes in the background, the current one first. */
+export function preloadMusic() {
+  void load(scene).then(() => load(scene === 'menu' ? 'game' : 'menu'));
+}
+
+function load(s: Scene): Promise<AudioBuffer | null> {
+  loading[s] ??= decode(TRACKS[s].url)
+    .then((b) => (buffers[s] = b))
+    .catch(() => null);
+  return loading[s]!;
+}
+
+function output(c: AudioContext): GainNode {
+  if (!out) {
+    out = c.createGain();
+    out.gain.value = volumeGain(volume) * LEVEL;
+    out.connect(c.destination);
   }
-  const conv = c.createConvolver();
-  conv.buffer = ir;
-  return conv;
+  return out;
 }
 
-function start(c: AudioContext) {
+function sync() {
+  const c = audioContext();
+  if (!c || c.state !== 'running') return;
+  if (!volume) return fadeOut(c, 1);
+  if (playing?.scene === scene) return;
+  const want = scene;
+  const b = buffers[want];
+  if (!b) {
+    void load(want).then(() => want === scene && sync());
+    return;
+  }
+  fadeOut(c, 2.5);
+  const src = c.createBufferSource();
+  src.buffer = b;
+  src.loop = true;
+  // A browser that keeps the encoder's leading silence would put a gap in the loop: skip it.
+  const loopLen = TRACKS[want].loop;
+  const extra = b.length - Math.round(loopLen * b.sampleRate);
+  const start = extra >= MP3_DELAY ? MP3_DELAY / b.sampleRate : 0;
+  if (b.duration >= start + loopLen - 0.01) {
+    src.loopStart = start;
+    src.loopEnd = start + loopLen;
+  }
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(0.0001, c.currentTime);
+  gain.gain.exponentialRampToValueAtTime(1, c.currentTime + 3);
+  src.connect(gain).connect(output(c));
+  src.start(c.currentTime, start);
+  playing = { scene: want, src, gain };
+}
+
+function fadeOut(c: AudioContext, sec: number) {
+  if (!playing) return;
+  const { src, gain } = playing;
   const t = c.currentTime;
-  out = c.createGain();
-  out.gain.setValueAtTime(0.0001, t);
-  out.gain.exponentialRampToValueAtTime(VOLUME, t + 5);
-  out.connect(c.destination);
-  wet = reverb(c);
-  const wetGain = c.createGain();
-  wetGain.gain.value = 0.9;
-  wet.connect(wetGain).connect(out);
-  drone = startDrone(c, out);
-  nextBar = t + 0.2;
-  bar = 0;
-  tick();
-  timer = window.setInterval(tick, 500);
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.0001), t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+  src.stop(t + sec + 0.05);
+  playing = null;
 }
 
-function stop() {
-  window.clearInterval(timer);
-  timer = 0;
-  const c = audioContext();
-  if (!c || !out) return;
-  const t = c.currentTime;
-  const g = out;
-  g.gain.cancelScheduledValues(t);
-  g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
-  drone?.stop(t + 1.6);
-  setTimeout(() => g.disconnect(), 1800);
-  out = null;
-  wet = null;
-  drone = null;
-}
-
-/** Schedules the next bars slightly ahead, so timer jitter never causes gaps. */
-function tick() {
-  const c = audioContext();
-  if (!c || !out) return;
-  if (nextBar < c.currentTime) nextBar = c.currentTime + 0.1;
-  while (nextBar < c.currentTime + 1.5) {
-    scheduleBar(c, nextBar, PROGRESSION[bar % PROGRESSION.length]);
-    nextBar += BAR;
-    bar++;
-  }
-}
-
-function startDrone(c: AudioContext, dest: AudioNode) {
-  const filter = c.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = 260;
-  filter.Q.value = 5;
-  const lfo = c.createOscillator();
-  lfo.frequency.value = 0.05;
-  const depth = c.createGain();
-  depth.gain.value = 140;
-  lfo.connect(depth).connect(filter.frequency);
-  const g = c.createGain();
-  g.gain.value = 0.5;
-  filter.connect(g).connect(dest);
-  const oscs = [midi(26), midi(26) * 1.004, midi(33)].map((f) => {
-    const o = c.createOscillator();
-    o.type = 'sawtooth';
-    o.frequency.value = f;
-    o.connect(filter);
-    return o;
-  });
-  const all = [lfo, ...oscs];
-  all.forEach((o) => o.start());
-  return { stop: (t: number) => all.forEach((o) => o.stop(t)) };
-}
-
-function scheduleBar(c: AudioContext, t: number, chord: number[]) {
-  // Choir-like pad: two detuned saws per voice through a soft low-pass, slow swell.
-  const pad = c.createBiquadFilter();
-  pad.type = 'lowpass';
-  pad.frequency.value = 900;
-  const env = c.createGain();
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.exponentialRampToValueAtTime(0.09, t + 3);
-  env.gain.setValueAtTime(0.09, t + BAR - 1);
-  env.gain.exponentialRampToValueAtTime(0.0001, t + BAR + 3);
-  pad.connect(env);
-  env.connect(out!);
-  env.connect(wet!);
-  for (const n of chord) {
-    for (const cents of [-8, 8]) {
-      const o = c.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.value = midi(n);
-      o.detune.value = cents;
-      o.connect(pad);
-      o.start(t);
-      o.stop(t + BAR + 3.1);
-    }
-  }
-  // Faint heartbeat on the downbeat.
-  heartbeat(c, t);
-  heartbeat(c, t + 0.32, 0.6);
-  // Sparse bells, mostly into the reverb.
-  for (let beat = 1; beat < BAR; beat++) {
-    if (Math.random() < 0.22) bell(c, t + beat + Math.random() * 0.3, midi(BELLS[Math.floor(Math.random() * BELLS.length)]));
-  }
-}
-
-function heartbeat(c: AudioContext, t: number, vol = 1) {
-  const o = c.createOscillator();
-  o.type = 'sine';
-  o.frequency.setValueAtTime(70, t);
-  o.frequency.exponentialRampToValueAtTime(32, t + 0.25);
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.35 * vol, t + 0.015);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-  o.connect(g).connect(out!);
-  o.start(t);
-  o.stop(t + 0.32);
-}
-
-function bell(c: AudioContext, t: number, f: number) {
-  // Inharmonic partials give a tolling, slightly cracked bell.
-  [1, 2.76, 5.4].forEach((m, k) => {
-    const o = c.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = f * m;
-    const g = c.createGain();
-    const dur = 5 / (k + 1);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.05 / (k + 1), t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g);
-    g.connect(wet!);
-    if (k === 0) g.connect(out!);
-    o.start(t);
-    o.stop(t + dur + 0.05);
-  });
-}
-
-// Pause everything while the tab is hidden; nobody needs a drone from a background tab.
+// Pause everything while the tab is hidden; nobody needs music from a background tab.
 document.addEventListener('visibilitychange', () => {
-  if (!timer) return;
   const c = audioContext();
-  if (document.hidden) void c?.suspend();
-  else void c?.resume();
+  if (!c || !playing) return;
+  if (document.hidden) void c.suspend();
+  else void c.resume();
 });

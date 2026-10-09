@@ -1,9 +1,10 @@
 import { allArt } from '../art/custom';
 import { warmBot } from './controller';
+import { loadSounds } from './sound';
 
 /**
  * The loading screen. Its markup and styles are in index.html, so it is up before this code
- * arrives; here every picture is fetched and decoded, the fonts and the bot's worker are loaded,
+ * arrives; here every picture and sound effect is fetched and decoded, the fonts and the bot's worker are loaded,
  * and only then does the menu open, so nothing in the game loads or pops in later.
  */
 
@@ -32,7 +33,7 @@ export async function loadAll(): Promise<void> {
   const fill = document.getElementById('boot-fill');
   const label = document.getElementById('boot-pct');
   const bar = fill?.parentElement;
-  const tasks: Promise<unknown>[] = [...allArt().map(picture), ...FONTS.map((f) => document.fonts?.load(f, SAMPLE)), warmBot()];
+  const tasks: Promise<unknown>[] = [...allArt().map(picture), ...FONTS.map((f) => document.fonts?.load(f, SAMPLE)), warmBot(), ...loadSounds()];
   let done = 0;
   const step = () => {
     done++;
