@@ -785,7 +785,7 @@ function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
   const undo: PatronUndo = { patron: pid, coin: p.coin, power: p.power, favor: s.favor[pid] ?? null };
   s.patronCalls--;
   s.patronsUsed.push(pid);
-  log(s, `${p.name} взывает к владыке «${PATRONS[pid].name}»`);
+  log(s, `${p.name} призывает владыку «${PATRONS[pid].name}»`);
   const line = s.log.length - 1;
   const hand = p.hand.length;
   const added = s.nextUid;
@@ -927,7 +927,7 @@ function cancelPatron(s: GameState, pi: PlayerIdx) {
   s.patronCalls++;
   s.patronsUsed.splice(s.patronsUsed.lastIndexOf(undo.patron), 1);
   s.pending = null;
-  log(s, `${p.name} передумывает взывать к «${PATRONS[undo.patron].name}»`);
+  log(s, `${p.name} передумывает призывать «${PATRONS[undo.patron].name}»`);
   emit(s, { k: 'cancel', p: pi, patron: undo.patron });
 }
 

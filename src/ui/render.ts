@@ -398,7 +398,7 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, 
     const can = patronAvailable(s, me, t.patron);
     return {
       html: patronTipHtml(s, me, t.patron),
-      label: pick ? waitPick : can ? 'Воззвать' : 'Сейчас воззвать нельзя',
+      label: pick ? waitPick : can ? 'Призвать' : 'Сейчас призвать нельзя',
       can,
       action: { t: 'patron', patron: t.patron },
     };
