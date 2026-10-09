@@ -2281,11 +2281,6 @@ button.toggle[aria-pressed='true'] b {
 .log-view .log-sub .log-card {
   color: #d9bb6c;
 }
-.log-view > .hint {
-  margin: -4px 0 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
 /* each turn opens with its number and the player, as a heading over that turn's moves */
 .log-view .log div.log-turn {
   margin-top: 8px;
@@ -3171,11 +3166,8 @@ summary > img.ic {
 .toss-coin.painted .moon img.ic {
   filter: drop-shadow(0 0 18px #ff6b5e55);
 }
-/* landscape: the journal takes the height the hint line would */
+/* landscape: the journal takes the screen's height */
 @media (orientation: landscape) and (max-height: 560px) {
-  .log-view > .hint {
-    display: none;
-  }
   .log-view .log {
     max-height: calc(100dvh - 150px);
   }

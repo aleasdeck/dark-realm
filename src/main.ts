@@ -644,7 +644,6 @@ function overlays(s: GameState): string {
   if (modal?.kind === 'log') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
       <h2>Журнал партии<span class="log-clock" title="Время партии">${logClock()}</span></h2>
-      <p class="hint">Нажмите на название карты, чтобы прочитать её</p>
       <div class="log">${journalHtml(s, me, (n) => ctrl?.clock.turnStart(n))}</div>
       <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
