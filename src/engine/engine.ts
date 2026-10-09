@@ -314,7 +314,7 @@ function startMatch(s: GameState) {
   s.phase = 'play';
   s.current = first;
   s.turn = 1;
-  log(s, `Покровители: ${s.patrons.map((p) => PATRONS[p].name).join(', ')}`);
+  log(s, `Владыки: ${s.patrons.map((p) => PATRONS[p].name).join(', ')}`);
   log(s, `Ход ${s.turn}: ${s.players[first].name}`);
   emit(s, { k: 'turn', p: first });
 }
@@ -379,7 +379,7 @@ function execEffect(s: GameState, e: Effect, pi: PlayerIdx, src?: number) {
       return gave(s, `${opp.name} сбросит ${nCards(e.n)} в начале хода`);
     case 'patronCall':
       s.patronCalls += e.n;
-      return gave(s, `+${e.n} призыв покровителя`);
+      return gave(s, `+${e.n} призыв владыки`);
     case 'create': {
       for (let i = 0; i < e.n; i++) {
         const c = mk(s, e.card);
@@ -779,13 +779,13 @@ export function patronAvailable(s: GameState, pi: PlayerIdx, pid: PatronId): boo
 }
 
 function activatePatron(s: GameState, pi: PlayerIdx, pid: PatronId) {
-  if (!patronAvailable(s, pi, pid)) throw new RuleError('Покровитель недоступен');
+  if (!patronAvailable(s, pi, pid)) throw new RuleError('Владыка недоступен');
   const p = s.players[pi];
   const opp = s.players[other(pi)];
   const undo: PatronUndo = { patron: pid, coin: p.coin, power: p.power, favor: s.favor[pid] ?? null };
   s.patronCalls--;
   s.patronsUsed.push(pid);
-  log(s, `${p.name} взывает к покровителю «${PATRONS[pid].name}»`);
+  log(s, `${p.name} взывает к владыке «${PATRONS[pid].name}»`);
   const line = s.log.length - 1;
   const hand = p.hand.length;
   const added = s.nextUid;
@@ -990,7 +990,7 @@ function checkInstantWin(s: GameState): boolean {
   const drafted = s.patrons.filter((x) => x !== 'treasury');
   const pi = s.current;
   if (drafted.length > 0 && drafted.every((x) => s.favor[x] === pi)) {
-    finish(s, pi, 'благосклонность всех покровителей');
+    finish(s, pi, 'благосклонность всех владык');
     return true;
   }
   return false;
@@ -1113,11 +1113,11 @@ export function applyAction(state: GameState, pi: PlayerIdx, a: Action): GameSta
   if (actingPlayer(s) !== pi) throw new RuleError('Сейчас не ваш ход');
 
   if (s.phase === 'draft') {
-    if (a.t !== 'draft' || !s.draftPool.includes(a.patron)) throw new RuleError('Выберите покровителя');
-    if (!mayDraft(s, pi, a.patron)) throw new RuleError('Этот покровитель у вас ещё не открыт');
+    if (a.t !== 'draft' || !s.draftPool.includes(a.patron)) throw new RuleError('Выберите владыку');
+    if (!mayDraft(s, pi, a.patron)) throw new RuleError('Этот владыка у вас ещё не открыт');
     s.draftPool = s.draftPool.filter((x) => x !== a.patron);
     s.patrons.push(a.patron);
-    log(s, `${s.players[pi].name} выбирает покровителя «${PATRONS[a.patron].name}»`);
+    log(s, `${s.players[pi].name} выбирает владыку «${PATRONS[a.patron].name}»`);
     emit(s, { k: 'draft', p: pi, patron: a.patron });
     s.draftStep++;
     if (s.draftStep >= DRAFT_PICKS) startMatch(s);

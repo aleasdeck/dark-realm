@@ -56,7 +56,7 @@ export function effectText(e: Effect): string {
       return `Подложить «${name}»${e.n > 1 ? ` ×${e.n}` : ''} ${where}`;
     }
     case 'patronCall':
-      return `+${e.n} призыв покровителя`;
+      return `+${e.n} призыв владыки`;
     case 'donate':
       return `Сбросить до ${cards(e.n)} из руки и взять столько же`;
     case 'choice':

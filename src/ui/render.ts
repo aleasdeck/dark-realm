@@ -344,7 +344,7 @@ export function boardHtml(
       ${pick ? `<div class="pick" title="${esc(pick.pending.prompt)}">${esc(pick.pending.prompt)}</div>` : ''}
       <div class="row">${slots(tavern)}</div>
     </section>
-    <div class="side-label sl-patrons"><span>Покровители</span></div>
+    <div class="side-label sl-patrons"><span>Владыки</span></div>
     <section class="patrons"><div class="p-row">${patronsRowHtml(s, me, focusPatron)}</div></section>
     ${sideLabel('table', 'Ваши наймиты', 'Наймиты')}
     <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">

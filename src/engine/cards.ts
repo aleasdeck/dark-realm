@@ -114,7 +114,7 @@ export const PATRONS: Record<PatronId, PatronDef> = {
   treasury: {
     id: 'treasury',
     name: 'Сундук Бездны',
-    title: 'Нейтральный покровитель',
+    title: 'Нейтральный владыка',
     palette: { bg1: '#0a0a0a', bg2: '#262019', accent: '#7d6a4d', glow: '#e8c98a' },
   },
 };
