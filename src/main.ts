@@ -5,7 +5,7 @@ import { BOT_LEVELS, type BotLevel } from './engine/bot';
 import { cardDef, LOCKED, PATRONS } from './engine/cards';
 import { actingPlayer, canCancel, draftedBy, mayDraft } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
-import type { Card, GameState, PatronId } from './engine/types';
+import type { Card, GameState, PatronId, ScriptId } from './engine/types';
 import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { DEFAULT_NAME, flushReports, ratingLine, ratingUrl, sameName, topPlayers, type RatedPlayer } from './net/rating';
 import { forgetMatch, leaveTab, savedMatch } from './net/saved';
@@ -40,7 +40,8 @@ import { journalHtml } from './ui/journal';
 import { formatClock, HOURGLASS } from './ui/clock';
 import { hideLoading, loadAll } from './ui/loading';
 import { savedBotGame } from './ui/savedGame';
-import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
+import { Coach, finale, hintAllows, showHint, type Hint } from './ui/tutorial';
+import { lessonDone, markLessonDone, newcomer } from './ui/lessons';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
 
 const app = document.getElementById('app')!;
@@ -83,7 +84,7 @@ function saveName(n: string) {
   }
 }
 
-const LEVEL_NAMES: Record<BotLevel, string> = { gentle: 'Наставник', easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
+const LEVEL_NAMES: Record<BotLevel, string> = { gentle: 'Бродяга', easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
 const LEVEL_ICONS: Record<BotLevel, string> = { gentle: 'level_gentle', easy: 'level_easy', medium: 'level_medium', hard: 'level_hard' };
 
 function roomFromUrl(): string {
@@ -128,10 +129,11 @@ let nickAsked = false;
 let nickNext: MenuView = 'net';
 
 /** Screens of the main menu; each one but the first has a way back to the one it came from. */
-type MenuView = 'home' | 'play' | 'bot' | 'net' | 'join' | 'nick' | 'rating' | 'settings';
+type MenuView = 'home' | 'play' | 'learn' | 'bot' | 'net' | 'join' | 'nick' | 'rating' | 'settings';
 const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   home: { title: '', back: 'home' },
   play: { title: 'Играть', back: 'home' },
+  learn: { title: 'Обучение', back: 'play' },
   bot: { title: 'Сложность бота', back: 'play' },
   net: { title: 'Сетевая игра', back: 'home' },
   join: { title: 'Присоединиться', back: 'net' },
@@ -140,7 +142,8 @@ const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   settings: { title: 'Настройки', back: 'home' },
 };
 
-const menuButton = (go: string, ic: string, label: string) => `<button class="menu-btn" data-go="${go}">${withIcon(ic, label)}</button>`;
+const menuButton = (go: string, ic: string, label: string, cls = '', note = '') =>
+  `<button class="menu-btn${cls ? ` ${cls}` : ''}" data-go="${go}">${withIcon(ic, label)}${note ? `<small>${note}</small>` : ''}</button>`;
 
 function menuBody(view: MenuView): string {
   switch (view) {
@@ -155,8 +158,14 @@ function menuBody(view: MenuView): string {
       // An unfinished game comes first, one tap away.
       return (
         (savedBotGame() ? menuButton('continue', 'rematch', 'Продолжить игру') : '') +
-        menuButton('tutorial', 'tutorial', 'Туториал') +
+        menuButton('learn', 'tutorial', 'Обучение', newcomer() ? 'fresh' : '') +
         menuButton('bot', 'play_bot', 'Против бота')
+      );
+    case 'learn':
+      // The basics glow until they are won; the advanced lesson is open from the start, only marked as the second.
+      return (
+        menuButton('lesson-basic', 'tutorial', 'Основы', lessonDone('basic') ? '' : 'fresh') +
+        menuButton('lesson-advanced', 'rules', 'Продвинутое', '', lessonDone('basic') ? '' : 'после основ')
       );
     case 'bot':
       return BOT_LEVELS.map((v) => menuButton(`level-${v}`, LEVEL_ICONS[v], LEVEL_NAMES[v])).join('');
@@ -226,7 +235,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
       const go = b.dataset.go!;
       const n = playerName();
       if (go === 'back') return menu('', v.back);
-      if (go === 'play' || go === 'net' || go === 'rating' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
+      if (go === 'play' || go === 'learn' || go === 'net' || go === 'rating' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
       if (go === 'rules') return showRules();
       if (go === 'nick-ok') return setNick();
       if (go === 'nick-skip') {
@@ -235,7 +244,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
       }
       if (go === 'continue') return continueBotGame();
       if (go === 'reconnect') return resume(false) || menu('Партия уже закончилась.', 'net');
-      if (go === 'tutorial') return startGame(new BotController(n, 'gentle'));
+      if (go.startsWith('lesson-')) return startLesson(go.slice(7) as ScriptId);
       if (go.startsWith('level-')) return startGame(new BotController(n, go.slice(6) as BotLevel));
       if (go === 'host') return host(n);
       if (go === 'enter') return join(n, normalizeCode(codeInput!.value));
@@ -381,6 +390,10 @@ function waiting(text: string, extra = '') {
   app.querySelector('[data-go="back"]')!.addEventListener('click', () => leaveGame());
 }
 
+function startLesson(lesson: ScriptId) {
+  startGame(new BotController(playerName(), 'gentle', undefined, lesson));
+}
+
 function host(name: string) {
   forgetNetMatches();
   startGame(new HostController(name, newRoomCode(), hostRoom));
@@ -449,7 +462,7 @@ function startGame(c: Controller) {
   peek = null;
   lastState = null;
   lastError = '';
-  coach = c instanceof BotController && c.tutorial ? new Coach() : null;
+  coach = c instanceof BotController && c.tutorial ? new Coach(c.lesson) : null;
   hint = null;
   tossed = false;
   closeCoin();
@@ -482,6 +495,7 @@ function render() {
   if (ctrl.error && ctrl.error !== lastError) play('error');
   lastError = ctrl.error;
   hint = coach?.hint(s, me) ?? null;
+  if (ctrl instanceof BotController && ctrl.tutorial && s.phase === 'over' && s.winner === me) markLessonDone(ctrl.lesson);
   if (s.phase === 'draft') {
     app.innerHTML = draftHtml(s) + netOverlay(s);
     if (hint) showHint(app, hint);
@@ -631,6 +645,18 @@ function overlays(s: GameState): string {
   // While the guest is away, the host's notice says so in place of the usual banner.
   const banner = net ? '' : ctrl!.notice || ctrl!.error;
   if (banner) html += `<div class="toast">${esc(banner)}</div>`;
+  const lesson = ctrl instanceof BotController && ctrl.tutorial ? finale(ctrl.lesson, s, me) : null;
+  if (lesson) {
+    // Two halves, side by side on a landscape screen: the vagrant's word, then what comes next.
+    html += `<div class="overlay"><div class="dialog end-dialog win lesson-end">
+      <div class="lesson-head">${icon('win', '', 'end-ic')}<h2>${esc(lesson.title)}</h2>
+      <p class="lesson-quote"><b>${esc(s.players[me === 0 ? 1 : 0].name)}:</b> «${richText(lesson.quote)}»</p></div>
+      <div class="lesson-body"><ul class="lesson-points">${lesson.points.map((x) => `<li>${richText(x)}</li>`).join('')}</ul>
+      ${lesson.next ? `<div class="buttons"><button data-act="next-lesson" data-lesson="${lesson.next}">${withIcon('rules', 'Продвинутое обучение')}</button></div>` : ''}
+      <div class="buttons"><button data-act="rematch" class="${lesson.next ? 'ghost' : ''}">${withIcon('rematch', 'Пройти ещё раз')}</button>
+      <button class="ghost" data-act="leave">${withIcon('back', 'В меню')}</button></div></div></div></div>`;
+    return html;
+  }
   if (s.phase === 'over') {
     const win = s.winner === me;
     html += `<div class="overlay"><div class="dialog end-dialog ${win ? 'win' : 'lose'}">
@@ -834,9 +860,10 @@ app.addEventListener('click', (ev) => {
   const act = el.dataset.act!;
   const uid = Number(el.dataset.uid);
   if (act === 'leave') return leaveGame();
+  if (act === 'next-lesson') return startLesson(el.dataset.lesson as ScriptId);
   if (act === 'exit') return leaveGame('', true);
   if (act === 'rematch' && ctrl instanceof BotController) {
-    if (ctrl.tutorial) coach = new Coach();
+    if (ctrl.tutorial) coach = new Coach(ctrl.lesson);
     tossed = false;
     return ctrl.restart();
   }

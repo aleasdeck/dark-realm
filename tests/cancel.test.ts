@@ -57,24 +57,17 @@ describe('calling off a patron', () => {
   });
 
   it('in the tutorial the coach asks for the Chest again after backing out', () => {
-    let s = createTutorialGame('A');
-    const coach = new Coach();
-    while (s.phase === 'draft') {
-      const pi = actingPlayer(s);
-      s = applyAction(s, pi, { t: 'draft', patron: s.draftPool[0] });
-    }
-    while (s.players[0].hand.length) {
-      s = s.pending
-        ? applyAction(s, 0, { t: 'choose', picks: s.pending.options.slice(0, Math.max(1, s.pending.min)).map((o) => o.ref) })
-        : applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
-    }
+    let s = createTutorialGame('A', 'advanced');
+    const coach = new Coach('advanced');
+    for (const patron of ['hlaalu', 'pelin', 'rajhin', 'eagle'] as const) s = applyAction(s, actingPlayer(s), { t: 'draft', patron });
+    while (s.players[0].hand.length) s = applyAction(s, 0, { t: 'play', uid: s.players[0].hand[0].uid });
     // Read the hints that only need an "OK" up to the Chest.
     for (let h = coach.hint(s, 0); h?.ok; h = coach.hint(s, 0)) coach.ack(h.id);
-    expect(coach.hint(s, 0)?.id).toBe('treasury');
+    expect(coach.hint(s, 0)?.id).toBe('chest');
     s = applyAction(s, 0, { t: 'patron', patron: 'treasury' });
-    expect(coach.hint(s, 0)?.id).toBe('choice');
+    expect(coach.hint(s, 0)?.id).toBe('chest-pick');
     s = applyAction(s, 0, { t: 'cancel' });
-    expect(coach.hint(s, 0)?.id).toBe('treasury');
+    expect(coach.hint(s, 0)?.id).toBe('chest');
   });
 });
 

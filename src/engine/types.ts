@@ -14,6 +14,8 @@ export type PatronId =
   | 'treasury';
 export type Owner = PatronId | 'neutral';
 export type PlayerIdx = 0 | 1;
+/** The two tutorial games: the basics, and the advanced one with a draft. */
+export type ScriptId = 'basic' | 'advanced';
 
 /** Atomic card/patron effects. `n` is always a non-negative amount. */
 export type Effect =
@@ -256,8 +258,8 @@ export interface GameState {
   instant?: number;
   /** Tutorial deal: these cards open the tavern, in this order. */
   tavernTop?: string[];
-  /** Tutorial: the first player's next purchases go on top of their deck, not to the cooldown. */
-  buyOnTop?: number;
+  /** A tutorial game: its director stacks the draws and the tavern (src/engine/director.ts). */
+  script?: ScriptId;
   /** Who moves first and opens the draft, as the coin fell; player 0 when no coin was tossed. */
   first?: PlayerIdx;
   /** Online games: the match's id, which both players send to the rating table with its result. */

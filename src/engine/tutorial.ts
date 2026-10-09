@@ -1,47 +1,94 @@
+import { applyAction, createGame } from './engine';
 import { cardDef } from './cards';
-import { createGame } from './engine';
-import type { GameState, PatronId } from './types';
+import type { GameState, PatronId, PlayerIdx, ScriptId } from './types';
 
-/** Patrons with the plainest cards: coins, power, draws and taunting agents, in draft order. */
-export const TUTORIAL_PATRONS: PatronId[] = ['crows', 'hlaalu', 'pelin', 'eagle'];
-export const TUTORIAL_GOAL = 20;
-export const TUTORIAL_INSTANT = 40;
-/**
- * Fixed deal: the first hand pays for the Chest (2 coins) and still buys a card in the tavern,
- * and the second hand has the 2 power the Eagle asks for.
- */
+/** The tutorial opponent, a mocking vagrant who still says exactly what to do. */
+export const TUTORIAL_OPPONENT = 'Бродяга';
+
+/** Both tutorials are dealt the same every time; the director stacks the rest. */
 export const TUTORIAL_SEED = 11;
-/**
- * The tavern opens with plain cards of the tutorial patrons. The first three cost at most the
- * 3 coins left after the Chest: power, coins, coins with a combo. The bought one goes on top of
- * the deck, so it is in the next hand.
- */
-/** Three affordable actions, plus an agent and a contract to show the card types (both too dear for now). */
-export const TUTORIAL_TAVERN = ['pelin_portcullis', 'hlaalu_exports', 'pelin_reinforce', 'hlaalu_hireling', 'crows_law'];
 
-/**
- * A short game against the gentle bot. Only the tutorial patrons are offered: the player drafts
- * the ones the coach points at and the bot takes the rest, so the deal is always the same.
- */
-export function createTutorialGame(name: string, seed = TUTORIAL_SEED): GameState {
-  return createGame(seed, [name, 'Наставник'], {
-    goal: TUTORIAL_GOAL,
-    instant: TUTORIAL_INSTANT,
-    pool: TUTORIAL_PATRONS,
-    tavernTop: TUTORIAL_TAVERN,
-    buyOnTop: 1,
-  });
+export interface Lesson {
+  /** Patrons in draft order: the player, the opponent twice, the player again. */
+  patrons: PatronId[];
+  goal: number;
+  instant: number;
+  /** Cards that open the tavern. */
+  tavern: string[];
+  /** The player drafts with the coach; otherwise the patrons are drafted before the game opens. */
+  draft: boolean;
 }
 
-/** Coins and power the first hand gives, used to pick a friendly seed. */
-export function openingValue(s: GameState) {
-  let coin = 0;
-  let power = 0;
-  for (const c of s.players[0].hand) {
-    for (const e of cardDef(c.id).play) {
-      if (e.k === 'coin') coin += e.n;
-      if (e.k === 'power') power += e.n;
-    }
+export const LESSONS: Record<ScriptId, Lesson> = {
+  // The basics: Wolf and Crow for the player, Rat and Eagle for the vagrant; a win at 20 on the fifth turn.
+  basic: {
+    patrons: ['pelin', 'hlaalu', 'eagle', 'crows'],
+    goal: 20,
+    instant: 20,
+    tavern: ['hlaalu_exports', 'pelin_portcullis', 'pelin_legion', 'pelin_reinforce', 'crows_brigand'],
+    draft: false,
+  },
+  // The advanced game: Rat and Eagle for the player, Wolf and Cat for the vagrant; 20, and he gets a reply.
+  advanced: {
+    patrons: ['hlaalu', 'pelin', 'rajhin', 'eagle'],
+    goal: 20,
+    instant: 40,
+    tavern: ['eagle_bonfire', 'hlaalu_exports', 'pelin_portcullis', 'rajhin_sleight', 'eagle_raid'],
+    draft: true,
+  },
+};
+
+/**
+ * Everything the vagrant does on a turn besides playing his cards and using his agents, tried in order.
+ * A purchase names a card, or takes the cheapest action (`cheap`) or the action with the most power (`power`).
+ */
+export type BotStep = { buy: string } | { patron: PatronId } | { attack: string };
+
+export const BOT_PLAN: Record<ScriptId, Record<number, BotStep[]>> = {
+  // His agent first, then a card with power each turn to keep up; the last purchase makes room for the final contract.
+  basic: {
+    2: [{ buy: 'crows_brigand' }],
+    4: [{ buy: 'power' }],
+    6: [{ buy: 'power' }],
+    8: [{ buy: 'power' }],
+  },
+  // The curse for the player, coins for the shield, the shield; then he knocks out the player's
+  // agent and takes the Eagle, plays the bag of tricks, and only then goes for prestige.
+  advanced: {
+    2: [{ patron: 'rajhin' }],
+    4: [{ buy: 'rajhin_sleight' }, { buy: 'pelin_portcullis' }],
+    6: [{ buy: 'pelin_bearer' }],
+    8: [{ attack: 'eagle_hunter' }, { patron: 'eagle' }, { buy: 'hlaalu_exports' }],
+    10: [{ buy: 'rajhin_tricks' }, { buy: 'power' }],
+    12: [{ buy: 'rajhin_tricks' }, { buy: 'power' }],
+    14: [{ buy: 'power' }],
+    16: [{ buy: 'power' }],
+  },
+};
+
+/** A tutorial game; the basics start straight on the table, the advanced one with the draft. */
+export function createTutorialGame(name: string, lesson: ScriptId = 'basic', seed = TUTORIAL_SEED): GameState {
+  const l = LESSONS[lesson];
+  let s = createGame(seed, [name, TUTORIAL_OPPONENT], {
+    goal: l.goal,
+    instant: l.instant,
+    pool: l.patrons,
+    tavernTop: l.tavern,
+    script: lesson,
+  });
+  if (!l.draft) {
+    for (const [i, patron] of l.patrons.entries()) s = applyAction(s, i === 0 || i === 3 ? 0 : 1, { t: 'draft', patron });
+    s.log = s.log.filter((line) => !line.includes('выбирает владыку'));
+    s.events = [];
   }
-  return { coin, power };
+  return s;
+}
+
+/** What the vagrant tells the player to buy in the advanced game once its lessons are past: dear Rat cards, then power. */
+const ADVICE = ['hlaalu_exchange', 'hlaalu_market', 'eagle_raid', 'pelin_siege', 'pelin_armory', 'pelin_volley', 'pelin_legion', 'pelin_portcullis', 'hlaalu_exports'];
+
+/** The card the vagrant points the player at in the tavern, if one is on offer and affordable. */
+export function suggestBuy(s: GameState, me: PlayerIdx): string | null {
+  const coin = s.players[me].coin;
+  return ADVICE.find((id) => s.tavern.some((c) => c.id === id) && cardDef(id).cost <= coin) ?? null;
 }
