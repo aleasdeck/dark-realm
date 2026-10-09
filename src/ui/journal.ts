@@ -1,6 +1,7 @@
 import { CARDS } from '../engine/cards';
 import { LOG_SUB } from '../engine/engine';
 import type { GameState, PlayerIdx } from '../engine/types';
+import { formatClock } from './clock';
 import { esc, paintIcons } from './rich';
 
 const BY_NAME = new Map(CARDS.map((c) => [c.name, c.id]));
@@ -20,9 +21,10 @@ function linkCards(text: string): string {
 
 /**
  * The game's journal: each turn under a heading, every move on its own line with what it gave,
- * and what it led to indented under it. Lines are tinted by whose move it was.
+ * and what it led to indented under it. Lines are tinted by whose move it was. A turn heading
+ * shows the game time the turn began at, when it is known.
  */
-export function journalHtml(s: GameState, me: PlayerIdx): string {
+export function journalHtml(s: GameState, me: PlayerIdx, turnStart: (turn: number) => number | undefined = () => undefined): string {
   const names = [s.players[me].name, s.players[me === 0 ? 1 : 0].name];
   let side = '';
   return s.log
@@ -44,7 +46,9 @@ export function journalHtml(s: GameState, me: PlayerIdx): string {
         }
       }
       const cls = [turn ? 'log-turn' : isSub ? 'log-sub' : 'log-move', side].filter(Boolean).join(' ');
-      return `<div class="${cls}">${who}${linkCards(text)}</div>`;
+      const at = turn ? turnStart(Number(/^Ход (\d+)/.exec(text)![1])) : undefined;
+      const time = at === undefined ? '' : `<span class="log-time">${formatClock(at)}</span>`;
+      return `<div class="${cls}">${who}${linkCards(text)}${time}</div>`;
     })
     .join('');
 }

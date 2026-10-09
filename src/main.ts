@@ -37,6 +37,7 @@ import { initPlayed, restorePlayed, savePlayed } from './ui/played';
 import { initDrag, restoreDrag } from './ui/drag';
 import { initFit } from './ui/fit';
 import { journalHtml } from './ui/journal';
+import { formatClock, HOURGLASS } from './ui/clock';
 import { hideLoading, loadAll } from './ui/loading';
 import { savedBotGame } from './ui/savedGame';
 import { Coach, hintAllows, showHint, type Hint } from './ui/tutorial';
@@ -444,7 +445,7 @@ function render() {
   const logAt = oldLog && oldLog.scrollTop + oldLog.clientHeight < oldLog.scrollHeight - 8 ? oldLog.scrollTop : null;
   // Where the cards were, read before the board is redrawn, so the moved ones can fly.
   const snap = prev !== s ? snapshot(app) : null;
-  onStateChange(prev, s, me);
+  onStateChange(prev, s, me, ctrl.clock);
   lastState = s;
   if (ctrl.error && ctrl.error !== lastError) play('error');
   lastError = ctrl.error;
@@ -576,6 +577,20 @@ function netOverlay(s: GameState): string {
   return '';
 }
 
+/** The game time so far, as the journal's title shows it. */
+function logClock(): string {
+  return ctrl ? `${HOURGLASS}${formatClock(ctrl.clock.elapsed())}` : '';
+}
+
+// While the journal is open its clock goes on ticking; the rest of the sheet stays as it is.
+setInterval(() => {
+  const el = modal?.kind === 'log' ? app.querySelector('.log-view .log-clock') : null;
+  if (el) el.innerHTML = logClock();
+}, 1000);
+
+// The game clock stands while the page is hidden (another app, a locked phone).
+document.addEventListener('visibilitychange', () => ctrl?.shownChanged());
+
 function overlays(s: GameState): string {
   const me = ctrl!.me;
   const net = netOverlay(s);
@@ -628,9 +643,9 @@ function overlays(s: GameState): string {
   }
   if (modal?.kind === 'log') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet log-view">
-      <h2>Журнал партии</h2>
+      <h2>Журнал партии<span class="log-clock" title="Время партии">${logClock()}</span></h2>
       <p class="hint">Нажмите на название карты, чтобы прочитать её</p>
-      <div class="log">${journalHtml(s, me)}</div>
+      <div class="log">${journalHtml(s, me, (n) => ctrl?.clock.turnStart(n))}</div>
       <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
