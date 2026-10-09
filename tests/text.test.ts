@@ -32,3 +32,12 @@ describe('fake coin', () => {
     expect(cardLines(def)).toEqual([{ label: '', text: '+1 ●' }]);
   });
 });
+
+describe('contracts', () => {
+  it('show only their effects, no rule reminders', () => {
+    const def = CARDS.find((c) => c.type === 'contractAgent' && c.name === 'Щитоносец-призрак')!;
+    expect(cardLines(def)).toEqual([{ label: 'Каждый ход', text: '+1 ⚔' }]);
+    const texts = CARDS.filter((c) => c.type.startsWith('contract')).flatMap((c) => cardLines(c).map((l) => l.text));
+    for (const t of texts) expect(t).not.toMatch(/Сразу выходит|уходит из игры|Срабатывает сразу/);
+  });
+});

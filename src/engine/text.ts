@@ -109,8 +109,6 @@ export function cardLines(def: CardDef): { label: string; text: string }[] {
     const c = def.combo?.[tier];
     if (c) lines.push({ label: `Комбо ${tier}`, text: effectsText(c) });
   }
-  if (def.type === 'contractAction' && !def.fleeting) lines.push({ label: '', text: 'Срабатывает сразу при покупке.' });
-  if (def.type === 'contractAgent') lines.push({ label: '', text: 'Сразу выходит на поле. Сражённый, уходит из игры.' });
   return lines;
 }
 
