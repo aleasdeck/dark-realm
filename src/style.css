@@ -3024,6 +3024,29 @@ button.zoom-act {
 .lesson-end .buttons button {
   flex: 1 1 auto;
 }
+/* «Пройти ещё раз» and «В меню» share a row even on the narrowest phone */
+.lesson-end .buttons + .buttons {
+  flex-wrap: nowrap;
+}
+.lesson-end .buttons + .buttons button {
+  min-width: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+@media (orientation: portrait) and (max-height: 700px) {
+  .end-dialog.lesson-end .end-ic {
+    width: 44px;
+    height: 44px;
+  }
+  .end-dialog.lesson-end h2 {
+    font-size: 26px;
+    margin: 4px 0;
+  }
+  .lesson-end .lesson-points {
+    margin-bottom: 10px;
+    line-height: 1.25;
+  }
+}
 @media (orientation: landscape) and (max-height: 560px) {
   .end-dialog.lesson-end {
     width: min(780px, 100%);
