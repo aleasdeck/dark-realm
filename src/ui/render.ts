@@ -332,10 +332,10 @@ export function boardHtml(
       <span class="counts">${count(them.deck.length, 'колода', 'pile_deck', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile_discard', 'pile-opp-cd')}</span>
     </header>
     <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name">${esc(them.name)}</span>${backsHtml(them.hand.length)}</section>
-    ${targets.size ? sideLabel('oppag attack', 'Атакуйте агентов', 'Атака') : sideLabel('oppag', 'Агенты соперника', 'Агенты')}
+    ${targets.size ? sideLabel('oppag attack', 'Атакуйте наймитов', 'Атака') : sideLabel('oppag', 'Наймиты соперника', 'Наймиты')}
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
       <div class="s-body">
-        ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">агентов нет</span>'}
+        ${theirAgents ? `<div class="part agents">${theirAgents}</div>` : theirPlayed ? '<div class="part agents"></div>' : '<span class="empty">наймитов нет</span>'}
         ${theirPlayed}
       </div>
     </section>
@@ -346,10 +346,10 @@ export function boardHtml(
     </section>
     <div class="side-label sl-patrons"><span>Покровители</span></div>
     <section class="patrons"><div class="p-row">${patronsRowHtml(s, me, focusPatron)}</div></section>
-    ${sideLabel('table', 'Ваши агенты', 'Агенты')}
+    ${sideLabel('table', 'Ваши наймиты', 'Наймиты')}
     <section class="strip my-table${played ? ' has-played' : ''}" style="--na:${you.agents.length}">
       <div class="s-body">
-        <div class="part agents">${myAgents || '<span class="empty">агентов нет</span>'}</div>
+        <div class="part agents">${myAgents || '<span class="empty">наймитов нет</span>'}</div>
         ${played}
       </div>
     </section>
@@ -449,7 +449,7 @@ export function focusView(s: GameState, me: PlayerIdx, t: Focus, idle: boolean, 
   if (theirs) {
     const can = idle && you.power > 0 && attackable(s, me).some((a) => a.uid === uid);
     const dmg = Math.min(you.power, hpLeft(theirs));
-    const label = can ? `Атаковать, −${dmg} ⚔` : you.power > 0 && idle ? 'Сначала агенты с провокацией' : 'Нужна сила для атаки';
+    const label = can ? `Атаковать, −${dmg} ⚔` : you.power > 0 && idle ? 'Сначала наймиты с провокацией' : 'Нужна сила для атаки';
     return view(theirs.id, label, can, { t: 'attack', uid }, theirs);
   }
   if (played) return view(played.id, '', false, null);

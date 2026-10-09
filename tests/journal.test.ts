@@ -42,6 +42,6 @@ describe('the journal', () => {
     expect(s.log.at(-1)).toBe('A взывает к покровителю «Ворон»: −5 ●, +4 ⚔');
     s.players[1].agents.push({ uid: 8000, id: 'hlaalu_oathman', dmg: 0, activated: false });
     s = applyAction(s, 0, { t: 'attack', uid: 8000 });
-    expect(s.log.slice(-2)).toEqual(['A атакует агента «Присягнувший счетовод»: −2', `${LOG_SUB}B теряет агента «Присягнувший счетовод»`]);
+    expect(s.log.slice(-2)).toEqual(['A атакует наймита «Присягнувший счетовод»: −2', `${LOG_SUB}B теряет наймита «Присягнувший счетовод»`]);
   });
 });

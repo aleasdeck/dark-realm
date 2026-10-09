@@ -40,16 +40,16 @@ export function effectText(e: Effect): string {
     case 'destroy':
       return `Уничтожить до ${cards(e.n)} в игре или в руке`;
     case 'knockout':
-      return e.n === 1 ? 'Сразить агента соперника' : `Сразить до ${e.n} агентов соперника`;
+      return e.n === 1 ? 'Сразить наймита соперника' : `Сразить до ${e.n} наймитов соперника`;
     case 'knockoutAll':
-      return 'Сразить всех агентов на столе, и своих, и соперника';
+      return 'Сразить всех наймитов на столе, и своих, и соперника';
     case 'returnTop':
-      if (e.agentsOnly) return `Вернуть ${e.n === 1 ? 'агента' : `до ${e.n} агентов`} из сброса наверх колоды`;
+      if (e.agentsOnly) return `Вернуть ${e.n === 1 ? 'наймита' : `до ${e.n} наймитов`} из сброса наверх колоды`;
       return `Вернуть ${e.n === 1 ? 'карту' : `до ${cards(e.n)}`} из сброса наверх колоды`;
     case 'replaceTavern':
       return `Заменить до ${cards(e.n)} в таверне`;
     case 'heal':
-      return `Исцелить своего агента на ${e.n}`;
+      return `Исцелить своего наймита на ${e.n}`;
     case 'create': {
       const name = CARD_MAP[e.card]?.name ?? e.card;
       const where = e.to === 'oppCooldown' ? 'в сброс соперника' : e.to === 'hand' ? 'в руку' : 'в свой сброс';
@@ -62,7 +62,7 @@ export function effectText(e: Effect): string {
     case 'choice':
       return e.options.map((o) => o.map(effectText).join(', ')).join(' ИЛИ ');
     case 'confine':
-      return `Заточить ${cards(e.n)} из сброса соперника под этим агентом`;
+      return `Заточить ${cards(e.n)} из сброса соперника под этим наймитом`;
     case 'setback': {
       const what = e.res === 'coin' ? `+${e.n} ${COIN}` : e.res === 'power' ? `+${e.n} ${POW}` : cards(e.n);
       return `Расплата: соперник в начале хода ${e.res === 'draw' ? 'берёт' : 'получает'} ${what}`;
@@ -79,9 +79,9 @@ export function effectText(e: Effect): string {
 const TRIGGER_TEXT: Record<TriggerOn, string> = {
   discard: 'Когда вы сбрасываете карту',
   toCooldown: 'Когда любая карта уходит в ваш сброс',
-  agentToCooldown: 'Когда другой ваш агент уходит в сброс',
-  agentPlay: 'Когда ваш агент разыгран или применён (и этот тоже)',
-  knockout: 'Когда сражён любой другой агент',
+  agentToCooldown: 'Когда другой ваш наймит уходит в сброс',
+  agentPlay: 'Когда ваш наймит разыгран или применён (и этот тоже)',
+  knockout: 'Когда сражён любой другой наймит',
 };
 
 export function effectsText(list: Effect[]): string {
@@ -90,9 +90,9 @@ export function effectsText(list: Effect[]): string {
 
 export const TYPE_NAMES: Record<CardDef['type'], string> = {
   action: 'Действие',
-  agent: 'Агент',
+  agent: 'Наймит',
   contractAction: 'Контракт',
-  contractAgent: 'Контракт-агент',
+  contractAgent: 'Контракт-наймит',
   starter: 'Начальная',
   curse: 'Проклятие',
 };
@@ -117,9 +117,9 @@ export function cardLines(def: CardDef): { label: string; text: string }[] {
 export const PATRON_RULES: Record<PatronId, { cost: string; effect: string }> = {
   treasury: { cost: `2 ${COIN}`, effect: `Уничтожить карту в игре или в руке, положить в сброс «Долговую расписку» (+2 ${COIN}).` },
   crows: { cost: `все ${COIN} (мин. 1)`, effect: `Получить ${POW} на 1 меньше, чем отдано ${COIN}. Переходит на вашу сторону, даже от соперника: нейтрален он только в начале игры. Нельзя, если он уже благоволит вам.` },
-  hlaalu: { cost: 'ваша карта ценой ≥ 1 в игре (сыгранная или агент)', effect: `Пожертвовать её и получить ${PRE} на 1 меньше её цены.` },
-  pelin: { cost: `2 ${POW} и агент в сбросе`, effect: 'Вернуть агента из сброса наверх колоды.' },
-  psijic: { cost: `4 ${COIN} и агент у соперника`, effect: 'Сразить агента соперника.' },
+  hlaalu: { cost: 'ваша карта ценой ≥ 1 в игре (сыгранная или наймит)', effect: `Пожертвовать её и получить ${PRE} на 1 меньше её цены.` },
+  pelin: { cost: `2 ${POW} и наймит в сбросе`, effect: 'Вернуть наймита из сброса наверх колоды.' },
+  psijic: { cost: `4 ${COIN} и наймит у соперника`, effect: 'Сразить наймита соперника.' },
   rajhin: { cost: `3 ${COIN}`, effect: 'Подложить «Морок» в сброс соперника.' },
   eagle: { cost: `2 ${POW}`, effect: 'Взять карту.' },
   alma: {
