@@ -8,6 +8,7 @@ import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '.
 import { newMatchId, rateGame, type RatingStatus } from '../net/rating';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
 import { LOCKSTEP, stateHash } from '../net/sync';
+import { GameClock } from './clock';
 import { forgetBotGame, saveBotGame } from './savedGame';
 import { strikePause } from './moves';
 import { draftPool, recordGame, unlockedPatrons } from './unlocks';
@@ -25,6 +26,8 @@ export abstract class Controller {
   unlocked: PatronId[] = [];
   /** Network games: where the finished game stands in the rating table; null when it isn't rated. */
   rating: RatingStatus | null = null;
+  /** How long this game has been played. */
+  clock = new GameClock();
   /** Whether finished games count toward unlocking patrons. */
   protected counts = true;
   private wasOver = false;
@@ -36,6 +39,7 @@ export abstract class Controller {
   }
 
   protected emit() {
+    this.clock.track(this.state, pageShown());
     const over = this.state?.phase === 'over';
     // A game counts once, when it ends after the draft; only a win moves the unlocks.
     if (over && !this.wasOver) {
@@ -61,11 +65,19 @@ export abstract class Controller {
   suspend() {
     this.dispose();
   }
+  /** The page was hidden or shown again: the game clock stands while nobody can see the game. */
+  shownChanged() {
+    this.clock.track(this.state, pageShown());
+  }
+
   dispose() {
+    this.clock.stop();
     this.stopRating?.();
     this.listeners = [];
   }
 }
+
+const pageShown = () => typeof document === 'undefined' || !document.hidden;
 
 /** The coin toss: who moves first and opens the draft. */
 export function tossCoin(): PlayerIdx {
@@ -178,6 +190,7 @@ export class BotController extends Controller {
   ) {
     super();
     this.counts = !this.tutorial;
+    if (!this.tutorial) this.clock = GameClock.open('bot', !!saved);
     if (saved) this.begin(saved);
     else this.restart();
   }
@@ -187,6 +200,8 @@ export class BotController extends Controller {
   }
 
   restart() {
+    // A rematch is a new game with a clock of its own.
+    if (this.state) this.clock = this.tutorial ? new GameClock() : GameClock.open('bot', false);
     this.begin(
       this.tutorial
         ? createTutorialGame(this.playerName)
@@ -299,6 +314,7 @@ export class HostController extends Controller {
     saved?: { client: string | null; state: GameState; seq?: number },
   ) {
     super();
+    this.clock = GameClock.open('host', !!saved);
     if (saved) {
       this.state = saved.state;
       this.client = saved.client;
@@ -505,6 +521,7 @@ export class GuestController extends Controller {
     restoring = false,
   ) {
     super();
+    this.clock = GameClock.open('guest', restoring);
     this.joined = restoring;
     this.notice = restoring ? 'Возвращаемся в партию…' : `Подключаемся к комнате ${code}…`;
     this.connect();

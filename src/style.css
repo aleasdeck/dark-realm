@@ -2281,11 +2281,6 @@ button.toggle[aria-pressed='true'] b {
 .log-view .log-sub .log-card {
   color: #d9bb6c;
 }
-.log-view > .hint {
-  margin: -4px 0 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
 /* each turn opens with its number and the player, as a heading over that turn's moves */
 .log-view .log div.log-turn {
   margin-top: 8px;
@@ -2297,6 +2292,25 @@ button.toggle[aria-pressed='true'] b {
 .log-view .log div.log-turn:first-child {
   margin-top: 0;
   border-top: 0;
+}
+/* the game time the turn began at, at the right end of its heading */
+.log-view .log div.log-turn {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.log-view .log .log-time {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* the game time so far, after the journal's title */
+.log-view h2 .log-clock {
+  margin-left: 10px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .dialog {
   background: var(--panel2);
@@ -2503,6 +2517,24 @@ button.toggle[aria-pressed='true'] b {
 .turn-banner.theirs {
   color: var(--them);
   text-shadow: 0 0 18px #ff3b2f;
+}
+/* the turn's number and the game time, in small type under the banner's words */
+.turn-banner small {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: #e3d3a5;
+  text-shadow: none;
+}
+.turn-banner .glass,
+.log-clock .glass {
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 2px;
+  vertical-align: -0.12em;
+  opacity: 0.85;
 }
 @keyframes turn-banner {
   0% {
@@ -3134,11 +3166,8 @@ summary > img.ic {
 .toss-coin.painted .moon img.ic {
   filter: drop-shadow(0 0 18px #ff6b5e55);
 }
-/* landscape: the journal takes the height the hint line would */
+/* landscape: the journal takes the screen's height */
 @media (orientation: landscape) and (max-height: 560px) {
-  .log-view > .hint {
-    display: none;
-  }
   .log-view .log {
     max-height: calc(100dvh - 150px);
   }

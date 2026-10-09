@@ -1,6 +1,7 @@
 import { prestigeGoal, reachedGoal } from '../engine/engine';
 import type { GameEvent, GameState, PlayerIdx } from '../engine/types';
 import { still } from './motion';
+import { formatClock, HOURGLASS, type GameClock } from './clock';
 import { agentHits, strikePause } from './moves';
 import { esc, paintIcons } from './render';
 import { play, type SoundName } from './sound';
@@ -25,16 +26,17 @@ export const GOAL_MS = 2400;
 let bannerTimer = 0;
 let goalTimer = 0;
 
-function banner(text: string, mine: boolean, delay = 0) {
+/** «Ваш ход» or «Ход соперника» across the table, with the turn's number and the game time under it. */
+function banner(text: string, sub: string, mine: boolean, delay = 0) {
   clearTimeout(bannerTimer);
   if (delay) {
-    bannerTimer = window.setTimeout(() => banner(text, mine), delay);
+    bannerTimer = window.setTimeout(() => banner(text, sub, mine), delay);
     return;
   }
   layer.querySelectorAll('.turn-banner').forEach((b) => b.remove());
   const el = document.createElement('div');
   el.className = `turn-banner ${mine ? 'mine' : 'theirs'}`;
-  el.textContent = text;
+  el.innerHTML = `${esc(text)}${sub ? `<small>${sub}</small>` : ''}`;
   layer.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
 }
@@ -77,7 +79,7 @@ const SOUND: Record<GameEvent['k'], SoundName> = {
   win: 'win',
 };
 
-export function onStateChange(prev: GameState | null, next: GameState, me: PlayerIdx) {
+export function onStateChange(prev: GameState | null, next: GameState, me: PlayerIdx, clock?: GameClock) {
   if (!prev || prev === next) return;
   const sounds = new Set<SoundName>();
   // Reaching the goal is told first; the turn banner of the same move comes after it.
@@ -89,7 +91,11 @@ export function onStateChange(prev: GameState | null, next: GameState, me: Playe
     let snd = SOUND[e.k];
     if (e.k === 'turn') {
       snd = e.p === me ? 'myTurn' : 'theirTurn';
-      if (next.phase === 'play') banner(e.p === me ? 'Ваш ход' : 'Ход соперника', e.p === me, pause + (reached.length ? GOAL_MS - 300 : 0));
+      if (next.phase === 'play') {
+        const at = clock ? (clock.turnStart(next.turn) ?? clock.elapsed()) : null;
+        const sub = `Ход ${next.turn}${at === null ? '' : ` · ${HOURGLASS}${formatClock(at)}`}`;
+        banner(e.p === me ? 'Ваш ход' : 'Ход соперника', sub, e.p === me, pause + (reached.length ? GOAL_MS - 300 : 0));
+      }
     } else if (e.k === 'win') {
       snd = e.p === me ? 'win' : 'lose';
     }
