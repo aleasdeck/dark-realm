@@ -59,6 +59,8 @@ export class Channel {
     readonly id: string,
     private out: (p: Packet) => void,
     private onEnd: () => void = () => {},
+    /** The broker the channel runs through, for the console. */
+    readonly via = '',
   ) {
     this.resend = setInterval(() => this.flush(), RESEND_MS / 2);
   }
@@ -202,11 +204,16 @@ export function relayHost(code: string, onChannel: (ch: Channel) => void, onList
               return;
             }
             const id = p.c;
-            ch = new Channel(id, reply, () => {
-              channels.delete(id);
-              ended.add(id);
-              mine.delete(ch!);
-            });
+            ch = new Channel(
+              id,
+              reply,
+              () => {
+                channels.delete(id);
+                ended.add(id);
+                mine.delete(ch!);
+              },
+              new URL(url).hostname,
+            );
             channels.set(id, ch);
             mine.add(ch);
             onChannel(ch);
@@ -299,7 +306,7 @@ export function relayJoin(code: string, urls = brokers()): RelayJoin {
         if (p.t !== 'hi' || done) return;
         finish();
         for (const m of conns) if (m !== conn) m.close();
-        ch = new Channel(c, (r) => conn.publish(hostTopic(code), JSON.stringify(r)), () => setTimeout(() => conn.close(), 200));
+        ch = new Channel(c, (r) => conn.publish(hostTopic(code), JSON.stringify(r)), () => setTimeout(() => conn.close(), 200), new URL(url).hostname);
         resolve(ch);
       },
       onClose: () => {

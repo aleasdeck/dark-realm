@@ -1,7 +1,7 @@
 import Peer, { type PeerOptions } from 'peerjs';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { PhraseId } from './phrases';
-import { relayHost, relayJoin } from './relay';
+import { relayHost, relayJoin, type Channel } from './relay';
 
 /*
  * Serverless rooms: the host registers a PeerJS id derived from the room code
@@ -109,9 +109,11 @@ interface Pipe {
   on(event: 'close' | 'error', cb: () => void): void;
 }
 
-function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link {
+/** Opens a link over `conn`; `label` names it in the console when it is lost. */
+function wrap(conn: Pipe, h: LinkHandlers, label: string, onClose: () => void = () => {}): Link {
   let closed = false;
-  let heard = Date.now();
+  const opened = Date.now();
+  let heard = opened;
   const send = (msg: NetMessage) => {
     if (!closed && conn.open) conn.send(msg);
   };
@@ -125,13 +127,15 @@ function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link
     }
     onClose();
   };
-  const lost = () => {
+  const lost = (why: string) => {
     if (closed) return;
+    const now = Date.now();
+    console.info(`[room] связь (${label}) потеряна: ${why}, жила ${Math.round((now - opened) / 1000)} с, тишина ${Math.round((now - heard) / 1000)} с`);
     stop();
     h.onClose();
   };
   const beat = setInterval(() => {
-    if (Date.now() - heard > SILENT_MS) lost();
+    if (Date.now() - heard > SILENT_MS) lost('тишина');
     else send({ type: 'ping' });
   }, PING_MS);
   conn.on('data', (d) => {
@@ -143,8 +147,8 @@ function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link
     if (msg.type === 'ping') send({ type: 'pong' });
     else if (msg.type !== 'pong') h.onMessage(msg);
   });
-  conn.on('close', lost);
-  conn.on('error', lost);
+  conn.on('close', () => lost('закрыта'));
+  conn.on('error', () => lost('ошибка'));
   return {
     send,
     close: () => {
@@ -263,11 +267,11 @@ export const hostRoom: OpenRoom = (code, onConnection) =>
       p.on('disconnected', later);
       p.on('close', later);
       p.on('connection', (conn) => {
-        conn.on('open', () => onConnection((h) => wrap(conn, h)));
+        conn.on('open', () => onConnection((h) => wrap(conn, h, 'напрямую')));
       });
     };
 
-    const relay = relayHost(code, (ch) => onConnection((h) => wrap(ch, h)), ready);
+    const relay = relayHost(code, (ch) => onConnection((h) => wrap(ch, h, `ретранслятор ${ch.via}`)), ready);
     const stopFront = onFront(() => {
       relay.wake();
       if (!peer || peer.destroyed) {
@@ -345,8 +349,9 @@ export const joinRoom: JoinRoom = (code, h) =>
       if (via === 'direct') relay.cancel();
       else direct.cancel();
       if (parked && parked !== pipe) parked.close();
-      console.info(`[room] ${code}: ${via === 'direct' ? 'прямое соединение' : 'через ретранслятор'}`);
-      resolve(wrap(pipe, h));
+      const label = via === 'direct' ? 'напрямую' : `ретранслятор ${(pipe as Channel).via}`;
+      console.info(`[room] ${code}: ${label}`);
+      resolve(wrap(pipe, h, label));
     };
     const fail = (err: RoomError) => {
       if (done) return;

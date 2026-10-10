@@ -1,0 +1,17 @@
+name: Net probe (temporary)
+on:
+  push:
+    branches: [claude/reliable-network-connect-i527ni]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm i --no-save playwright && npx playwright install --with-deps chromium
+      - run: (npx vite preview --port 4173 --host 127.0.0.1 &) && sleep 3 && node scripts/net-probe.mjs
