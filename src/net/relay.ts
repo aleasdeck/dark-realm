@@ -52,7 +52,6 @@ export class Channel {
   private unacked = new Map<number, { pkt: Packet; at: number }>();
   private early = new Map<number, Extract<Packet, { t: 'd' }>>();
   private parts: string[] = [];
-  private ackTimer: ReturnType<typeof setTimeout> | undefined;
   private resend: ReturnType<typeof setInterval>;
   private listeners: Record<string, Listener[]> = {};
 
@@ -61,14 +60,17 @@ export class Channel {
     private out: (p: Packet) => void,
     private onEnd: () => void = () => {},
   ) {
-    this.resend = setInterval(() => {
-      const now = Date.now();
-      for (const u of this.unacked.values()) {
-        if (now - u.at < RESEND_MS) continue;
-        u.at = now;
-        this.out(u.pkt);
-      }
-    }, RESEND_MS / 2);
+    this.resend = setInterval(() => this.flush(), RESEND_MS / 2);
+  }
+
+  /** Sends again what has gone unacknowledged for too long. */
+  private flush() {
+    const now = Date.now();
+    for (const u of this.unacked.values()) {
+      if (now - u.at < RESEND_MS) continue;
+      u.at = now;
+      this.out(u.pkt);
+    }
   }
 
   on(event: 'data' | 'close' | 'error', cb: Listener) {
@@ -99,6 +101,9 @@ export class Channel {
       return;
     }
     if (p.t !== 'd') return;
+    // A page in the background runs its timers once a minute, so packets that arrive drive the
+    // resending too.
+    this.flush();
     if (p.n >= this.expected) this.early.set(p.n, p);
     for (let d = this.early.get(this.expected); d; d = this.early.get(this.expected)) {
       this.early.delete(this.expected++);
@@ -115,11 +120,8 @@ export class Channel {
       this.emit('data', msg);
       if (!this.open) return;
     }
-    // Acknowledged once for a burst of packets, and again for a repeat whose ack was lost.
-    clearTimeout(this.ackTimer);
-    this.ackTimer = setTimeout(() => {
-      if (this.open && this.expected > 0) this.out({ t: 'a', c: this.id, n: this.expected - 1 });
-    }, 50);
+    // Acknowledged at once, for a repeat too (its ack was lost): a timer could wait a minute in a hidden tab.
+    if (this.open) this.out({ t: 'a', c: this.id, n: this.expected - 1 });
   }
 
   close() {
@@ -136,7 +138,6 @@ export class Channel {
     if (tell) this.out({ t: 'x', c: this.id });
     this.open = false;
     clearInterval(this.resend);
-    clearTimeout(this.ackTimer);
     this.onEnd();
     this.emit('close');
   }

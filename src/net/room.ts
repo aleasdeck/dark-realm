@@ -34,6 +34,8 @@ export type NetMessage =
   /** The host turns this connection away; the guest gives up and goes back to the menu. */
   | { type: 'reject'; message: string }
   | { type: 'ping' }
+  /** The answer to a ping, sent at once: a hidden tab's own timers may fire only once a minute. */
+  | { type: 'pong' }
   | { type: 'bye' };
 
 const PREFIX = 'dark-realm-tot-';
@@ -133,7 +135,10 @@ function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link
     if (closed) return;
     heard = Date.now();
     const msg = d as NetMessage;
-    if (msg.type !== 'ping') h.onMessage(msg);
+    // Each side hears the other at least as often as it pings itself, even when the other
+    // page is in the background and its browser runs its timers once a minute.
+    if (msg.type === 'ping') send({ type: 'pong' });
+    else if (msg.type !== 'pong') h.onMessage(msg);
   });
   conn.on('close', lost);
   conn.on('error', lost);
