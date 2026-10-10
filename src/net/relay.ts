@@ -256,9 +256,8 @@ class Line {
   renew() {
     const now = Date.now();
     if (this.closed || this.next || now - this.renewed < STALL_MS) return;
-    // The first time goes in the connection log, the rest only to the console.
-    if (this.mq) (this.renewed ? console.info : mqttLog)(`${this.name} молчит, переподключаюсь`);
     this.renewed = now;
+    if (this.mq) mqttLog(`${this.name} молчит, переподключаюсь`);
     this.dial();
   }
 
