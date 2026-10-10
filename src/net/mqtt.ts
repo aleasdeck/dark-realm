@@ -123,7 +123,7 @@ export function readPublish(p: Packet): { topic: string; payload: string; id?: n
   return { topic, payload: dec.decode(p.body.subarray(at)), id };
 }
 
-/** Where a broker that dropped a working connection is reported (the connection log in room.ts). */
+/** Where a broker that dropped a working connection is reported (the console, via room.ts). */
 let onLog: ((text: string) => void) | null = null;
 export function logMqttTo(fn: (text: string) => void) {
   onLog = fn;

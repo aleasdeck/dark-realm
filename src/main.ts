@@ -6,7 +6,7 @@ import { cardDef, LOCKED, PATRONS } from './engine/cards';
 import { actingPlayer, canCancel, draftedBy, mayDraft } from './engine/engine';
 import { PATRON_RULES } from './engine/text';
 import type { Card, GameState, PatronId, ScriptId } from './engine/types';
-import { hostRoom, joinRoom, netLog, newRoomCode, normalizeCode } from './net/room';
+import { hostRoom, joinRoom, newRoomCode, normalizeCode } from './net/room';
 import { DEFAULT_NAME, flushReports, ratingLine, ratingUrl, sameName, topPlayers, type RatedPlayer } from './net/rating';
 import { forgetMatch, leaveTab, savedMatch } from './net/saved';
 import { BotController, Controller, GuestController, HostController } from './ui/controller';
@@ -753,7 +753,6 @@ function overlays(s: GameState): string {
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
       <h2>Меню${ctrl instanceof HostController || ctrl instanceof GuestController ? `<span class="room-tag">Комната <b>${esc(ctrl.code)}</b></span>` : ''}</h2>
-      ${ctrl instanceof HostController || ctrl instanceof GuestController ? `<div class="net-log">${netLog().slice(-3).map(esc).join('<br>')}</div>` : ''}
       <div class="sheet-actions column">
         <button data-act="log">${withIcon('log', 'Журнал партии')}</button>
         <button data-act="rules">${withIcon('rules', 'Правила')}</button>

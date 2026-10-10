@@ -58,16 +58,8 @@ const JOIN_MS = 20000;
 /** A link that goes silent sooner than this after opening counts against its way through. */
 const SHORT_MS = 60000;
 
-/** The last connection events, for the game menu: which way the link goes and why it dropped. */
-const events: string[] = [];
-export function netLog(): readonly string[] {
-  return events;
-}
+/** Connection events for the console: which way the link goes and why it dropped. */
 export function note(text: string) {
-  const t = new Date();
-  const hms = [t.getHours(), t.getMinutes(), t.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
-  events.push(`${hms} ${text}`);
-  if (events.length > 8) events.shift();
   console.info(`[room] ${text}`);
 }
 logMqttTo(note);
