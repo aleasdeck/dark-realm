@@ -286,10 +286,19 @@ function sideLabel(cls: string, full: string, short: string) {
   return `<div class="side-label sl-${cls}"><span class="sl-full">${full}</span><span class="sl-short">${short}</span></div>`;
 }
 
+/** The crossed out, pulsing mark by the name of an opponent who dropped out of a network game. */
+export function lostMark(): string {
+  return `<span class="net-lost" role="img" aria-label="Соперник без связи" title="Соперник переподключается">${icon('net_lost', '⚠')}</span>`;
+}
+
+/**
+ * The table. `net` is set in network games: the players' names open the phrases (`say`), and
+ * the opponent's shows that they dropped out (`lost`).
+ */
 export function boardHtml(
   s: GameState,
   me: PlayerIdx,
-  opts: { myTurn: boolean; idle: boolean; focus: Focus | null; pick: TavernPick | null },
+  opts: { myTurn: boolean; idle: boolean; focus: Focus | null; pick: TavernPick | null; net?: { say: boolean; lost: boolean } },
 ): string {
   const you = s.players[me];
   const them = s.players[other(me)];
@@ -324,14 +333,16 @@ export function boardHtml(
     })
     .join('');
   const focusPatron = opts.focus?.kind === 'patron' ? opts.focus.patron : null;
+  const say = (side: 'me' | 'opp') => (opts.net?.say ? ` data-act="say" data-side="${side}"` : '');
+  const lost = opts.net?.lost ? lostMark() : '';
 
   return `<div class="game ${opts.myTurn ? 'my-turn' : 'their-turn'}">
     <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
-      <span class="who">${esc(them.name)}</span>
+      ${lost}<span class="who"${say('opp')}>${esc(them.name)}</span>
       <span class="res-group">${res(them, prestigeGoal(s))}</span>
       <span class="counts">${count(them.deck.length, 'колода', 'pile_deck', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile_discard', 'pile-opp-cd')}</span>
     </header>
-    <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name">${esc(them.name)}</span>${backsHtml(them.hand.length)}</section>
+    <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name">${lost}<span${say('opp')}>${esc(them.name)}</span></span>${backsHtml(them.hand.length)}</section>
     ${targets.size ? sideLabel('oppag attack', 'Атакуйте наймитов', 'Атака') : sideLabel('oppag', 'Наймиты соперника', 'Наймиты')}
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
       <div class="s-body">
@@ -355,7 +366,7 @@ export function boardHtml(
     </section>
     <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
     <div class="bar my-bar${opts.myTurn ? ' active' : ''}">
-      <span class="who">${esc(you.name)}</span>
+      <span class="who"${say('me')}>${esc(you.name)}</span>
       <span class="res-group">${res(you, prestigeGoal(s))}</span>
       <span class="counts">${count(you.deck.length, 'колода', 'pile_deck', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile_discard', 'pile-cd')}</span>
     </div>

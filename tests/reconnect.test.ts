@@ -79,11 +79,14 @@ describe('host reconnect', () => {
 
     first.drop();
     expect(host.online).toBe(false);
-    expect(host.notice).toBe('Соперник переподключается…');
+    // The table shows a mark by the opponent's name instead of a notice.
+    expect(host.reconnecting).toBe(true);
+    expect(host.notice).toBe('');
 
     const again = room.connect();
     again.say({ type: 'hello', name: 'Гость', client: 'g1' });
     expect(host.online).toBe(true);
+    expect(host.reconnecting).toBe(false);
     expect(host.notice).toBe('');
     expect(lastState(again)).toEqual({ type: 'state', state: host.state, seq: 0 });
   });
@@ -134,7 +137,8 @@ describe('host reconnect', () => {
     const back = new HostController(saved.name, saved.code, room2.open, saved);
     expect(back.state).toEqual(host.state);
     await Promise.resolve();
-    expect(back.notice).toBe('Соперник переподключается…');
+    expect(back.notice).toBe('');
+    expect(back.reconnecting).toBe(true);
     const g = room2.connect();
     g.say({ type: 'hello', name: 'Гость', client: 'g1' });
     expect(back.online).toBe(true);
@@ -298,6 +302,58 @@ describe('online draft', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(w.sent.find((m) => m.type === 'hello')).toMatchObject({ patrons: ['hunding'] });
+    guest.dispose();
+  });
+});
+
+describe('phrases', () => {
+  it('sends a phrase to the guest and shows it on the host too', async () => {
+    const room = fakeRoom();
+    const host = new HostController('Хозяин', 'ABCDE', room.open);
+    await Promise.resolve();
+    const heard: [number, string][] = [];
+    host.onPhrase = (by, id) => heard.push([by, id]);
+    expect(host.say('hello')).toBe(false);
+
+    const g = room.connect();
+    g.say({ type: 'hello', name: 'Гость', client: 'g1' });
+    expect(host.say('hello')).toBe(true);
+    expect(g.sent.at(-1)).toEqual({ type: 'say', phrase: 'hello' });
+    g.say({ type: 'say', phrase: 'sorry' });
+    // An unknown phrase and a flood of them are dropped.
+    g.say({ type: 'say', phrase: 'nonsense' as never });
+    g.say({ type: 'say', phrase: 'thanks' });
+    expect(heard).toEqual([
+      [0, 'hello'],
+      [1, 'sorry'],
+    ]);
+    host.dispose();
+  });
+
+  it('lets the guest speak only while the host is there', async () => {
+    const { accept, w } = wire();
+    const join: JoinRoom = async (_code, handlers) => accept(handlers);
+    const guest = new GuestController('ABCDE', 'Гость', join);
+    const heard: [number, string][] = [];
+    guest.onPhrase = (by, id) => heard.push([by, id]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(guest.say('curse')).toBe(false);
+
+    const room = fakeRoom();
+    const host = new HostController('Хозяин', 'ABCDE', room.open);
+    await Promise.resolve();
+    const h = room.connect();
+    h.say({ type: 'hello', name: 'Гость', client: 'g1' });
+    w.say(lastState(h)!);
+    expect(guest.say('curse')).toBe(true);
+    expect(w.sent.at(-1)).toEqual({ type: 'say', phrase: 'curse' });
+    w.say({ type: 'say', phrase: 'thanks' });
+    expect(heard).toEqual([
+      [1, 'curse'],
+      [0, 'thanks'],
+    ]);
+    host.dispose();
     guest.dispose();
   });
 });
