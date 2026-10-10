@@ -2712,6 +2712,8 @@ button.toggle[aria-pressed='true'] b {
 @media (min-aspect-ratio: 4/3) and (min-height: 561px) {
   :root {
     --z: 1.25;
+    /* what lies over the table grows a little less than the table itself */
+    --zs: max(1, var(--z) * 0.75);
   }
   .game {
     zoom: var(--z);
@@ -2727,7 +2729,24 @@ button.toggle[aria-pressed='true'] b {
   .zoom > *,
   .tooltip .card.big,
   .peek-card .card.big {
-    zoom: max(1, var(--z) * 0.75);
+    zoom: var(--zs);
+  }
+  /* so do the sheets and dialogs over the table (piles, choices, journal, game menu, the end);
+     their dvh caps are divided back */
+  body:has(.game) :is(.sheet, .dialog, .peek-actions) {
+    zoom: var(--zs);
+  }
+  body:has(.game) .sheet {
+    max-height: calc(92dvh / var(--zs));
+  }
+  body:has(.game) .dialog {
+    max-width: calc(92vw / var(--zs));
+  }
+  body:has(.game) :is(.dialog.intro, .lesson-end) {
+    max-height: calc(100dvh / var(--zs) - 24px);
+  }
+  body:has(.game) .log-view .log {
+    max-height: min(calc(66dvh / var(--zs)), calc(100dvh / var(--zs) - 190px));
   }
 }
 @media (min-aspect-ratio: 4/3) and (min-height: 700px) {
