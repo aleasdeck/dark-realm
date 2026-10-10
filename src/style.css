@@ -214,11 +214,7 @@ input {
 button.menu-btn {
   padding: 14px;
   font-size: 18px;
-  /* each button is its own slab of dark stone (textures.ts) */
-  background:
-    var(--tex, none) center / cover no-repeat,
-    linear-gradient(#0f2117d9, #08140dd9);
-  text-shadow: 0 1px 2px #000, 0 0 8px #000c;
+  background: linear-gradient(#1f4a30b8, #12301fb8);
   border-color: #3f8a5cc0;
   box-shadow: inset 0 1px 0 #ffffff1a, 0 2px 8px #0008;
   backdrop-filter: blur(3px);
@@ -3167,24 +3163,6 @@ button.menu-btn > img.ic {
     transform: scale(1.12) rotate(-4deg);
   }
 }
-/* the slab's cracks light up from inside while it is pressed (menuFx.ts adds .lit) */
-button.menu-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: var(--glow, none) center / cover no-repeat;
-  mix-blend-mode: screen;
-  opacity: 0;
-  transition: opacity 0.6s ease-out;
-}
-button.menu-btn.lit::before {
-  opacity: 1;
-  transition-duration: 0.12s;
-}
-button.menu-btn > :not(.press-glow) {
-  position: relative;
-}
 /* the menu's screens slide in from the side; nothing they carry past the edge may widen the page */
 #app:has(> .menu) {
   overflow: clip;
@@ -3216,8 +3194,7 @@ button.menu-btn > :not(.press-glow) {
   .menu button.toggle,
   .menu-sheet .sheet-actions button,
   .menu > button,
-  button.menu-btn > img.ic,
-  button.menu-btn::before {
+  button.menu-btn > img.ic {
     transition: none;
   }
 }

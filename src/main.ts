@@ -40,7 +40,6 @@ import { journalHtml } from './ui/journal';
 import { formatClock, HOURGLASS } from './ui/clock';
 import { hideLoading, loadAll } from './ui/loading';
 import { fadeIn, initMenuFx, playMenu, shootMenu } from './ui/menuFx';
-import { textureStyle } from './ui/textures';
 import { savedBotGame } from './ui/savedGame';
 import { Coach, finale, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { lessonDone, markLessonDone, newcomer } from './ui/lessons';
@@ -152,7 +151,7 @@ function menuDepth(view: MenuView): number {
 }
 
 const menuButton = (go: string, ic: string, label: string, cls = '', note = '') =>
-  `<button class="menu-btn${cls ? ` ${cls}` : ''}" data-go="${go}"${textureStyle(go)}>${withIcon(ic, label)}${note ? `<small>${note}</small>` : ''}</button>`;
+  `<button class="menu-btn${cls ? ` ${cls}` : ''}" data-go="${go}">${withIcon(ic, label)}${note ? `<small>${note}</small>` : ''}</button>`;
 
 function menuBody(view: MenuView): string {
   switch (view) {
@@ -185,7 +184,7 @@ function menuBody(view: MenuView): string {
         menuButton('join', 'join', 'Присоединиться')
       );
     case 'join':
-      return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter"${textureStyle('enter')}>${withIcon('join', 'Войти')}</button></div>`;
+      return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter">${withIcon('join', 'Войти')}</button></div>`;
     case 'nick':
       return `<p class="nick-text">Придумайте ник: его увидит соперник, и под ним вы попадёте в рейтинг. Сменить ник можно в Настройках.</p>
         <input id="nick" maxlength="24" placeholder="Ваш ник" autocomplete="nickname">
