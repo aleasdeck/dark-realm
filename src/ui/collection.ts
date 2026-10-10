@@ -54,24 +54,29 @@ function note(d: CardDef): string {
 function headHtml(t: Tab): string {
   if (t === 'neutral') return `<div class="coll-head"><h3>Общие карты</h3><span class="coll-sub">ничьи</span></div>`;
   const p = PATRONS[t];
-  return `<div class="coll-head"><h3 style="color:${p.palette.glow}">${esc(p.name)}</h3><span class="coll-sub">${esc(p.title)}</span></div>`;
+  return `<div class="coll-head"><h3 style="color:${p.palette.glow}">${esc(p.name)}</h3><span class="coll-sub">${esc(p.title)}</span></div>${callHtml(t)}`;
 }
 
-/** Under the cards: how big the deck is and what calling its patron does. */
+/** What calling the patron costs and does, right under its name. */
+function callHtml(t: PatronId): string {
+  const rule = PATRON_RULES[t];
+  return `<p class="coll-call"><b>Призыв:</b> ${richText(rule.cost)} → ${richText(rule.effect)}</p>`;
+}
+
+/** Under the cards: how big the deck is, or where the common cards come from. */
 function footHtml(t: Tab): string {
   if (t === 'neutral') {
     return `<p class="coll-rule">${['«Золото»: 6 штук в начальной колоде.', '«Фальшивую монету» получает второй игрок в первый ход.', '«Долговую расписку» даёт призыв Сундука Бездны.', '«Морок» подкладывает в сброс соперник, призвав Кота.'].join(' ')}</p>`;
   }
   const count = CARDS.filter((c) => c.patron === t).reduce((n, c) => n + c.copies, 0);
-  const rule = PATRON_RULES[t];
-  return `<p class="coll-rule">${count} карт в таверне.</p><p class="coll-rule"><b>Призыв:</b> ${richText(rule.cost)} → ${richText(rule.effect)}</p>`;
+  return `<p class="coll-rule">${count} карт в таверне.</p>`;
 }
 
 function lockedHtml(t: PatronId): string {
   const p = PATRONS[t];
   return `<div class="coll-closed" style="--accent:${p.palette.accent};--glow:${p.palette.glow}">
     <div class="coll-closed-emblem"><img src="${patronEmblem(t)}" alt="" draggable="false">${icon('lock', '🔒', 'coll-lock')}</div>
-    <h3>${esc(p.name)}</h3><p>Колода закрыта. ${esc(unlockHint(t))}</p></div>`;
+    <h3>${esc(p.name)}</h3><p>Колода закрыта. ${esc(unlockHint(t))}</p>${callHtml(t)}</div>`;
 }
 
 function bodyHtml(t: Tab): string {

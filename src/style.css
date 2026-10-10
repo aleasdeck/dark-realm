@@ -553,6 +553,20 @@ button.coll-tab {
   font-size: 13px;
   color: var(--muted);
 }
+.coll-call {
+  margin: -2px 0 2px;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+  background: #0f2219cc;
+  border-left: 2px solid var(--green);
+  border-radius: 4px;
+}
+.coll-closed .coll-call {
+  max-width: 360px;
+  color: var(--text);
+}
 .coll-rule {
   margin: 0;
   padding: 0 2px;
