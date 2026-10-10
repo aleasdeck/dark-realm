@@ -1778,8 +1778,9 @@ button.coll-tab {
 
 /* phones held sideways: the fields run the full width, as in the original game, and the patrons
    stand in a column on the right. The bars sit in the corners next to the patrons, the opponent's
-   on top and yours at the bottom over the controls; the hands fill the rest of those rows */
-@media (orientation: landscape) and (max-height: 560px) {
+   on top and yours at the bottom over the controls; the hands fill the rest of those rows.
+   A wide computer screen gets the same table, zoomed up (see the end of the game screen's rules) */
+@media (orientation: landscape) and (max-height: 560px), (min-aspect-ratio: 4/3) and (min-height: 561px) {
   :root {
     --tw: min(13.5dvh, 90px);
   }
@@ -2687,8 +2688,8 @@ button.toggle[aria-pressed='true'] b {
   }
 }
 
-/* big screens: scale the whole table up instead of leaving it tiny */
-@media (min-width: 1000px) and (min-height: 760px) {
+/* big upright screens: scale the whole table up instead of leaving it tiny */
+@media (min-width: 1000px) and (min-height: 760px) and (max-aspect-ratio: 4/3) {
   .game {
     zoom: 1.3;
     height: calc(100dvh / 1.3);
@@ -2697,13 +2698,61 @@ button.toggle[aria-pressed='true'] b {
     --tx: clamp(0px, (100dvh / 1.3 - 700px) * 0.2, min(var(--tw) * 0.35, 26px));
   }
 }
-@media (min-width: 1400px) and (min-height: 960px) {
+@media (min-width: 1400px) and (min-height: 960px) and (max-aspect-ratio: 4/3) {
   .game {
     zoom: 1.5;
     height: calc(100dvh / 1.5);
     /* the zoomed table has less height than the viewport, so tiles must not size off raw dvh */
     --tw: min(124px, calc(11.5dvh / 1.5));
     --tx: clamp(0px, (100dvh / 1.5 - 700px) * 0.2, min(var(--tw) * 0.35, 26px));
+  }
+}
+/* wide computer screens: the sideways table, drawn for a low phone screen, is zoomed until it is
+   about that low (450-560px), so a monitor shows it big rather than lost in empty fields */
+@media (min-aspect-ratio: 4/3) and (min-height: 561px) {
+  :root {
+    --z: 1.25;
+  }
+  .game {
+    zoom: var(--z);
+    height: calc(100dvh / var(--z));
+    /* the zoomed table has less height than the viewport, so nothing in it sizes off raw dvh;
+       the tavern cards are a little taller than on a phone, the agent strips have room to spare */
+    --tw: min(calc(16dvh / var(--z)), 100px);
+    --hw: min(calc(17dvh / var(--z)), 112px);
+    --emb: clamp(18px, (100dvh / var(--z) - 160px) / 8.2, 34px);
+    --tx: 0px;
+  }
+  /* the enlarged card lies over the table, outside its zoom, so it grows on its own */
+  .zoom > *,
+  .tooltip .card.big,
+  .peek-card .card.big {
+    zoom: max(1, var(--z) * 0.75);
+  }
+}
+@media (min-aspect-ratio: 4/3) and (min-height: 700px) {
+  :root {
+    --z: 1.55;
+  }
+}
+@media (min-aspect-ratio: 4/3) and (min-height: 850px) {
+  :root {
+    --z: 1.85;
+  }
+}
+@media (min-aspect-ratio: 4/3) and (min-height: 1000px) {
+  :root {
+    --z: 2.2;
+  }
+}
+@media (min-aspect-ratio: 4/3) and (min-height: 1200px) {
+  :root {
+    --z: 2.6;
+  }
+}
+@media (min-aspect-ratio: 4/3) and (min-height: 1440px) {
+  :root {
+    --z: 3.1;
   }
 }
 
@@ -3796,7 +3845,7 @@ summary > img.ic {
   }
 }
 /* held sideways the name sits in a narrow gap left of the opponent's hand */
-@media (orientation: landscape) and (max-height: 560px) {
+@media (orientation: landscape) and (max-height: 560px), (min-aspect-ratio: 4/3) and (min-height: 561px) {
   .oh-name .net-lost {
     width: 18px;
     height: 18px;
