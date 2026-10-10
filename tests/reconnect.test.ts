@@ -327,6 +327,11 @@ describe('phrases', () => {
       [0, 'hello'],
       [1, 'sorry'],
     ]);
+    // Half a minute later the guest may speak again.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 30000);
+    g.say({ type: 'say', phrase: 'thanks' });
+    expect(heard.at(-1)).toEqual([1, 'thanks']);
     host.dispose();
   });
 

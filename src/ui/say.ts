@@ -7,9 +7,9 @@ import { esc } from './rich';
  * the table, so redrawing the table doesn't cut them short.
  */
 
-/** How long a bubble stays up, and how long after saying something the menu stays shut. */
+/** How long a bubble stays up, and how long after saying something the menu stays shut (no word of it anywhere). */
 const SHOWN_MS = 4500;
-const PAUSE_MS = 3000;
+const PAUSE_MS = 30000;
 
 let saidAt = 0;
 const bubbles = new Map<'me' | 'opp', { el: HTMLElement; timer: number }>();

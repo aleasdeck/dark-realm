@@ -74,10 +74,13 @@ export abstract class Controller {
     this.onPhrase?.(this.me, id);
     return true;
   }
-  /** A phrase from the opponent; a flood of them shows one a second at most. */
+  /**
+   * A phrase from the opponent. A player may say one every 30 s; a game that sends them
+   * faster has some dropped (with a little slack for timers that run late).
+   */
   protected heard(id: unknown) {
     const now = Date.now();
-    if (!isPhrase(id) || now - this.heardAt < 1000) return;
+    if (!isPhrase(id) || now - this.heardAt < 25000) return;
     this.heardAt = now;
     this.onPhrase?.(this.me === 0 ? 1 : 0, id);
   }
