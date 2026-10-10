@@ -12,12 +12,15 @@ function plural(n: number, one: string, few: string, many: string): string {
 /**
  * Resource icons, the same glyphs as on the player bars. Effect texts write amounts as "+2 ●"
  * and the UI paints them in the resource's color (richText in src/ui/render.ts).
+ * Card counts in rules texts are "3 ▯", painted as a small card.
  */
-export const ICON = { coin: '●', power: '⚔', prestige: '✦' } as const;
-const { coin: COIN, power: POW, prestige: PRE } = ICON;
+export const ICON = { coin: '●', power: '⚔', prestige: '✦', card: '▯' } as const;
+const { coin: COIN, power: POW, prestige: PRE, card: CARD } = ICON;
 
-/** "1 карту", "3 карты", "5 карт". */
+/** "1 карту", "3 карты", "5 карт": for the journal and messages. */
 export const cards = (n: number) => `${n} ${plural(n, 'карту', 'карты', 'карт')}`;
+/** "3 ▯": card counts in card and patron texts. */
+const nc = (n: number) => `${n} ${CARD}`;
 
 export function effectText(e: Effect): string {
   switch (e.k) {
@@ -30,24 +33,24 @@ export function effectText(e: Effect): string {
     case 'oppLosePrestige':
       return `Соперник теряет ${e.n} ${PRE}`;
     case 'draw':
-      return `Взять ${cards(e.n)}`;
+      return `Взять ${nc(e.n)}`;
     case 'oppDiscard':
-      return `Соперник сбрасывает ${cards(e.n)}`;
+      return `Соперник сбрасывает ${nc(e.n)}`;
     case 'acquire':
       return `Получить карту из таверны ценой до ${e.n}`;
     case 'toss':
-      return `Просмотреть ${e.n} верхн. карт колоды и сбросить любые`;
+      return `Просмотреть ${nc(e.n)} сверху колоды и сбросить любые`;
     case 'destroy':
-      return `Уничтожить до ${cards(e.n)} в игре или в руке`;
+      return `Уничтожить до ${nc(e.n)} в игре или в руке`;
     case 'knockout':
       return e.n === 1 ? 'Сразить наймита соперника' : `Сразить до ${e.n} наймитов соперника`;
     case 'knockoutAll':
       return 'Сразить всех наймитов на столе, и своих, и соперника';
     case 'returnTop':
       if (e.agentsOnly) return `Вернуть ${e.n === 1 ? 'наймита' : `до ${e.n} наймитов`} из сброса наверх колоды`;
-      return `Вернуть ${e.n === 1 ? 'карту' : `до ${cards(e.n)}`} из сброса наверх колоды`;
+      return `Вернуть ${e.n === 1 ? nc(1) : `до ${nc(e.n)}`} из сброса наверх колоды`;
     case 'replaceTavern':
-      return `Заменить до ${cards(e.n)} в таверне`;
+      return `Заменить до ${nc(e.n)} в таверне`;
     case 'heal':
       return `Исцелить своего наймита на ${e.n}`;
     case 'create': {
@@ -58,21 +61,21 @@ export function effectText(e: Effect): string {
     case 'patronCall':
       return `+${e.n} призыв владыки`;
     case 'donate':
-      return `Сбросить до ${cards(e.n)} из руки и взять столько же`;
+      return `Сбросить до ${nc(e.n)} из руки и взять столько же`;
     case 'choice':
       return e.options.map((o) => o.map(effectText).join(', ')).join(' ИЛИ ');
     case 'confine':
-      return `Заточить ${cards(e.n)} из сброса соперника под этим наймитом`;
+      return `Заточить ${nc(e.n)} из сброса соперника под этим наймитом`;
     case 'setback': {
-      const what = e.res === 'coin' ? `+${e.n} ${COIN}` : e.res === 'power' ? `+${e.n} ${POW}` : cards(e.n);
+      const what = e.res === 'coin' ? `+${e.n} ${COIN}` : e.res === 'power' ? `+${e.n} ${POW}` : nc(e.n);
       return `Расплата: соперник в начале хода ${e.res === 'draw' ? 'берёт' : 'получает'} ${what}`;
     }
     case 'reprieve':
-      return `Посмотреть ${e.n} верхн. карт колоды соперника и одну отправить в его сброс`;
+      return `Посмотреть ${nc(e.n)} сверху колоды соперника и одну отправить в его сброс`;
     case 'bargain':
       return 'Взять любую карту таверны (не контракт), соперник получает такую же';
     case 'selfDiscard':
-      return `Сбросить ${cards(e.n)} из руки`;
+      return `Сбросить ${nc(e.n)} из руки`;
   }
 }
 
@@ -119,15 +122,15 @@ export const PATRON_RULES: Record<PatronId, { cost: string; effect: string }> = 
   pelin: { cost: `2 ${POW} и наймит в сбросе`, effect: 'Вернуть наймита из сброса наверх колоды.' },
   psijic: { cost: `4 ${COIN} и наймит у соперника`, effect: 'Сразить наймита соперника.' },
   rajhin: { cost: `3 ${COIN}`, effect: 'Подложить «Морок» в сброс соперника.' },
-  eagle: { cost: `2 ${POW}`, effect: 'Взять карту.' },
+  eagle: { cost: `2 ${POW}`, effect: `Взять 1 ${CARD}.` },
   alma: {
     cost: `благоволит: 1 ${COIN} и сброс карты; нейтральна: сброс карты; против вас: 1 ${COIN}`,
-    effect: 'Посмотреть 5 / 4 / 3 верхние карты колоды соперника и одну отправить в его сброс.',
+    effect: `Посмотреть 5 / 4 / 3 ${CARD} сверху колоды соперника и одну отправить в его сброс.`,
   },
   hunding: { cost: `2 ${POW}`, effect: `+1 ${COIN}. Пока он благоволит вам, вы получаете +1 ${COIN} в начале каждого хода.` },
   druid: {
     cost: `2 ${POW}`,
-    effect: 'Заменить до 2 карт в таверне. Пока благоволит, 4-я карта Оленя за ход (5-я, пока нейтрален) приносит «Химеру».',
+    effect: `Заменить до 2 ${CARD} в таверне. Пока благоволит, 4-я карта Оленя за ход (5-я, пока нейтрален) приносит «Химеру».`,
   },
   mora: { cost: `3 ${POW} (2, если благоволит сопернику)`, effect: 'Взять любую карту таверны (не контракт); соперник получает такую же.' },
   alessia: {
@@ -136,6 +139,6 @@ export const PATRON_RULES: Record<PatronId, { cost: string; effect: string }> = 
   },
   orgnum: {
     cost: `3 / 2 / 1 ${COIN} (благоволит / нейтрален / против вас)`,
-    effect: `${POW} за размер колоды: +1 за каждые 4 карты и «Разграбление острова» в сброс / +1 за каждые 6 карт / просто +2 ${POW}.`,
+    effect: `${POW} за размер колоды: +1 за каждые 4 ${CARD} и «Разграбление острова» в сброс / +1 за каждые 6 ${CARD} / просто +2 ${POW}.`,
   },
 };
