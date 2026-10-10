@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PacketReader, connectPacket, publishPacket, readPublish, subscribePacket } from '../src/net/mqtt';
-import { Channel, PART, type Packet } from '../src/net/relay';
+import { Channel, PART, STALL_MS, type Packet } from '../src/net/relay';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -71,6 +71,39 @@ describe('relay channel', () => {
     expect(got.b).toEqual([]);
     for (const d of held.reverse()) d();
     expect(got.b).toEqual([0, 1, 2, 3, 4, 5].map((i) => ({ i })));
+  });
+
+  it('runs over several brokers at once and acks each packet once', () => {
+    vi.useFakeTimers();
+    let acks = 0;
+    // Every packet goes over three brokers, so each end gets three copies.
+    const { a, got } = pair((p, d) => {
+      if (p.t === 'a') acks++;
+      d();
+      d();
+      d();
+    });
+    for (let i = 0; i < 5; i++) a.send({ i });
+    expect(got.b).toEqual([0, 1, 2, 3, 4].map((i) => ({ i })));
+    expect(acks).toBe(5);
+  });
+
+  it('tells when what it sent has gone unacknowledged too long', async () => {
+    vi.useFakeTimers();
+    let through = true;
+    const { a } = pair((_p, d) => through && d());
+    a.send({ i: 1 });
+    expect(a.stalled(STALL_MS)).toBe(false);
+    through = false;
+    a.send({ i: 2 });
+    await vi.advanceTimersByTimeAsync(STALL_MS - 100);
+    expect(a.stalled(STALL_MS)).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(a.stalled(STALL_MS)).toBe(true);
+    // A fresh connection gets the resent packet through.
+    through = true;
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(a.stalled(STALL_MS)).toBe(false);
   });
 
   it('tells the other side when it closes', () => {
