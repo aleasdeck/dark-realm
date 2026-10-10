@@ -214,7 +214,7 @@ input {
 button.menu-btn {
   padding: 14px;
   font-size: 18px;
-  /* each button wears its own material (textures.ts) over the translucent green */
+  /* each button is its own slab of stone (textures.ts) over the translucent green */
   background:
     var(--tex, none) center / cover no-repeat,
     linear-gradient(#1f4a30b8, #12301fb8);
