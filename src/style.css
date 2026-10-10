@@ -3815,6 +3815,18 @@ summary > img.ic {
   letter-spacing: 0.08em;
 }
 
+/* the game menu's last connection events: which way the link goes, why it dropped */
+.menu-sheet .net-log {
+  margin: -4px 0 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  text-align: center;
+}
+.menu-sheet .net-log:empty {
+  display: none;
+}
+
 /* the opponent dropped out: a red, crossed out connection pulses by their name */
 .net-lost {
   display: inline-flex;

@@ -123,6 +123,12 @@ export function readPublish(p: Packet): { topic: string; payload: string; id?: n
   return { topic, payload: dec.decode(p.body.subarray(at)), id };
 }
 
+/** Where a broker that dropped a working connection is reported (the connection log in room.ts). */
+let onLog: ((text: string) => void) | null = null;
+export function logMqttTo(fn: (text: string) => void) {
+  onLog = fn;
+}
+
 export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   let ws: WebSocket;
   let open = false;
@@ -137,7 +143,7 @@ export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   };
   const shut = (why?: string) => {
     if (closed) return;
-    if (open && why) console.info(`[room] брокер ${url} отключился: ${why}`);
+    if (open && why) onLog?.(`брокер ${new URL(url).hostname} отключился: ${why}`);
     closed = true;
     open = false;
     clearInterval(beat);
