@@ -296,14 +296,9 @@ async function loadRating() {
         <span class="r-deck">${deckEmblem(p.deck)}</span><span class="r-score">${p.rating}</span><span class="r-win">${p.wins}</span><span class="r-loss">${p.losses}</span></li>`,
     )
     .join('');
-  const note = sameName(name, DEFAULT_NAME)
-    ? 'Задайте имя в Настройках, чтобы попасть в рейтинг.'
-    : 'Сетевые партии против людей. Партия засчитывается, когда результат пришлют оба игрока.';
-  board.innerHTML = `${
-    rows
-      ? `<div class="rating-head"><span class="r-place">#</span><span class="r-name">Игрок</span><span class="r-deck">Колода</span><span class="r-score">Рейтинг</span><span class="r-win" title="Победы">${icon('win', 'П')}</span><span class="r-loss" title="Поражения">${icon('lose', 'Пр')}</span></div><ol class="rating-list">${rows}</ol>`
-      : '<p class="wait">В рейтинге пока никого нет. Сыграйте сетевую партию!</p>'
-  }<p class="rating-note">${note}</p>`;
+  board.innerHTML = rows
+    ? `<div class="rating-head"><span class="r-place">#</span><span class="r-name">Игрок</span><span class="r-deck">Колода</span><span class="r-score">Рейтинг</span><span class="r-win" title="Победы">${icon('win', 'П')}</span><span class="r-loss" title="Поражения">${icon('lose', 'Пр')}</span></div><ol class="rating-list">${rows}</ol>`
+    : '<p class="wait">В рейтинге пока никого нет. Сыграйте сетевую партию!</p>';
   board.querySelector('.me')?.scrollIntoView({ block: 'nearest' });
 }
 

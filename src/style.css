@@ -437,11 +437,6 @@ button.menu-btn {
     font-size: 14px;
   }
 }
-.rating-note {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
 /* the collection: the same frame as the rating, a row of deck emblems on top, the cards scroll under it */
 .menu[data-view='collection'] {
   height: 100dvh;
