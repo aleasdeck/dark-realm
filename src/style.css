@@ -910,17 +910,45 @@ button.menu-btn {
   gap: 5px;
   align-items: center;
 }
-/* agents fill the strip's height, and shrink only when there are too many to fit across */
+/* agents fill the strip's height; when too many to fit across, each next one slides over the one
+   before it instead of shrinking (they shrink only if the overlap would leave less than --peek showing) */
+.strip .agents {
+  /* the chips' stacking order stays inside the frame, under sheets and overlays */
+  isolation: isolate;
+}
 .strip .agents .chip {
+  --room: calc(100cqw - var(--reserve, 0px) - 12px);
+  --peek: 26px;
   /* upright like a card: full strip height, 0.72 as wide */
-  --ch: min(calc(100cqh - 4px), calc(((100cqw - var(--reserve, 0px) - 12px) / max(var(--na), 1) - 6px) / 0.72), calc(var(--tw) * 2.4));
+  --ch: min(calc(100cqh - 4px), calc(var(--tw) * 2.4), calc((var(--room) - var(--peek) * max(var(--na) - 1, 0)) / 0.72));
+  --cw: calc(var(--ch) * 0.72);
+  /* how far each agent sits right of the one before it: a gap apart while they fit, closer once they don't */
+  --step: min(calc(var(--cw) + 5px), calc((var(--room) - var(--cw)) / max(var(--na) - 1, 1)));
   height: var(--ch);
-  width: calc(var(--ch) * 0.72);
+  width: var(--cw);
+}
+.strip .agents .chip + .chip {
+  margin-left: calc(var(--step) - var(--cw) - 5px);
+}
+/* dim spent agents through their art and frame, not a filter on the whole chip: a filter would trap
+   the health badge under the next agent */
+.strip .agents .chip.spent {
+  filter: none;
+  border-color: color-mix(in srgb, var(--accent) 65%, #000);
+}
+.strip .agents .chip.spent img,
+.strip .agents .chip.spent .c-hp {
+  filter: brightness(0.65);
 }
 .strip .agents .chip img {
   object-fit: cover;
 }
 .strip .agents .c-hp {
+  /* top left, the corner an overlapping agent leaves showing, and over every agent */
+  top: -6px;
+  left: -6px;
+  right: auto;
+  z-index: 3;
   width: 26px;
   height: 28px;
   line-height: 24px;
