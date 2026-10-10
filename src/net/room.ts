@@ -1,10 +1,14 @@
-import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
+import Peer, { type PeerOptions } from 'peerjs';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
+import { relayHost, relayJoin } from './relay';
 
 /*
  * Serverless rooms: the host registers a PeerJS id derived from the room code
  * on the public PeerJS broker, the guest connects to it over WebRTC. The host
  * runs the authoritative engine; the guest sends actions and receives state.
+ * When WebRTC can't get through, the same messages go through public MQTT
+ * brokers instead (src/net/relay.ts): the host listens there too, and the guest
+ * takes the relay when the direct link fails or is slow to open.
  *
  * Both sides ping each other, so a link that silently died (a reloaded or
  * crashed page, a phone that dropped off the network) is noticed within
@@ -37,13 +41,32 @@ const PREFIX = 'dark-realm-tot-';
 const PING_MS = 2500;
 const SILENT_MS = 10000;
 
-/** `?peer=host:port` points at a self-hosted PeerJS server instead of the public broker. */
-function peerOptions(): PeerOptions {
+/** How long the guest waits for the direct link before it takes the relay, and for either at all. */
+const DIRECT_MS = 5000;
+const JOIN_MS = 20000;
+
+/**
+ * Where WebRTC looks for a way through NATs: several STUN servers, so one being down or
+ * blocked doesn't matter, and PeerJS's own TURN relay (its default).
+ */
+const ICE: RTCIceServer[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+];
+
+/**
+ * `?peer=host:port` points at a self-hosted PeerJS server instead of the public broker;
+ * `?peer=off` leaves WebRTC out, so only the relay is used (for tests).
+ */
+function peerOptions(): PeerOptions | null {
   const custom = new URLSearchParams(location.search).get('peer');
-  if (!custom) return {};
+  const config = { iceServers: ICE };
+  if (!custom) return { config };
+  if (custom === 'off') return null;
   const [host, port] = custom.split(':');
   const local = host === 'localhost' || host === '127.0.0.1';
-  return { host, port: Number(port) || (local ? 9000 : 443), secure: !local, path: '/' };
+  return { host, port: Number(port) || (local ? 9000 : 443), secure: !local, path: '/', config };
 }
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -72,7 +95,16 @@ export interface LinkHandlers {
 /** Opens a link over an incoming or outgoing connection; `onClose` lets the caller tidy up after it. */
 export type Accept = (h: LinkHandlers) => Link;
 
-function wrap(conn: DataConnection, h: LinkHandlers, onClose: () => void = () => {}): Link {
+/** A connection under a link: a PeerJS DataConnection or a relay channel. */
+interface Pipe {
+  readonly open: boolean;
+  send(msg: unknown): void;
+  close(): void;
+  on(event: 'data', cb: (d: unknown) => void): void;
+  on(event: 'close' | 'error', cb: () => void): void;
+}
+
+function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link {
   let closed = false;
   let heard = Date.now();
   const send = (msg: NetMessage) => {
@@ -140,66 +172,207 @@ export interface HostedRoom {
 
 export type OpenRoom = (code: string, onConnection: (accept: Accept) => void) => Promise<HostedRoom>;
 
+/** Calls `fn` whenever the page comes back to the front, until the returned function is called. */
+function onFront(fn: () => void): () => void {
+  if (typeof document === 'undefined') return () => {};
+  const h = () => {
+    if (document.visibilityState === 'visible') fn();
+  };
+  document.addEventListener('visibilitychange', h);
+  window.addEventListener('online', h);
+  return () => {
+    document.removeEventListener('visibilitychange', h);
+    window.removeEventListener('online', h);
+  };
+}
+
 /**
- * Opens a room and resolves once it is registered. Every connection that opens goes to
- * `onConnection`; the host decides from the guest's hello whether to keep it.
- * If the broker drops the room, it is registered again under the same code.
+ * Opens a room and resolves once guests can find it, on the PeerJS broker or on a relay
+ * broker. Every connection that opens goes to `onConnection`; the host decides from the
+ * guest's hello whether to keep it. A broker that drops the room gets it registered again,
+ * at once when the page comes back to the front (a phone switching to a messenger to send
+ * the code puts the page to sleep).
  */
 export const hostRoom: OpenRoom = (code, onConnection) =>
   new Promise((resolve, reject) => {
-    const peer = new Peer(PREFIX + code, peerOptions());
+    const options = peerOptions();
+    const started = Date.now();
     let opened = false;
-    let retry = 0;
-    peer.on('open', () => {
-      retry = 0;
-      if (opened) return;
+    let closed = false;
+    let peer: Peer | null = null;
+    let peerFailed: RoomError | null = options ? null : new RoomError('off', 'WebRTC отключён.');
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const room: HostedRoom = {
+      close: () => {
+        closed = true;
+        clearTimeout(retry);
+        clearTimeout(giveUp);
+        stopFront();
+        peer?.destroy();
+        relay.close();
+      },
+    };
+    const ready = () => {
+      if (opened || closed) return;
       opened = true;
-      resolve({ close: () => peer.destroy() });
-    });
-    peer.on('error', (err) => {
-      if (!opened) {
-        peer.destroy();
-        reject(roomError(err));
+      clearTimeout(giveUp);
+      resolve(room);
+    };
+    const fail = (err: RoomError) => {
+      if (opened || closed) return;
+      room.close();
+      reject(err);
+    };
+    // Without the PeerJS broker the room still opens if a relay broker answers in time.
+    const check = () => {
+      if (peerFailed && !relay.listening && Date.now() - started >= 10000) fail(peerFailed);
+    };
+    const giveUp = setTimeout(check, 10000);
+
+    const startPeer = () => {
+      if (!options || closed) return;
+      const p = new Peer(PREFIX + code, options);
+      peer = p;
+      p.on('open', ready);
+      p.on('error', (err) => {
+        if (p !== peer || closed || opened) return;
+        const e = roomError(err);
+        // The code is someone else's room: guests coming straight would end up there.
+        if (e.type === 'unavailable-id') return fail(e);
+        peerFailed = e;
+        check();
+      });
+      // Connections already open live on without the broker, but a guest coming back needs it.
+      // A peer that lost the broker connects again; one that never got on is made anew.
+      const later = () => {
+        clearTimeout(retry);
+        retry = setTimeout(() => {
+          if (closed || p !== peer) return;
+          if (p.destroyed) startPeer();
+          else if (p.disconnected) p.reconnect();
+        }, 3000);
+      };
+      p.on('disconnected', later);
+      p.on('close', later);
+      p.on('connection', (conn) => {
+        conn.on('open', () => onConnection((h) => wrap(conn, h)));
+      });
+    };
+
+    const relay = relayHost(code, (ch) => onConnection((h) => wrap(ch, h)), ready);
+    const stopFront = onFront(() => {
+      relay.wake();
+      if (!peer || peer.destroyed) {
+        clearTimeout(retry);
+        startPeer();
+      } else if (peer.disconnected) {
+        clearTimeout(retry);
+        peer.reconnect();
       }
     });
-    // Connections already open live on without the broker, but a guest coming back needs it.
-    peer.on('disconnected', () => {
-      if (!opened) return;
-      clearTimeout(retry);
-      retry = window.setTimeout(() => {
-        if (!peer.destroyed && peer.disconnected) peer.reconnect();
-      }, 3000);
-    });
-    peer.on('connection', (conn) => {
-      conn.on('open', () => onConnection((h) => wrap(conn, h)));
-    });
+    startPeer();
   });
 
 export type JoinRoom = (code: string, h: LinkHandlers) => Promise<Link>;
 
-export const joinRoom: JoinRoom = (code, h) =>
-  new Promise((resolve, reject) => {
-    const peer = new Peer(peerOptions());
-    let done = false;
-    const fail = (err: RoomError) => {
+interface Attempt {
+  ready: Promise<Pipe>;
+  cancel(): void;
+}
+
+/** A direct WebRTC connection to the host through the PeerJS broker. */
+function joinDirect(code: string): Attempt {
+  const options = peerOptions();
+  if (!options) return { ready: Promise.reject(new RoomError('off', 'WebRTC отключён.')), cancel() {} };
+  const peer = new Peer(options);
+  let done = false;
+  let fail!: (e: RoomError) => void;
+  const ready = new Promise<Pipe>((resolve, reject) => {
+    fail = (e) => {
       if (done) return;
       done = true;
-      clearTimeout(timer);
       peer.destroy();
-      reject(err);
+      reject(e);
     };
-    const timer = setTimeout(() => fail(new RoomError('timeout', 'Не удалось подключиться к комнате.')), 15000);
     peer.on('error', (err) => fail(roomError(err)));
     peer.on('open', () => {
       // PeerJS's binary serialization splits big messages into chunks; its JSON one drops
       // anything over 16 KB, which a game state passes after a few turns. The host's end of
       // the connection takes the serialization the guest picks here.
       const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'binary' });
+      // ICE found no way through: there is no point waiting any longer.
+      conn.on('error', () => fail(new RoomError('negotiation', 'Не удалось подключиться к комнате.')));
       conn.on('open', () => {
         if (done) return;
         done = true;
-        clearTimeout(timer);
-        resolve(wrap(conn, h, () => peer.destroy()));
+        const pipe: Pipe = conn;
+        // The peer goes when its connection does.
+        conn.on('close', () => peer.destroy());
+        resolve(pipe);
       });
     });
+  });
+  return { ready, cancel: () => fail(new RoomError('cancelled', '')) };
+}
+
+/**
+ * Joins a room. The direct WebRTC link and the relay are tried at once: the direct one is
+ * taken if it opens within a few seconds, the relay otherwise. A room neither finds fails
+ * with the direct attempt's reason, which tells "no such room" from "no network".
+ */
+export const joinRoom: JoinRoom = (code, h) =>
+  new Promise((resolve, reject) => {
+    const started = Date.now();
+    const direct = joinDirect(code);
+    const relay = relayJoin(code);
+    let directErr: RoomError | null = null;
+    let relayFailed = false;
+    let parked: Pipe | null = null;
+    let done = false;
+    const take = (pipe: Pipe, via: string) => {
+      if (done) return pipe.close();
+      done = true;
+      clearTimeout(timer);
+      clearTimeout(grace);
+      if (via === 'direct') relay.cancel();
+      else direct.cancel();
+      if (parked && parked !== pipe) parked.close();
+      console.info(`[room] ${code}: ${via === 'direct' ? 'прямое соединение' : 'через ретранслятор'}`);
+      resolve(wrap(pipe, h));
+    };
+    const fail = (err: RoomError) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      clearTimeout(grace);
+      direct.cancel();
+      relay.cancel();
+      parked?.close();
+      reject(err);
+    };
+    const settle = () => {
+      if (done) return;
+      if (parked && (directErr || Date.now() - started >= DIRECT_MS)) return take(parked, 'relay');
+      if (directErr && relayFailed) fail(directErr.type === 'off' ? new RoomError('network', 'Нет связи с сервером комнат.') : directErr);
+    };
+    const timer = setTimeout(() => fail(directErr?.type === 'peer-unavailable' ? directErr : new RoomError('timeout', 'Не удалось подключиться к комнате.')), JOIN_MS);
+    const grace = setTimeout(settle, DIRECT_MS);
+    direct.ready.then(
+      (pipe) => take(pipe, 'direct'),
+      (err: RoomError) => {
+        directErr = err;
+        settle();
+      },
+    );
+    relay.ready.then(
+      (ch) => {
+        if (done) return ch.close();
+        parked = ch;
+        settle();
+      },
+      () => {
+        relayFailed = true;
+        settle();
+      },
+    );
   });

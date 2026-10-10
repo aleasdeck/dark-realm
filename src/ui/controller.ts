@@ -281,6 +281,11 @@ const RETRY_MS = [1000, 2000, 3000, 5000];
 const retryDelay = (n: number) => RETRY_MS[Math.min(n, RETRY_MS.length - 1)];
 /** A connection that hasn't said hello by then is dropped. */
 const HELLO_MS = 15000;
+/**
+ * How long a guest keeps trying to get into a room the first time: the host may be
+ * away for a moment, e.g. a phone that switched to a messenger to send the code.
+ */
+const FIRST_JOIN_MS = 45000;
 
 /**
  * The room's host runs the game. The room stays open for the whole match: a guest who
@@ -514,6 +519,7 @@ export class GuestController extends Controller {
   private disposed = false;
   /** Stepping out to the menu keeps the match saved and doesn't say goodbye. */
   private kept = false;
+  private readonly started = Date.now();
 
   constructor(
     readonly code: string,
@@ -547,10 +553,7 @@ export class GuestController extends Controller {
     } catch (e) {
       if (this.disposed) return;
       if (this.joined) this.retry();
-      else {
-        this.gone = e instanceof Error ? e.message : String(e);
-        this.emit();
-      }
+      else this.retryFirst(e instanceof Error ? e.message : String(e));
       return;
     }
     if (this.disposed) return link.close();
@@ -663,7 +666,7 @@ export class GuestController extends Controller {
     this.link = null;
     this.live = false;
     if (!this.joined) {
-      this.gone = 'Соединение потеряно.';
+      return this.retryFirst('Соединение потеряно.');
     } else if (this.state?.phase === 'over') {
       this.notice = 'Соединение потеряно.';
     } else {
@@ -676,6 +679,18 @@ export class GuestController extends Controller {
   private retry() {
     if (this.disposed || this.hostLeft) return;
     this.notice = 'Связь потеряна. Переподключаемся…';
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.connect(), retryDelay(this.tries++));
+    this.emit();
+  }
+
+  /** A room the guest hasn't got into yet is tried again for a while, then given up with `why`. */
+  private retryFirst(why: string) {
+    if (Date.now() - this.started >= FIRST_JOIN_MS) {
+      this.gone = why;
+      return this.emit();
+    }
+    this.notice = `Комната ${this.code} пока не отвечает. Пробуем ещё…`;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.connect(), retryDelay(this.tries++));
     this.emit();

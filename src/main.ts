@@ -94,8 +94,8 @@ function roomFromUrl(): string {
 
 function roomLink(code: string) {
   const u = new URL(location.href);
-  const peer = u.searchParams.get('peer');
-  u.search = `?room=${code}${peer ? `&peer=${encodeURIComponent(peer)}` : ''}`;
+  const keep = ['peer', 'relay'].filter((k) => u.searchParams.get(k)).map((k) => `&${k}=${encodeURIComponent(u.searchParams.get(k)!)}`);
+  u.search = `?room=${code}${keep.join('')}`;
   u.hash = '';
   return u.toString();
 }
