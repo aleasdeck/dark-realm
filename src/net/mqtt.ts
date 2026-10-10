@@ -128,6 +128,9 @@ let onLog: ((text: string) => void) | null = null;
 export function logMqttTo(fn: (text: string) => void) {
   onLog = fn;
 }
+export function mqttLog(text: string) {
+  onLog?.(text);
+}
 
 export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   let ws: WebSocket;
@@ -143,7 +146,7 @@ export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   };
   const shut = (why?: string) => {
     if (closed) return;
-    if (open && why) onLog?.(`брокер ${new URL(url).hostname} отключился: ${why}`);
+    if (open && why) mqttLog(`брокер ${new URL(url).hostname} отключился: ${why}`);
     closed = true;
     open = false;
     clearInterval(beat);

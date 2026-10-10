@@ -1,4 +1,4 @@
-import { mqttConnect, type Mqtt } from './mqtt';
+import { mqttConnect, mqttLog, type Mqtt } from './mqtt';
 
 /*
  * The relay: when a direct WebRTC link between the players can't be made (a strict NAT on a
@@ -9,6 +9,11 @@ import { mqttConnect, type Mqtt } from './mqtt';
  *
  * A broker passes messages at most once, so a channel numbers what it sends, the other side
  * acknowledges it, and whatever goes unacknowledged is sent again. Big messages go in parts.
+ *
+ * A channel runs over every broker at once, so one that stalls changes nothing while another
+ * still gets through. Some networks let a connection start and then quietly stop passing
+ * anything through it (Russian ones do this to foreign servers); when nothing gets acknowledged
+ * for a few seconds, every connection that has gone quiet is swapped for a fresh one.
  */
 
 /** Public brokers that take anyone over WebSockets; `?relay=url,url` replaces them (for tests). */
@@ -21,6 +26,10 @@ export const PART = 8000;
 const RESEND_MS = 1500;
 /** The guest knocks again this often until a broker answers. */
 const KNOCK_MS = 1500;
+/** A channel with something unacknowledged for this long has stalled: its quiet connections are renewed. */
+export const STALL_MS = 2000;
+/** Waits before connecting again to a broker that dropped or refused us. */
+const BACKOFF = [1000, 2000, 5000, 10000];
 
 export function brokers(): string[] {
   const custom = new URLSearchParams(location.search).get('relay');
@@ -49,7 +58,10 @@ export class Channel {
   open = true;
   private next = 0;
   private expected = 0;
-  private unacked = new Map<number, { pkt: Packet; at: number }>();
+  /** Sent and not yet acknowledged: when it was first sent and when last. */
+  private unacked = new Map<number, { pkt: Packet; since: number; at: number }>();
+  /** The last acknowledgement sent, so the copies of a packet coming over the other brokers don't each get one. */
+  private acked = { n: -1, at: 0 };
   private early = new Map<number, Extract<Packet, { t: 'd' }>>();
   private parts: string[] = [];
   private resend: ReturnType<typeof setInterval>;
@@ -59,7 +71,7 @@ export class Channel {
     readonly id: string,
     private out: (p: Packet) => void,
     private onEnd: () => void = () => {},
-    /** The broker the channel runs through, for the console. */
+    /** The brokers the channel runs through, for the connection log. */
     readonly via = '',
   ) {
     this.resend = setInterval(() => this.flush(), RESEND_MS / 2);
@@ -73,6 +85,13 @@ export class Channel {
       u.at = now;
       this.out(u.pkt);
     }
+  }
+
+  /** Whether something sent has gone unacknowledged for `ms`. */
+  stalled(ms: number): boolean {
+    const now = Date.now();
+    for (const u of this.unacked.values()) if (now - u.since >= ms) return true;
+    return false;
   }
 
   on(event: 'data' | 'close' | 'error', cb: Listener) {
@@ -89,7 +108,8 @@ export class Channel {
     for (let i = 0; i < s.length || i === 0; i += PART) {
       const last = i + PART >= s.length;
       const pkt: Packet = { t: 'd', c: this.id, n: this.next++, p: s.slice(i, i + PART), ...(last ? { e: 1 as const } : {}) };
-      this.unacked.set(pkt.n, { pkt, at: Date.now() });
+      const now = Date.now();
+      this.unacked.set(pkt.n, { pkt, since: now, at: now });
       this.out(pkt);
     }
   }
@@ -106,7 +126,8 @@ export class Channel {
     // A page in the background runs its timers once a minute, so packets that arrive drive the
     // resending too.
     this.flush();
-    if (p.n >= this.expected) this.early.set(p.n, p);
+    const repeat = p.n < this.expected;
+    if (!repeat) this.early.set(p.n, p);
     for (let d = this.early.get(this.expected); d; d = this.early.get(this.expected)) {
       this.early.delete(this.expected++);
       this.parts.push(d.p);
@@ -122,17 +143,16 @@ export class Channel {
       this.emit('data', msg);
       if (!this.open) return;
     }
-    // Acknowledged at once, for a repeat too (its ack was lost): a timer could wait a minute in a hidden tab.
-    if (this.open) this.out({ t: 'a', c: this.id, n: this.expected - 1 });
+    // Acknowledged at once, for a repeat too (its ack was lost): a timer could wait a minute in a
+    // hidden tab. A repeat just after the ack is the same packet over another broker.
+    const now = Date.now();
+    if (!this.open || (repeat && this.acked.n >= p.n && now - this.acked.at < RESEND_MS / 3)) return;
+    this.acked = { n: this.expected - 1, at: now };
+    this.out({ t: 'a', c: this.id, n: this.expected - 1 });
   }
 
   close() {
     this.end(true);
-  }
-
-  /** The broker connection under the channel is gone. */
-  drop() {
-    this.end(false);
   }
 
   private end(tell: boolean) {
@@ -157,6 +177,116 @@ function parse(payload: string): Packet | null {
 const hostTopic = (code: string) => `${TOPIC}${code}/h`;
 const guestTopic = (code: string, c: string) => `${TOPIC}${code}/g/${c}`;
 
+/** A broker's short name for the connection log: hivemq for broker.hivemq.com. */
+function short(url: string): string {
+  const u = new URL(url);
+  return /^[\d.]+$/.test(u.hostname) ? u.host : (u.hostname.split('.').slice(-2)[0] ?? u.hostname);
+}
+
+/**
+ * A connection to one broker, subscribed to `topic`, that comes back when it is lost and can
+ * be swapped for a fresh one when it has gone quiet. `onFail` hears of each attempt the broker
+ * never took.
+ */
+class Line {
+  /** The connection in use, and a fresh one on its way. */
+  private mq: Mqtt | null = null;
+  private next: Mqtt | null = null;
+  private tries = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private closed = false;
+  private renewed = 0;
+  /** When anything last came over this line. */
+  heard = 0;
+  readonly name: string;
+
+  constructor(
+    readonly url: string,
+    private topic: string,
+    private onMessage: (payload: string) => void,
+    private onUp: () => void = () => {},
+    private onFail: () => void = () => {},
+  ) {
+    this.name = short(url);
+    this.dial();
+  }
+
+  get up(): boolean {
+    return !!this.mq?.open;
+  }
+
+  publish(topic: string, payload: string) {
+    this.mq?.publish(topic, payload);
+  }
+
+  private dial() {
+    clearTimeout(this.timer);
+    if (this.closed || this.next) return;
+    let opened = false;
+    const conn: Mqtt = mqttConnect(this.url, {
+      onOpen: () => {
+        opened = true;
+        this.tries = 0;
+        conn.subscribe(this.topic);
+        // The fresh connection takes over, and the one it replaces goes.
+        const old = this.mq;
+        this.mq = conn;
+        this.next = null;
+        this.heard = Date.now();
+        old?.close();
+        this.onUp();
+      },
+      onMessage: (_topic, payload) => {
+        this.heard = Date.now();
+        this.onMessage(payload);
+      },
+      onClose: () => {
+        if (conn === this.next) this.next = null;
+        else if (conn === this.mq) this.mq = null;
+        else return;
+        if (!opened) this.onFail();
+        if (this.closed || this.mq || this.next) return;
+        this.timer = setTimeout(() => this.dial(), BACKOFF[Math.min(this.tries++, BACKOFF.length - 1)]);
+      },
+    });
+    this.next = conn;
+  }
+
+  /** Connects afresh beside a connection that has gone quiet; the new one takes over once the broker takes it. */
+  renew() {
+    const now = Date.now();
+    if (this.closed || this.next || now - this.renewed < STALL_MS) return;
+    // The first time goes in the connection log, the rest only to the console.
+    if (this.mq) (this.renewed ? console.info : mqttLog)(`${this.name} молчит, переподключаюсь`);
+    this.renewed = now;
+    this.dial();
+  }
+
+  /** Connects at once if the line is down and waiting to try again. */
+  wake() {
+    if (!this.mq && !this.next) this.dial();
+  }
+
+  close() {
+    this.closed = true;
+    clearTimeout(this.timer);
+    const conns = [this.next, this.mq];
+    this.next = this.mq = null;
+    for (const c of conns) c?.close();
+  }
+}
+
+/** Renews the lines that have heard nothing for a while, if one of the channels over them has stalled. */
+function watch(channels: Iterable<Channel>, lines: Line[]) {
+  let stalled = false;
+  for (const ch of channels) stalled ||= ch.stalled(STALL_MS);
+  if (!stalled) return;
+  const now = Date.now();
+  for (const l of lines) if (now - l.heard >= STALL_MS) l.renew();
+}
+
+const names = (lines: Line[]) => lines.filter((l) => l.up).map((l) => l.name).join(', ');
+
 export interface RelayHost {
   /** Whether at least one broker is listening for guests. */
   readonly listening: boolean;
@@ -170,95 +300,59 @@ export interface RelayHost {
  * long as the room is open. `onListening` fires each time a broker starts listening.
  */
 export function relayHost(code: string, onChannel: (ch: Channel) => void, onListening: () => void, urls = brokers()): RelayHost {
-  let closed = false;
   const channels = new Map<string, Channel>();
   /** Channels closed here, so late packets for them don't open them again. */
   const ended = new Set<string>();
 
-  const station = (url: string) => {
-    let mq: Mqtt | null = null;
-    let listening = false;
-    let tries = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const mine = new Set<Channel>();
-    const connect = () => {
-      clearTimeout(timer);
-      if (closed) return;
-      const conn = mqttConnect(url, {
-        onOpen: () => {
-          tries = 0;
-          conn.subscribe(hostTopic(code));
-          listening = true;
-          onListening();
+  const packet = (line: Line, payload: string) => {
+    const p = parse(payload);
+    if (!p) return;
+    if (p.t === 'knock') return line.publish(guestTopic(code, p.c), JSON.stringify({ t: 'hi', c: p.c }));
+    let ch = channels.get(p.c);
+    if (!ch) {
+      // A channel starts with its first message. A later one may come over a quicker broker
+      // before it; anything for a channel that ended here is left over.
+      if (ended.has(p.c)) {
+        if (p.t !== 'x') line.publish(guestTopic(code, p.c), JSON.stringify({ t: 'x', c: p.c }));
+        return;
+      }
+      if (p.t !== 'd' || p.n !== 0) return;
+      const id = p.c;
+      ch = new Channel(
+        id,
+        (r) => {
+          const s = JSON.stringify(r);
+          for (const l of lines) l.publish(guestTopic(code, id), s);
         },
-        onMessage: (_topic, payload) => {
-          const p = parse(payload);
-          if (!p) return;
-          const reply = (r: Packet) => conn.publish(guestTopic(code, p.c), JSON.stringify(r));
-          if (p.t === 'knock') return reply({ t: 'hi', c: p.c });
-          let ch = channels.get(p.c);
-          if (!ch) {
-            // A channel starts with its first message; anything else is left from one that ended.
-            if (p.t !== 'd' || p.n !== 0 || ended.has(p.c)) {
-              if (p.t !== 'x') reply({ t: 'x', c: p.c });
-              return;
-            }
-            const id = p.c;
-            ch = new Channel(
-              id,
-              reply,
-              () => {
-                channels.delete(id);
-                ended.add(id);
-                mine.delete(ch!);
-              },
-              new URL(url).hostname,
-            );
-            channels.set(id, ch);
-            mine.add(ch);
-            onChannel(ch);
-          }
-          ch.receive(p);
+        () => {
+          channels.delete(id);
+          ended.add(id);
         },
-        onClose: () => {
-          if (mq !== conn) return;
-          mq = null;
-          listening = false;
-          for (const ch of [...mine]) ch.drop();
-          if (!closed) timer = setTimeout(connect, [1000, 2000, 5000, 10000][Math.min(tries++, 3)]);
-        },
-      });
-      mq = conn;
-    };
-    connect();
-    return {
-      get listening() {
-        return listening;
-      },
-      wake() {
-        if (!mq && !closed) connect();
-      },
-      close() {
-        clearTimeout(timer);
-        for (const ch of [...mine]) ch.close();
-        const conn = mq;
-        mq = null;
-        conn?.close();
-      },
-    };
+        names(lines),
+      );
+      channels.set(id, ch);
+      onChannel(ch);
+    }
+    ch.receive(p);
+    watch(channels.values(), lines);
   };
 
-  const stations = urls.map(station);
+  const lines: Line[] = urls.map((url) => {
+    const line: Line = new Line(url, hostTopic(code), (payload) => packet(line, payload), onListening);
+    return line;
+  });
+  const dog = setInterval(() => watch(channels.values(), lines), 1000);
   return {
     get listening() {
-      return stations.some((s) => s.listening);
+      return lines.some((l) => l.up);
     },
     wake() {
-      for (const s of stations) s.wake();
+      for (const l of lines) l.wake();
     },
     close() {
-      closed = true;
-      for (const s of stations) s.close();
+      clearInterval(dog);
+      for (const ch of [...channels.values()]) ch.close();
+      for (const l of lines) l.close();
     },
   };
 }
@@ -270,61 +364,63 @@ export interface RelayJoin {
   cancel(): void;
 }
 
-/** The guest's end: knocks on every broker and keeps the first one the host answers on. */
+/** The guest's end: knocks on every broker, and once the host answers on one, talks over all of them. */
 export function relayJoin(code: string, urls = brokers()): RelayJoin {
   const c = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-  const conns: Mqtt[] = [];
+  let ch: Channel | null = null;
   let done = false;
-  let left = urls.length;
-  let knock: ReturnType<typeof setInterval> | undefined;
+  const failed = new Set<Line>();
+  let dog: ReturnType<typeof setInterval> | undefined;
   let resolve!: (ch: Channel) => void;
   let reject!: (e: Error) => void;
   const ready = new Promise<Channel>((res, rej) => {
     resolve = res;
     reject = rej;
   });
+  const send = (p: Packet) => {
+    const s = JSON.stringify(p);
+    for (const l of lines) l.publish(hostTopic(code), s);
+  };
+  const knock = () => send({ t: 'knock', c });
+  const knocking = setInterval(knock, KNOCK_MS);
   const finish = () => {
     done = true;
-    clearInterval(knock);
+    clearInterval(knocking);
   };
-  const knockAll = () => {
-    for (const m of conns) if (m.open) m.publish(hostTopic(code), JSON.stringify({ t: 'knock', c }));
+  const shut = () => {
+    clearInterval(dog);
+    for (const l of lines) l.close();
   };
-  for (const url of urls) {
-    let ch: Channel | null = null;
-    const conn: Mqtt = mqttConnect(url, {
-      onOpen: () => {
-        if (done) return conn.close();
-        conn.subscribe(guestTopic(code, c));
-        conn.publish(hostTopic(code), JSON.stringify({ t: 'knock', c }));
-        knock ??= setInterval(knockAll, KNOCK_MS);
-      },
-      onMessage: (_topic, payload) => {
-        const p = parse(payload);
-        if (!p || p.c !== c) return;
-        if (ch) return ch.receive(p);
-        if (p.t !== 'hi' || done) return;
-        finish();
-        for (const m of conns) if (m !== conn) m.close();
-        ch = new Channel(c, (r) => conn.publish(hostTopic(code), JSON.stringify(r)), () => setTimeout(() => conn.close(), 200), new URL(url).hostname);
-        resolve(ch);
-      },
-      onClose: () => {
-        if (ch) return ch.drop();
-        if (--left === 0 && !done) {
-          finish();
-          reject(new Error('relay'));
-        }
-      },
+  const packet = (payload: string) => {
+    const p = parse(payload);
+    if (!p || p.c !== c) return;
+    if (ch) {
+      ch.receive(p);
+      return watch([ch], lines);
+    }
+    if (p.t !== 'hi' || done) return;
+    finish();
+    ch = new Channel(c, send, () => setTimeout(shut, 200), names(lines));
+    const made = ch;
+    dog = setInterval(() => watch([made], lines), 1000);
+    resolve(ch);
+  };
+  const lines: Line[] = urls.map((url) => {
+    const line: Line = new Line(url, guestTopic(code, c), packet, () => !done && knock(), () => {
+      failed.add(line);
+      if (done || failed.size < lines.length || lines.some((l) => l.up)) return;
+      finish();
+      shut();
+      reject(new Error('relay'));
     });
-    conns.push(conn);
-  }
+    return line;
+  });
   return {
     ready,
     cancel() {
       if (done) return;
       finish();
-      for (const m of conns) m.close();
+      shut();
       reject(new Error('cancelled'));
     },
   };

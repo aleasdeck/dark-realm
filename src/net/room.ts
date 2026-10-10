@@ -3,6 +3,7 @@ import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { PhraseId } from './phrases';
 import { logMqttTo } from './mqtt';
 import { relayHost, relayJoin, type Channel } from './relay';
+import { directLink, rtcAllowed, type Direct, type Signal } from './rtc';
 
 /*
  * Serverless rooms: the host registers a PeerJS id derived from the room code
@@ -10,7 +11,9 @@ import { relayHost, relayJoin, type Channel } from './relay';
  * runs the authoritative engine; the guest sends actions and receives state.
  * When WebRTC can't get through, the same messages go through public MQTT
  * brokers instead (src/net/relay.ts): the host listens there too, and the guest
- * takes the relay when the direct link fails or is slow to open.
+ * takes the relay when the direct link fails or is slow to open. A link that runs over the
+ * relay then tries to go direct, trading the WebRTC offer and answer over the relay itself
+ * (src/net/rtc.ts), so two devices on one network talk directly even without PeerJS.
  *
  * Both sides ping each other, so a link that silently died (a reloaded or
  * crashed page, a phone that dropped off the network) is noticed within
@@ -40,6 +43,8 @@ export type NetMessage =
   | { type: 'ping' }
   /** The answer to a ping, sent at once: a hidden tab's own timers may fire only once a minute. */
   | { type: 'pong' }
+  /** Setting up the direct link over the relay: an offer or answer, or `go` when the sender has moved over to it. */
+  | { type: 'rtc'; sdp?: RTCSessionDescriptionInit; go?: 1 }
   | { type: 'bye' };
 
 const PREFIX = 'dark-realm-tot-';
@@ -134,18 +139,37 @@ interface Pipe {
 
 /**
  * Opens a link over `conn`; `label` names it in the connection log. `onSilent` hears of a
- * link that went silent, with how long it had been open.
+ * link that went silent, with how long it had been open. A link over the relay tries to go
+ * direct: the guest's end (`upgrade: 'offer'`) starts it, the host's end answers.
  */
-function wrap(conn: Pipe, h: LinkHandlers, label: string, onClose: () => void = () => {}, onSilent?: (age: number) => void): Link {
+function wrap(
+  conn: Pipe,
+  h: LinkHandlers,
+  label: string,
+  onClose: () => void = () => {},
+  onSilent?: (age: number) => void,
+  upgrade: 'offer' | 'answer' | null = null,
+): Link {
   let closed = false;
   const opened = Date.now();
   let heard = opened;
+  /** The direct link being set up or in use; whether this side sends over it, and whether the other side does. */
+  let direct: Direct | null = null;
+  let sendDirect = false;
+  let theyDirect = false;
+  /** What came over the direct link before the relay said the other side moved over: it waits for the rest from the relay. */
+  let held: NetMessage[] = [];
+  let release: ReturnType<typeof setTimeout> | undefined;
   const send = (msg: NetMessage) => {
-    if (!closed && conn.open) conn.send(msg);
+    if (closed) return;
+    if (sendDirect && direct) direct.send(msg);
+    else if (conn.open) conn.send(msg);
   };
   const stop = () => {
     closed = true;
     clearInterval(beat);
+    clearTimeout(release);
+    direct?.close();
     try {
       conn.close();
     } catch {
@@ -165,17 +189,57 @@ function wrap(conn: Pipe, h: LinkHandlers, label: string, onClose: () => void = 
     if (Date.now() - heard > SILENT_MS) lost('тишина');
     else send({ type: 'ping' });
   }, PING_MS);
-  conn.on('data', (d) => {
+  const take = (msg: NetMessage) => {
     if (closed) return;
     heard = Date.now();
-    const msg = d as NetMessage;
     // Each side hears the other at least as often as it pings itself, even when the other
     // page is in the background and its browser runs its timers once a minute.
     if (msg.type === 'ping') send({ type: 'pong' });
     else if (msg.type !== 'pong') h.onMessage(msg);
+  };
+  const moved = () => {
+    theyDirect = true;
+    clearTimeout(release);
+    const waiting = held;
+    held = [];
+    for (const m of waiting) take(m);
+  };
+  const goDirect = () => {
+    direct = directLink(ICE, upgrade === 'offer', (s: Signal) => conn.open && conn.send({ type: 'rtc', ...s }), {
+      onOpen: () => {
+        if (closed) return;
+        // The last word over the relay: what follows comes the direct way.
+        conn.send({ type: 'rtc', go: 1 });
+        sendDirect = true;
+        note(`связь (${label}) переведена напрямую`);
+        label = 'напрямую';
+      },
+      onData: (d) => {
+        if (closed) return;
+        if (theyDirect) return take(d as NetMessage);
+        held.push(d as NetMessage);
+        // A relay that died before the word got through: the direct link carries on.
+        release ??= setTimeout(moved, 5000);
+      },
+      onClose: () => {
+        direct = null;
+        if (sendDirect || theyDirect) lost('прямая связь закрыта');
+      },
+    });
+  };
+  conn.on('data', (d) => {
+    if (closed) return;
+    const msg = d as NetMessage;
+    if (msg.type !== 'rtc') return take(msg);
+    heard = Date.now();
+    if (msg.go) return moved();
+    if (!msg.sdp) return;
+    if (!direct && upgrade === 'answer' && rtcAllowed()) goDirect();
+    direct?.take({ sdp: msg.sdp });
   });
   conn.on('close', () => lost('закрыта'));
   conn.on('error', () => lost('ошибка'));
+  if (upgrade === 'offer' && rtcAllowed()) goDirect();
   return {
     send,
     close: () => {
@@ -306,7 +370,7 @@ export const hostRoom: OpenRoom = (code, onConnection) =>
       code,
       (ch) => {
         note(`гость подключился через ретранслятор ${ch.via}`);
-        onConnection((h) => wrap(ch, h, `ретранслятор ${ch.via}`));
+        onConnection((h) => wrap(ch, h, `ретранслятор ${ch.via}`, undefined, undefined, 'answer'));
       },
       () => ready('ретранслятор'),
     );
@@ -388,12 +452,21 @@ export const joinRoom: JoinRoom = (code, h) =>
       else direct.cancel();
       if (parked && parked !== pipe) parked.close();
       const label = via === 'direct' ? 'напрямую' : `ретранслятор ${(pipe as Channel).via}`;
-      note(`${code}: ${label}`);
+      // Why PeerJS didn't get there first, for the log.
+      const why = via === 'direct' ? '' : ` (PeerJS: ${directErr ? directErr.type || 'ошибка' : 'не успел'})`;
+      note(`${code}: ${label}${why}`);
       const way = via === 'direct' ? 'direct' : 'relay';
       resolve(
-        wrap(pipe, h, label, undefined, (age) => {
-          shaky = age < SHORT_MS ? way : null;
-        }),
+        wrap(
+          pipe,
+          h,
+          label,
+          undefined,
+          (age) => {
+            shaky = age < SHORT_MS ? way : null;
+          },
+          via === 'direct' ? null : 'offer',
+        ),
       );
     };
     const fail = (err: RoomError) => {
@@ -407,8 +480,8 @@ export const joinRoom: JoinRoom = (code, h) =>
       reject(err);
     };
     // The direct link gets a few seconds' head start, none if it stalled last time, and
-    // all the time there is if the relay did.
-    const head = shaky === 'direct' ? 0 : shaky === 'relay' ? JOIN_MS - 3000 : DIRECT_MS;
+    // twice as long if the relay did.
+    const head = shaky === 'direct' ? 0 : shaky === 'relay' ? 2 * DIRECT_MS : DIRECT_MS;
     const settle = () => {
       if (done) return;
       if (parked && (directErr || Date.now() - started >= head)) return take(parked, 'relay');
