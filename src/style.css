@@ -3588,10 +3588,33 @@ summary > img.ic {
     animation-duration: 2.4s;
   }
 }
-/* held sideways the opponent's name, and its mark, sit over their hand, not in the bar */
+/* held sideways the bar has no name: the mark pulses over the opponent's hand instead, where
+   there is room for it even on the smallest phones */
+.oh-lost {
+  display: none;
+}
 @media (orientation: landscape) and (max-height: 560px) {
   .bar .net-lost {
     display: none;
+  }
+  .oh-lost {
+    display: flex;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    padding: 6px;
+    border-radius: 50%;
+    /* a dark disc lifts the red mark off the card backs */
+    background: radial-gradient(circle, #050302e6 0 58%, transparent 72%);
+    pointer-events: none;
+  }
+  .oh-lost .net-lost {
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 6px #ff2a1acc);
   }
 }
 .dialog.reconnect h2 .net-lost {

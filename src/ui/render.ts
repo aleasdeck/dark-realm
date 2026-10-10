@@ -342,7 +342,7 @@ export function boardHtml(
       <span class="res-group">${res(them, prestigeGoal(s))}</span>
       <span class="counts">${count(them.deck.length, 'колода', 'pile_deck', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile_discard', 'pile-opp-cd')}</span>
     </header>
-    <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name">${lost}<span${say('opp')}>${esc(them.name)}</span></span>${backsHtml(them.hand.length)}</section>
+    <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name"><span${say('opp')}>${esc(them.name)}</span></span>${lost ? `<span class="oh-lost">${lost}</span>` : ''}${backsHtml(them.hand.length)}</section>
     ${targets.size ? sideLabel('oppag attack', 'Атакуйте наймитов', 'Атака') : sideLabel('oppag', 'Наймиты соперника', 'Наймиты')}
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
       <div class="s-body">
