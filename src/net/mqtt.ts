@@ -123,6 +123,12 @@ export function readPublish(p: Packet): { topic: string; payload: string; id?: n
   return { topic, payload: dec.decode(p.body.subarray(at)), id };
 }
 
+/** Where a broker that dropped a working connection is reported (the connection log in room.ts). */
+let onLog: ((text: string) => void) | null = null;
+export function logMqttTo(fn: (text: string) => void) {
+  onLog = fn;
+}
+
 export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   let ws: WebSocket;
   let open = false;
@@ -135,8 +141,9 @@ export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   const write = (b: Uint8Array<ArrayBuffer>) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(b);
   };
-  const shut = () => {
+  const shut = (why?: string) => {
     if (closed) return;
+    if (open && why) onLog?.(`брокер ${new URL(url).hostname} отключился: ${why}`);
     closed = true;
     open = false;
     clearInterval(beat);
@@ -153,7 +160,7 @@ export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
   }, CONNECT_MS);
   const beat = setInterval(() => {
     // The broker answers every ping; one that has said nothing for two rounds is gone.
-    if (Date.now() - heard > PING_MS * 2 + 5000) return shut();
+    if (Date.now() - heard > PING_MS * 2 + 5000) return shut('не отвечает');
     if (open) write(new Uint8Array([0xc0, 0]));
   }, PING_MS);
 
@@ -182,8 +189,8 @@ export function mqttConnect(url: string, h: MqttHandlers): Mqtt {
       }
     }
   };
-  ws.onclose = shut;
-  ws.onerror = shut;
+  ws.onclose = (e) => shut(`закрыт (${e.code}${e.reason ? ' ' + e.reason : ''})`);
+  ws.onerror = () => shut('ошибка');
 
   return {
     get open() {

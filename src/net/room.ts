@@ -1,7 +1,8 @@
 import Peer, { type PeerOptions } from 'peerjs';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
 import type { PhraseId } from './phrases';
-import { relayHost, relayJoin } from './relay';
+import { logMqttTo } from './mqtt';
+import { relayHost, relayJoin, type Channel } from './relay';
 
 /*
  * Serverless rooms: the host registers a PeerJS id derived from the room code
@@ -49,6 +50,28 @@ const SILENT_MS = 10000;
 /** How long the guest waits for the direct link before it takes the relay, and for either at all. */
 const DIRECT_MS = 5000;
 const JOIN_MS = 20000;
+/** A link that goes silent sooner than this after opening counts against its way through. */
+const SHORT_MS = 60000;
+
+/** The last connection events, for the game menu: which way the link goes and why it dropped. */
+const events: string[] = [];
+export function netLog(): readonly string[] {
+  return events;
+}
+export function note(text: string) {
+  const t = new Date();
+  const hms = [t.getHours(), t.getMinutes(), t.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
+  events.push(`${hms} ${text}`);
+  if (events.length > 8) events.shift();
+  console.info(`[room] ${text}`);
+}
+logMqttTo(note);
+
+/**
+ * The guest's way through that went silent soon after it opened: the next join takes the
+ * other one first. Some networks let a connection start and then stall it.
+ */
+let shaky: 'direct' | 'relay' | null = null;
 
 /**
  * Where WebRTC looks for a way through NATs: several STUN servers, so one being down or
@@ -109,9 +132,14 @@ interface Pipe {
   on(event: 'close' | 'error', cb: () => void): void;
 }
 
-function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link {
+/**
+ * Opens a link over `conn`; `label` names it in the connection log. `onSilent` hears of a
+ * link that went silent, with how long it had been open.
+ */
+function wrap(conn: Pipe, h: LinkHandlers, label: string, onClose: () => void = () => {}, onSilent?: (age: number) => void): Link {
   let closed = false;
-  let heard = Date.now();
+  const opened = Date.now();
+  let heard = opened;
   const send = (msg: NetMessage) => {
     if (!closed && conn.open) conn.send(msg);
   };
@@ -125,13 +153,16 @@ function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link
     }
     onClose();
   };
-  const lost = () => {
+  const lost = (why: string) => {
     if (closed) return;
+    const now = Date.now();
+    note(`связь (${label}) потеряна: ${why}, жила ${Math.round((now - opened) / 1000)} с`);
+    if (why === 'тишина') onSilent?.(now - opened);
     stop();
     h.onClose();
   };
   const beat = setInterval(() => {
-    if (Date.now() - heard > SILENT_MS) lost();
+    if (Date.now() - heard > SILENT_MS) lost('тишина');
     else send({ type: 'ping' });
   }, PING_MS);
   conn.on('data', (d) => {
@@ -143,8 +174,8 @@ function wrap(conn: Pipe, h: LinkHandlers, onClose: () => void = () => {}): Link
     if (msg.type === 'ping') send({ type: 'pong' });
     else if (msg.type !== 'pong') h.onMessage(msg);
   });
-  conn.on('close', lost);
-  conn.on('error', lost);
+  conn.on('close', () => lost('закрыта'));
+  conn.on('error', () => lost('ошибка'));
   return {
     send,
     close: () => {
@@ -220,8 +251,9 @@ export const hostRoom: OpenRoom = (code, onConnection) =>
         relay.close();
       },
     };
-    const ready = () => {
+    const ready = (via: string) => {
       if (opened || closed) return;
+      note(`комната ${code} открыта (${via})`);
       opened = true;
       clearTimeout(giveUp);
       resolve(room);
@@ -241,7 +273,7 @@ export const hostRoom: OpenRoom = (code, onConnection) =>
       if (!options || closed) return;
       const p = new Peer(PREFIX + code, options);
       peer = p;
-      p.on('open', ready);
+      p.on('open', () => ready('PeerJS'));
       p.on('error', (err) => {
         if (p !== peer || closed || opened) return;
         const e = roomError(err);
@@ -263,11 +295,21 @@ export const hostRoom: OpenRoom = (code, onConnection) =>
       p.on('disconnected', later);
       p.on('close', later);
       p.on('connection', (conn) => {
-        conn.on('open', () => onConnection((h) => wrap(conn, h)));
+        conn.on('open', () => {
+          note('гость подключился напрямую');
+          onConnection((h) => wrap(conn, h, 'напрямую'));
+        });
       });
     };
 
-    const relay = relayHost(code, (ch) => onConnection((h) => wrap(ch, h)), ready);
+    const relay = relayHost(
+      code,
+      (ch) => {
+        note(`гость подключился через ретранслятор ${ch.via}`);
+        onConnection((h) => wrap(ch, h, `ретранслятор ${ch.via}`));
+      },
+      () => ready('ретранслятор'),
+    );
     const stopFront = onFront(() => {
       relay.wake();
       if (!peer || peer.destroyed) {
@@ -345,8 +387,14 @@ export const joinRoom: JoinRoom = (code, h) =>
       if (via === 'direct') relay.cancel();
       else direct.cancel();
       if (parked && parked !== pipe) parked.close();
-      console.info(`[room] ${code}: ${via === 'direct' ? 'прямое соединение' : 'через ретранслятор'}`);
-      resolve(wrap(pipe, h));
+      const label = via === 'direct' ? 'напрямую' : `ретранслятор ${(pipe as Channel).via}`;
+      note(`${code}: ${label}`);
+      const way = via === 'direct' ? 'direct' : 'relay';
+      resolve(
+        wrap(pipe, h, label, undefined, (age) => {
+          shaky = age < SHORT_MS ? way : null;
+        }),
+      );
     };
     const fail = (err: RoomError) => {
       if (done) return;
@@ -358,13 +406,16 @@ export const joinRoom: JoinRoom = (code, h) =>
       parked?.close();
       reject(err);
     };
+    // The direct link gets a few seconds' head start, none if it stalled last time, and
+    // all the time there is if the relay did.
+    const head = shaky === 'direct' ? 0 : shaky === 'relay' ? JOIN_MS - 3000 : DIRECT_MS;
     const settle = () => {
       if (done) return;
-      if (parked && (directErr || Date.now() - started >= DIRECT_MS)) return take(parked, 'relay');
+      if (parked && (directErr || Date.now() - started >= head)) return take(parked, 'relay');
       if (directErr && relayFailed) fail(directErr.type === 'off' ? new RoomError('network', 'Нет связи с сервером комнат.') : directErr);
     };
     const timer = setTimeout(() => fail(directErr?.type === 'peer-unavailable' ? directErr : new RoomError('timeout', 'Не удалось подключиться к комнате.')), JOIN_MS);
-    const grace = setTimeout(settle, DIRECT_MS);
+    const grace = setTimeout(settle, head);
     direct.ready.then(
       (pipe) => take(pipe, 'direct'),
       (err: RoomError) => {
