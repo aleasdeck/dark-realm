@@ -19,6 +19,7 @@ import {
   cardHtml,
   esc,
   focusView,
+  lostMark,
   paintIcons,
   patronEmblem,
   patronTipHtml,
@@ -44,6 +45,8 @@ import { savedBotGame } from './ui/savedGame';
 import { Coach, finale, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { lessonDone, markLessonDone, newcomer } from './ui/lessons';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
+import { clearPhrases, markSaid, maySay, sayAt, sayMenuHtml, showPhrase, type SayAt } from './ui/say';
+import { isPhrase } from './net/phrases';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -51,7 +54,13 @@ let selected = new Set<number>();
 let pendingKey = '';
 let autoPlay = false;
 /** Open sheet; the played cards one follows the table live, so a play while it is open shows up in it. */
-let modal: { kind: 'pile'; title: string; cards: Card[] } | { kind: 'played'; side: 'me' | 'opp' } | { kind: 'log' } | { kind: 'menu' } | null = null;
+let modal:
+  | { kind: 'pile'; title: string; cards: Card[] }
+  | { kind: 'played'; side: 'me' | 'opp' }
+  | { kind: 'log' }
+  | { kind: 'menu' }
+  | ({ kind: 'say' } & SayAt)
+  | null = null;
 let focus: Focus | null = null;
 /**
  * A card opened from a sheet (a pile or a choice) to read its text; ref is set when the card
@@ -119,6 +128,7 @@ function leaveGame(message = '', keep = false) {
   closeCoin();
   clearFx();
   clearMotion();
+  clearPhrases();
   const peer = new URLSearchParams(location.search).get('peer');
   history.replaceState(null, '', location.pathname + (peer ? `?peer=${encodeURIComponent(peer)}` : ''));
   menu(message);
@@ -479,7 +489,12 @@ function startGame(c: Controller) {
   closeCoin();
   clearFx();
   clearMotion();
+  clearPhrases();
   c.subscribe(render);
+  c.onPhrase = (by, id) => {
+    showPhrase(by === c.me ? 'me' : 'opp', id);
+    if (by !== c.me) play('click');
+  };
   render();
   fadeIn(app);
 }
@@ -509,7 +524,7 @@ function render() {
   hint = coach?.hint(s, me) ?? null;
   if (ctrl instanceof BotController && ctrl.tutorial && s.phase === 'over' && s.winner === me) markLessonDone(ctrl.lesson);
   if (s.phase === 'draft') {
-    app.innerHTML = draftHtml(s) + netOverlay(s);
+    app.innerHTML = draftHtml(s) + netOverlay(s) + sayMenu();
     if (hint) showHint(app, hint);
     // A match picked up after a reload doesn't toss again once the draft is under way.
     if (s.first !== undefined && !tossed && s.draftStep === 0) {
@@ -527,7 +542,7 @@ function render() {
     const view = focus ? focusView(s, me, focus, idle, pick) : null;
     if (!view) focus = null;
     savePlayed(app);
-    app.innerHTML = boardHtml(s, me, { myTurn, idle, focus, pick }) + overlays(s);
+    app.innerHTML = boardHtml(s, me, { myTurn, idle, focus, pick, net: netNames() }) + overlays(s);
     restorePlayed(app);
     restoreDrag();
     animateChange(app, snap, prev, s, me);
@@ -602,11 +617,29 @@ function draftHtml(s: GameState): string {
   return `<div class="draft">
     <h2>${mine ? 'Выберите владыку' : `Выбирает ${esc(s.players[turn].name)}…`}</h2>
     <div class="draft-picks">${([me, me === 0 ? 1 : 0] as const)
-      .map((pi) => `<div><b>${coin(pi)}${esc(s.players[pi].name)}</b><span class="picks">${picks(pi)}</span></div>`)
+      .map((pi) => `<div><b>${coin(pi)}${nameHtml(s.players[pi].name, pi === me ? 'me' : 'opp')}</b><span class="picks">${picks(pi)}</span></div>`)
       .join('')}</div>
     <div class="draft-tiles">${tiles}</div>
     <button class="ghost" data-act="exit">${withIcon('back', 'Выйти')}</button>
   </div>`;
+}
+
+/** What a network table does with the players' names: they open the phrases, and the opponent's shows them gone. */
+function netNames(): { say: boolean; lost: boolean } | undefined {
+  if (!(ctrl instanceof HostController || ctrl instanceof GuestController)) return undefined;
+  return { say: true, lost: ctrl instanceof HostController && ctrl.reconnecting };
+}
+
+/** A player's name in the draft; online it opens the phrases, and the opponent's shows when they are gone. */
+function nameHtml(name: string, side: 'me' | 'opp'): string {
+  const net = netNames();
+  if (!net) return esc(name);
+  return `<span class="say-name" data-act="say" data-side="${side}">${esc(name)}</span>${side === 'opp' && net.lost ? lostMark() : ''}`;
+}
+
+/** The phrase menu, while it is open. */
+function sayMenu(): string {
+  return modal?.kind === 'say' ? sayMenuHtml(modal) : '';
 }
 
 /** A new choice starts with nothing selected. */
@@ -627,11 +660,11 @@ function syncPending(s: GameState) {
 function netOverlay(s: GameState): string {
   if (s.phase === 'over') return '';
   if (ctrl instanceof GuestController && ctrl.offline) {
-    return `<div class="overlay"><div class="dialog reconnect"><h2>Нет связи</h2>
+    return `<div class="overlay"><div class="dialog reconnect"><h2>${lostMark()}Нет связи</h2>
       <p class="wait">${esc(ctrl.notice)}</p>
       <div class="buttons"><button class="ghost" data-act="exit">${withIcon('back', 'В меню')}</button></div></div></div>`;
   }
-  if (ctrl instanceof HostController && !ctrl.online) return `<div class="toast away">${esc(ctrl.notice)}</div>`;
+  if (ctrl instanceof HostController && !ctrl.online && ctrl.notice) return `<div class="toast away">${esc(ctrl.notice)}</div>`;
   return '';
 }
 
@@ -718,7 +751,7 @@ function overlays(s: GameState): string {
       <div class="sheet-actions"><button data-act="close">${withIcon('close', 'Закрыть')}</button></div></div></div>`;
   } else if (modal?.kind === 'menu') {
     html += `<div class="overlay sheet-wrap" data-act="close"><div class="sheet menu-sheet">
-      <h2>Меню</h2>
+      <h2>Меню${ctrl instanceof HostController || ctrl instanceof GuestController ? `<span class="room-tag">Комната <b>${esc(ctrl.code)}</b></span>` : ''}</h2>
       <div class="sheet-actions column">
         <button data-act="log">${withIcon('log', 'Журнал партии')}</button>
         <button data-act="rules">${withIcon('rules', 'Правила')}</button>
@@ -727,6 +760,8 @@ function overlays(s: GameState): string {
         <button class="danger" data-act="concede">${withIcon('concede', 'Сдаться')}</button>
         <button class="ghost" data-act="close">${withIcon('back', 'Вернуться к игре')}</button>
       </div></div></div>`;
+  } else if (modal?.kind === 'say') {
+    html += sayMenu();
   } else if (modal?.kind === 'pile') {
     const cards = [...modal.cards].sort((a, b) => cardDef(a.id).name.localeCompare(cardDef(b.id).name));
     html += pileSheet(`${modal.title} (${cards.length})`, cards);
@@ -892,7 +927,7 @@ app.addEventListener('click', (ev) => {
     return render();
   }
   if (!s) return;
-  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'log', 'played', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
+  if (['end', 'confirm', 'cancel', 'play-all', 'concede', 'menu', 'say', 'log', 'played', 'pile-deck', 'pile-cd', 'pile-opp-deck', 'pile-opp-cd'].includes(act)) focus = null;
   const me = ctrl.me;
   switch (act) {
     case 'draft':
@@ -951,6 +986,17 @@ app.addEventListener('click', (ev) => {
       return tapFocus({ kind: 'patron', patron: el.dataset.patron as PatronId });
     case 'confirm-focus':
       return confirmFocus();
+    case 'say':
+      if (!maySay()) return play('error');
+      modal = { kind: 'say', ...sayAt(el) };
+      play('click');
+      return render();
+    case 'say-pick': {
+      const id = el.dataset.phrase;
+      modal = null;
+      if (isPhrase(id) && ctrl.say(id)) markSaid();
+      return render();
+    }
     case 'menu':
       modal = { kind: 'menu' };
       return render();
