@@ -1,4 +1,4 @@
-import { PHRASE_IDS, PHRASES, type PhraseId } from '../net/phrases';
+import { PHRASE_IDS, PHRASE_LABELS, PHRASES, type PhraseId } from '../net/phrases';
 import { esc } from './rich';
 
 /*
@@ -36,7 +36,7 @@ export function sayAt(name: HTMLElement): SayAt {
 
 /** The menu of phrases, over a backdrop that shuts it. */
 export function sayMenuHtml(at: SayAt): string {
-  const items = PHRASE_IDS.map((id) => `<button data-act="say-pick" data-phrase="${id}">${esc(PHRASES[id])}</button>`).join('');
+  const items = PHRASE_IDS.map((id) => `<button data-act="say-pick" data-phrase="${id}">${esc(PHRASE_LABELS[id])}</button>`).join('');
   return `<div class="overlay say-wrap" data-act="close"><div class="say-menu ${at.below ? 'below' : 'above'}" style="--x:${at.x}px;--y:${at.y}px">${items}</div></div>`;
 }
 
@@ -63,12 +63,12 @@ export function showPhrase(side: 'me' | 'opp', id: PhraseId) {
   el.setAttribute('role', 'status');
   el.textContent = PHRASES[id];
   document.body.append(el);
-  // Centred on the name as far as the screen allows; the tail keeps pointing at the name.
+  // Lined up with the start of the name as far as the screen allows; the tail points at where the name begins.
   const w = el.offsetWidth;
-  const cx = r.left + Math.min(r.width, 120) / 2;
-  const left = Math.max(8, Math.min(innerWidth - w - 8, cx - w / 2));
+  const start = r.left + 10;
+  const left = Math.max(8, Math.min(innerWidth - w - 8, r.left - 4));
   el.style.left = `${left}px`;
-  el.style.setProperty('--tail', `${Math.max(14, Math.min(w - 14, cx - left))}px`);
+  el.style.setProperty('--tail', `${Math.max(14, Math.min(w - 14, start - left))}px`);
   if (below) el.style.top = `${r.bottom + 10}px`;
   else el.style.bottom = `${innerHeight - r.top + 10}px`;
   const timer = window.setTimeout(() => {

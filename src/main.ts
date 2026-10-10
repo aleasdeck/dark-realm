@@ -634,7 +634,7 @@ function netNames(): { say: boolean; lost: boolean } | undefined {
 function nameHtml(name: string, side: 'me' | 'opp'): string {
   const net = netNames();
   if (!net) return esc(name);
-  return `${side === 'opp' && net.lost ? lostMark() : ''}<span class="say-name" data-act="say" data-side="${side}">${esc(name)}</span>`;
+  return `<span class="say-name" data-act="say" data-side="${side}">${esc(name)}</span>${side === 'opp' && net.lost ? lostMark() : ''}`;
 }
 
 /** The phrase menu, while it is open. */

@@ -12,6 +12,14 @@ export const PHRASES = {
 
 export type PhraseId = keyof typeof PHRASES;
 
+/** What each phrase is, as the menu lists them; the whole phrase shows once it is said. */
+export const PHRASE_LABELS: Record<PhraseId, string> = {
+  hello: 'Приветствие',
+  thanks: 'Благодарность',
+  sorry: 'Извинение',
+  curse: 'Расстройство',
+};
+
 export const PHRASE_IDS = Object.keys(PHRASES) as PhraseId[];
 
 export function isPhrase(id: unknown): id is PhraseId {

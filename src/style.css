@@ -813,9 +813,15 @@ button.menu-btn {
   color: var(--them);
   flex: 1 1 0;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+/* the name gives way to the marks after it */
+.who-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .res-group {
   display: flex;
@@ -1628,12 +1634,14 @@ button.menu-btn {
     justify-content: space-between;
   }
   .oh-name {
-    display: block;
+    display: flex;
+    align-items: center;
     position: absolute;
     left: 8px;
     top: 50%;
     transform: translateY(-50%);
-    max-width: calc(50% - 60px);
+    /* up to the leftmost card back: half of a back plus half the fan's spread, and a small gap */
+    max-width: calc(50% - 20px - max(0px, (var(--nb) - 1) * 6.5px));
     font-family: var(--title-font);
     font-weight: 700;
     color: var(--them);
@@ -3563,14 +3571,11 @@ summary > img.ic {
   width: 24px;
   height: 24px;
   margin-block: -5px;
-  margin-right: 4px;
+  margin-left: 6px;
   vertical-align: middle;
   color: var(--them);
   filter: drop-shadow(0 0 4px #ff2a1acc);
   animation: net-lost 1.1s ease-in-out infinite;
-}
-.bar .net-lost {
-  margin-right: -2px;
 }
 .net-lost img.ic {
   width: 100%;
@@ -3588,39 +3593,18 @@ summary > img.ic {
     animation-duration: 2.4s;
   }
 }
-/* held sideways the bar has no name: the mark pulses over the opponent's hand instead, where
-   there is room for it even on the smallest phones */
-.oh-lost {
-  display: none;
-}
+/* held sideways the name sits in a narrow gap left of the opponent's hand */
 @media (orientation: landscape) and (max-height: 560px) {
-  .bar .net-lost {
-    display: none;
-  }
-  .oh-lost {
-    display: flex;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 2;
-    padding: 6px;
-    border-radius: 50%;
-    /* a dark disc lifts the red mark off the card backs */
-    background: radial-gradient(circle, #050302e6 0 58%, transparent 72%);
-    pointer-events: none;
-  }
-  .oh-lost .net-lost {
-    width: 30px;
-    height: 30px;
-    margin: 0;
-    filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 6px #ff2a1acc);
+  .oh-name .net-lost {
+    width: 18px;
+    height: 18px;
+    margin-left: 3px;
   }
 }
 .dialog.reconnect h2 .net-lost {
   width: 26px;
   height: 26px;
-  margin-right: 8px;
+  margin: 0 8px 0 0;
 }
 
 /* a name at a network table opens the phrases */
@@ -3635,8 +3619,8 @@ summary > img.ic {
 }
 .say-menu {
   position: fixed;
-  left: clamp(8px, calc(var(--x) - 130px), calc(100vw - min(260px, 100vw - 16px) - 8px));
-  width: min(260px, calc(100vw - 16px));
+  left: clamp(8px, calc(var(--x) - 90px), calc(100vw - 188px));
+  width: 180px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3654,14 +3638,7 @@ summary > img.ic {
   bottom: calc(100dvh - var(--y) + 6px);
 }
 .say-menu button {
-  text-align: left;
-  font-family: var(--text-font);
-  font-variant: normal;
-  text-transform: none;
-  font-weight: 400;
-  font-style: italic;
-  font-size: 14px;
-  line-height: 1.25;
+  font-size: 15px;
   padding: 8px 10px;
 }
 @keyframes say-in {

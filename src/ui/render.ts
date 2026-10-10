@@ -338,11 +338,11 @@ export function boardHtml(
 
   return `<div class="game ${opts.myTurn ? 'my-turn' : 'their-turn'}">
     <header class="bar opp-bar${opts.myTurn ? '' : ' active'}">
-      ${lost}<span class="who"${say('opp')}>${esc(them.name)}</span>
+      <span class="who"><span class="who-name"${say('opp')}>${esc(them.name)}</span>${lost}</span>
       <span class="res-group">${res(them, prestigeGoal(s))}</span>
       <span class="counts">${count(them.deck.length, 'колода', 'pile_deck', 'pile-opp-deck')}${count(them.cooldown.length, 'сброс', 'pile_discard', 'pile-opp-cd')}</span>
     </header>
-    <section class="opp-hand" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name"><span${say('opp')}>${esc(them.name)}</span></span>${lost ? `<span class="oh-lost">${lost}</span>` : ''}${backsHtml(them.hand.length)}</section>
+    <section class="opp-hand" style="--nb:${them.hand.length}" aria-label="Карт в руке соперника: ${them.hand.length}"><span class="oh-name"><span class="who-name"${say('opp')}>${esc(them.name)}</span>${lost}</span>${backsHtml(them.hand.length)}</section>
     ${targets.size ? sideLabel('oppag attack', 'Атакуйте наймитов', 'Атака') : sideLabel('oppag', 'Наймиты соперника', 'Наймиты')}
     <section class="strip opp-agents${theirPlayed ? ' has-played' : ''}" style="--na:${them.agents.length}">
       <div class="s-body">
@@ -366,7 +366,7 @@ export function boardHtml(
     </section>
     <section class="hand fan" style="--n:${n}">${n ? hand : '<span class="empty">рука пуста</span>'}</section>
     <div class="bar my-bar${opts.myTurn ? ' active' : ''}">
-      <span class="who"${say('me')}>${esc(you.name)}</span>
+      <span class="who"><span class="who-name"${say('me')}>${esc(you.name)}</span></span>
       <span class="res-group">${res(you, prestigeGoal(s))}</span>
       <span class="counts">${count(you.deck.length, 'колода', 'pile_deck', 'pile-deck')}${count(you.cooldown.length, 'сброс', 'pile_discard', 'pile-cd')}</span>
     </div>
