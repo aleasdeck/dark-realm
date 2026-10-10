@@ -214,7 +214,11 @@ input {
 button.menu-btn {
   padding: 14px;
   font-size: 18px;
-  background: linear-gradient(#1f4a30b8, #12301fb8);
+  /* each button is its own slab of dark stone (textures.ts) */
+  background:
+    var(--tex, none) center / cover no-repeat,
+    linear-gradient(#0f2117d9, #08140dd9);
+  text-shadow: 0 1px 2px #000, 0 0 8px #000c;
   border-color: #3f8a5cc0;
   box-shadow: inset 0 1px 0 #ffffff1a, 0 2px 8px #0008;
   backdrop-filter: blur(3px);
@@ -308,6 +312,15 @@ button.menu-btn {
   .menu .field input {
     flex: 1;
     min-width: 0;
+  }
+  /* the nick screen's note is shorter, so «Назад» stays on the smallest phones */
+  .menu .nick-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .menu #nick {
+    padding-block: 7px;
   }
 }
 .nick-text {
@@ -3116,6 +3129,96 @@ button.menu-btn small {
   .intro-patron img,
   button.menu-btn.fresh {
     animation: none;
+  }
+}
+
+/* ── menu motion (menuFx.ts): presses glow, screens slide ── */
+button.menu-btn,
+.menu button.toggle,
+.menu-sheet .sheet-actions button,
+.menu > button {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.12s ease-out,
+    border-color 0.2s,
+    box-shadow 0.2s,
+    filter 0.2s;
+}
+/* the button sinks a little under the finger and its rim lights up */
+button.menu-btn:active:not(:disabled),
+.menu button.toggle:active,
+.menu-sheet .sheet-actions button:active:not(:disabled),
+.menu > button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+  border-color: var(--green-glow);
+  box-shadow: inset 0 1px 0 #ffffff1a, 0 0 16px #4fd17a88;
+  filter: brightness(1.15);
+}
+button.menu-btn > img.ic {
+  transition: transform 0.2s ease-out;
+}
+@media (hover: hover) {
+  button.menu-btn:hover:not(:disabled) {
+    border-color: #6fd895;
+    box-shadow: inset 0 1px 0 #ffffff26, 0 0 14px #4fd17a55, 0 2px 8px #0008;
+  }
+  button.menu-btn:hover:not(:disabled) > img.ic {
+    transform: scale(1.12) rotate(-4deg);
+  }
+}
+/* the slab's cracks light up from inside while it is pressed (menuFx.ts adds .lit) */
+button.menu-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--glow, none) center / cover no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+button.menu-btn.lit::before {
+  opacity: 1;
+  transition-duration: 0.12s;
+}
+button.menu-btn > :not(.press-glow) {
+  position: relative;
+}
+/* the menu's screens slide in from the side; nothing they carry past the edge may widen the page */
+#app:has(> .menu) {
+  overflow: clip;
+}
+/* the glow spreading from the finger */
+.press-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, #8dffad66 0%, #4fd17a33 40%, transparent 70%);
+  mix-blend-mode: screen;
+}
+/* the screen on its way out, over the new one while it fades */
+.menu-exit {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+.menu-exit .menu-ghost {
+  position: fixed;
+  margin: 0;
+  max-width: none;
+  min-height: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  button.menu-btn,
+  .menu button.toggle,
+  .menu-sheet .sheet-actions button,
+  .menu > button,
+  button.menu-btn > img.ic,
+  button.menu-btn::before {
+    transition: none;
   }
 }
 

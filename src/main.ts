@@ -39,6 +39,8 @@ import { initFit } from './ui/fit';
 import { journalHtml } from './ui/journal';
 import { formatClock, HOURGLASS } from './ui/clock';
 import { hideLoading, loadAll } from './ui/loading';
+import { fadeIn, initMenuFx, playMenu, shootMenu } from './ui/menuFx';
+import { textureStyle } from './ui/textures';
 import { savedBotGame } from './ui/savedGame';
 import { Coach, finale, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { lessonDone, markLessonDone, newcomer } from './ui/lessons';
@@ -142,8 +144,15 @@ const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   settings: { title: 'Настройки', back: 'home' },
 };
 
+/** How far a screen lies from the first one, so the menu knows which way to slide. */
+function menuDepth(view: MenuView): number {
+  let d = 0;
+  for (let v = view; v !== 'home'; v = MENU_VIEWS[v].back) d++;
+  return d;
+}
+
 const menuButton = (go: string, ic: string, label: string, cls = '', note = '') =>
-  `<button class="menu-btn${cls ? ` ${cls}` : ''}" data-go="${go}">${withIcon(ic, label)}${note ? `<small>${note}</small>` : ''}</button>`;
+  `<button class="menu-btn${cls ? ` ${cls}` : ''}" data-go="${go}"${textureStyle(go)}>${withIcon(ic, label)}${note ? `<small>${note}</small>` : ''}</button>`;
 
 function menuBody(view: MenuView): string {
   switch (view) {
@@ -176,7 +185,7 @@ function menuBody(view: MenuView): string {
         menuButton('join', 'join', 'Присоединиться')
       );
     case 'join':
-      return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter">${withIcon('join', 'Войти')}</button></div>`;
+      return `<div class="join"><input id="code" placeholder="КОД КОМНАТЫ" maxlength="8" value="${esc(roomFromUrl())}" autocomplete="off"><button class="menu-btn" data-go="enter"${textureStyle('enter')}>${withIcon('join', 'Войти')}</button></div>`;
     case 'nick':
       return `<p class="nick-text">Придумайте ник: его увидит соперник, и под ним вы попадёте в рейтинг. Сменить ник можно в Настройках.</p>
         <input id="nick" maxlength="24" placeholder="Ваш ник" autocomplete="nickname">
@@ -198,6 +207,8 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     view = 'nick';
   }
   const v = MENU_VIEWS[view];
+  const depth = menuDepth(view);
+  const shot = shootMenu(app, depth, view);
   setMusicScene('menu');
   app.innerHTML = `<div class="menu home ${view === 'home' ? 'root' : 'sub'}" data-view="${view}">
     <h1 class="logo"><img src="${logoUrl}" alt="Dark Realm"></h1>
@@ -252,6 +263,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   );
   if (view === 'rating' && ratingUrl()) loadRating();
   themedScroll(app);
+  playMenu(app, shot, depth);
 }
 
 /** The emblem of a player's favourite deck in the rating; nothing for an unknown patron or none yet. */
@@ -470,6 +482,7 @@ function startGame(c: Controller) {
   clearMotion();
   c.subscribe(render);
   render();
+  fadeIn(app);
 }
 
 // ── game rendering ───────────────────────────────────────
@@ -1042,6 +1055,7 @@ window.addEventListener('resize', () => {
 });
 
 initFit();
+initMenuFx();
 
 // Results of network games that didn't reach the rating table before.
 flushReports();
