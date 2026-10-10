@@ -61,7 +61,7 @@ export function shootMenu(root: ParentNode, depth: number, next: string): MenuSh
     for (let el: HTMLElement = pressed; el !== old; el = el.parentElement!) path.unshift([...el.parentElement!.children].indexOf(el));
     let twin: Element = ghost;
     for (const i of path) twin = twin.children[i];
-    twin.classList.add('chosen', 'lit');
+    twin.classList.add('chosen');
   }
   exitLayer().append(ghost);
   ghost.querySelectorAll<HTMLElement>('.tscroll-body').forEach((b) => (b.scrollTop = Number(b.dataset.top)));
@@ -185,18 +185,6 @@ function glow(btn: HTMLElement, x: number, y: number) {
   );
 }
 
-/** Lights the cracks of a stone button until the finger lifts, and a moment longer. */
-function light(btn: HTMLElement) {
-  btn.classList.add('lit');
-  const off = () => {
-    removeEventListener('pointerup', off, true);
-    removeEventListener('pointercancel', off, true);
-    setTimeout(() => btn.classList.remove('lit'), 180);
-  };
-  addEventListener('pointerup', off, true);
-  addEventListener('pointercancel', off, true);
-}
-
 /** The buttons that answer a press with a glow: the main menu's and the game menu's. */
 const GLOWS = 'button.menu-btn, .menu button.toggle, .menu-sheet .sheet-actions button, .menu > button';
 
@@ -207,7 +195,6 @@ export function initMenuFx() {
     (ev) => {
       const btn = (ev.target as HTMLElement).closest?.<HTMLElement>('button');
       pressed = btn;
-      if (btn?.matches('button.menu-btn:not(:disabled)')) light(btn);
       if (!btn || still() || (btn as HTMLButtonElement).disabled || !btn.matches(GLOWS)) return;
       glow(btn, ev.clientX, ev.clientY);
     },
