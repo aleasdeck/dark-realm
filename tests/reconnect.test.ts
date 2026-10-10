@@ -228,13 +228,29 @@ describe('guest reconnect', () => {
     expect(guest.notice).toBe('');
   });
 
-  it('gives up on a room it never got into', async () => {
+  it('keeps trying a room it never got into for a while, then gives up', async () => {
+    vi.useFakeTimers();
     const net = fakeHost();
     net.setUp(false);
     const guest = new GuestController('ZZZZZ', 'Гость', net.join);
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(guest.gone).toBe('');
+    expect(guest.notice).toBe('Комната ZZZZZ пока не отвечает. Пробуем ещё…');
+    await vi.advanceTimersByTimeAsync(50000);
     expect(guest.gone).toBe('Комната не найдена. Проверьте код.');
+  });
+
+  it('gets into a room whose host was away for a moment', async () => {
+    vi.useFakeTimers();
+    const net = fakeHost();
+    net.setUp(false);
+    const guest = new GuestController('ABCDE', 'Гость', net.join);
+    await vi.advanceTimersByTimeAsync(4000);
+    net.setUp(true);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(guest.gone).toBe('');
+    expect(net.links).toHaveLength(1);
+    expect(net.links[0].sent[0]).toMatchObject({ type: 'hello', name: 'Гость' });
   });
 
   it('goes back to the menu when the room turns it away', async () => {
