@@ -8,6 +8,7 @@ import type { Accept, HostedRoom, JoinRoom, Link, NetMessage, OpenRoom } from '.
 import { newMatchId, rateGame, type RatingStatus } from '../net/rating';
 import { clientId, forgetMatch, saveMatch } from '../net/saved';
 import { LOCKSTEP, stateHash } from '../net/sync';
+import { isPhrase, type PhraseId } from '../net/phrases';
 import { GameClock } from './clock';
 import { forgetBotGame, saveBotGame } from './savedGame';
 import { strikePause } from './moves';
@@ -33,6 +34,9 @@ export abstract class Controller {
   private wasOver = false;
   private stopRating: (() => void) | null = null;
   private listeners: (() => void)[] = [];
+  /** Network games: called with each phrase said at the table, by either player. */
+  onPhrase: ((by: PlayerIdx, id: PhraseId) => void) | null = null;
+  private heardAt = 0;
 
   subscribe(fn: () => void) {
     this.listeners.push(fn);
@@ -59,6 +63,27 @@ export abstract class Controller {
   }
 
   abstract dispatch(a: Action): void;
+  /** Says a phrase to the opponent; false when there is nobody to hear it. */
+  say(_id: PhraseId): boolean {
+    return false;
+  }
+  /** Sends a phrase over `link` and shows it on this side too. */
+  protected sayOver(link: Link | null, id: PhraseId): boolean {
+    if (!link || !this.state) return false;
+    link.send({ type: 'say', phrase: id });
+    this.onPhrase?.(this.me, id);
+    return true;
+  }
+  /**
+   * A phrase from the opponent. A player may say one every 30 s; a game that sends them
+   * faster has some dropped (with a little slack for timers that run late).
+   */
+  protected heard(id: unknown) {
+    const now = Date.now();
+    if (!isPhrase(id) || now - this.heardAt < 25000) return;
+    this.heardAt = now;
+    this.onPhrase?.(this.me === 0 ? 1 : 0, id);
+  }
   /** The coin toss has been shown; the game may go on. */
   tossShown() {}
   /** The player steps out to the menu but keeps the match to come back to. */
@@ -74,6 +99,7 @@ export abstract class Controller {
     this.clock.stop();
     this.stopRating?.();
     this.listeners = [];
+    this.onPhrase = null;
   }
 }
 
@@ -312,6 +338,8 @@ export class HostController extends Controller {
   private disposed = false;
   /** Stepping out to the menu keeps the match saved and doesn't say goodbye. */
   private kept = false;
+  /** The guest left the match on purpose. */
+  private left = false;
 
   constructor(
     private playerName: string,
@@ -335,6 +363,15 @@ export class HostController extends Controller {
     return !!this.link;
   }
 
+  /** The guest dropped out of the match under way and may be back any moment; the table shows it by their name. */
+  get reconnecting() {
+    return !!this.state && !this.link && !this.left && this.state.phase !== 'over';
+  }
+
+  say(id: PhraseId) {
+    return this.sayOver(this.link, id);
+  }
+
   private async open() {
     try {
       const room = await this.openRoom(this.code, (accept) => this.accept(accept));
@@ -342,7 +379,7 @@ export class HostController extends Controller {
       this.room = room;
       this.ready = true;
       this.tries = 0;
-      this.notice = this.state && !this.link ? 'Соперник переподключается…' : '';
+      this.notice = '';
     } catch (e) {
       if (this.disposed) return;
       // A new room gives up at once; a match in progress keeps trying, as the broker
@@ -393,6 +430,7 @@ export class HostController extends Controller {
       if (this.link !== link) this.link?.close();
       this.link = link;
       this.lockstep = (m.v ?? 0) >= LOCKSTEP;
+      this.left = false;
       this.notice = '';
       this.sendState();
       this.save();
@@ -415,9 +453,12 @@ export class HostController extends Controller {
       this.commit(next, 1, m.action);
     } else if (m.type === 'sync') {
       this.sendState();
+    } else if (m.type === 'say') {
+      this.heard(m.phrase);
     } else if (m.type === 'bye') {
       link.close();
       this.link = null;
+      this.left = true;
       this.notice = 'Соперник покинул партию.';
       this.emit();
     }
@@ -425,7 +466,8 @@ export class HostController extends Controller {
 
   private lost() {
     this.link = null;
-    this.notice = this.state?.phase === 'over' ? 'Соперник отключился.' : 'Соперник переподключается…';
+    // During the match the opponent's name shows that they are gone (see `reconnecting`).
+    this.notice = this.state?.phase === 'over' ? 'Соперник отключился.' : '';
     this.emit();
   }
 
@@ -539,6 +581,10 @@ export class GuestController extends Controller {
     return !this.live;
   }
 
+  say(id: PhraseId) {
+    return this.live && this.sayOver(this.link, id);
+  }
+
   private async connect() {
     let link: Link | undefined;
     try {
@@ -581,6 +627,8 @@ export class GuestController extends Controller {
       this.keep();
     } else if (m.type === 'error') {
       this.error = m.message;
+    } else if (m.type === 'say') {
+      return this.heard(m.phrase);
     } else if (m.type === 'reject') {
       link.close();
       this.link = null;

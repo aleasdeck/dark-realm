@@ -84,7 +84,7 @@ function comboText(s: GameState): string {
   const count = ['', 'одна карта', 'две карты', 'три карты', 'четыре карты', 'пять карт'][n] ?? `${n} карт`;
   const name = pid === 'neutral' ? '' : ` ${GENITIVE[pid as PatronId] ?? PATRONS[pid as PatronId].name}`;
   const which = levels.map((k) => `«Комбо ${k}»`).join(' и ');
-  return `Комбо! ${count[0].toUpperCase() + count.slice(1)}${name} за ход, сработал${levels.length > 1 ? 'и' : 'о'} ${which}. И слепой курице зерно попадается. Держись одного владыки.`;
+  return `Комбо! ${count[0].toUpperCase() + count.slice(1)}${name} за ход, сработал${levels.length > 1 ? 'и' : 'о'} ${which}. И слепой курице зерно попадается. Читай карты и держись одного владыки.`;
 }
 
 const BASIC_PATRONS_ROW = (['pelin', 'hlaalu', 'crows', 'eagle'] as PatronId[])
@@ -138,21 +138,21 @@ const BASIC: Step[] = [
     id: 'hand',
     turn: 1,
     target: '.hand',
-    text: 'Карта не кусается. Тронь её и жми «Сыграть». Или тащи на стол.',
+    text: 'Карта не кусается. Тронь её и прочти, что она даёт. Потом жми «Сыграть» или тащи на стол.',
     done: (s, me) => s.players[me].hand.length < 5,
   },
   {
     id: 'resources',
     turn: 1,
-    target: '.my-bar .res-group, .hand, .controls [data-act="play-all"]',
-    text: 'Монеты ● и сила ⚔ копятся тут. Не возись по одной: ▶▶ выбросит всё разом.',
+    target: '.my-bar .res-group, .hand',
+    text: 'Монеты ● и сила ⚔ копятся тут. Играй по одной и читай каждую: в картах вся твоя сила.',
     done: handEmpty,
   },
   {
     id: 'tavern',
     turn: 1,
     target: '.tavern',
-    text: 'Это таверна. Подсвечено то, на что тебе хватит ●. Выбирай: Волк бьёт, Крыса копит, Ворон всего понемногу.',
+    text: 'Это таверна, подсвечено то, на что хватит ●. Карты Волка дают силу ⚔, карты Крысы монеты ●, карты Ворона понемногу всего. Тронь и прочти, прежде чем брать.',
     done: (s, me) => bought(s, me) || (idleEmpty(s, me) && nothingToBuy(s, me)),
   },
   {
@@ -188,7 +188,7 @@ const BASIC: Step[] = [
     id: 'shop',
     turn: 3,
     target: '.tavern',
-    text: 'Силы нет? Значит, ход покупок. Трать всё до последнего медяка.',
+    text: 'Силы нет? Значит, ход покупок. Читай строку «Комбо» на картах и бери того владыки, чьи карты у тебя уже есть.',
     when: idleEmpty,
     done: (s, me) => idleEmpty(s, me) && nothingToBuy(s, me),
   },
@@ -197,7 +197,7 @@ const BASIC: Step[] = [
     id: 'reshuffle',
     turn: 5,
     target: '.hand',
-    text: 'Колода кончилась, сброс перемешан. Гляди-ка, твои покупки вернулись.',
+    text: 'Колода кончилась, сброс перемешан, покупки вернулись. Прочти их: «Комбо 2» сработает, если за ход сыграешь две карты одного владыки.',
     ok: true,
   },
   // The fourth turn: a weak hand, the patrons, favor, the opponent's agent.
@@ -380,7 +380,8 @@ const ADVANCED: Step[] = [
     id: 'junk',
     turn: 1,
     target: '.hand, .controls [data-act="play-all"]',
-    text: 'Глянь на руку: сплошное Золото, по 1 ● за карту. Мусор. Выкладывай всё ▶▶, а потом покажу, как от него избавиться.',
+    text: 'Глянь на руку: сплошное Золото, по 1 ● за карту. Мусор. Жми ▶▶, он выложит всё разом, а потом покажу, как от мусора избавиться.',
+    why: '▶▶ годится для мусора. Хорошие карты выкладывай по одной и читай, иначе не поймёшь, откуда что взялось.',
     done: handEmpty,
   },
   {
@@ -722,7 +723,7 @@ export function showHint(root: HTMLElement, h: Hint) {
   bubble.dataset.hint = h.id;
   // the play-all button is named by its icon, as it is drawn under the table
   bubble.innerHTML = `<p class="coach-who">${TUTORIAL_OPPONENT}</p><p>${paintIcons(esc(h.text)).replace('▶▶', icon('play_all', '▶▶'))}</p>${
-    h.why ? `<p class="coach-why"><b>Почему так.</b> ${paintIcons(esc(h.why))}</p>` : ''
+    h.why ? `<p class="coach-why"><b>Почему так.</b> ${paintIcons(esc(h.why)).replace('▶▶', icon('play_all', '▶▶'))}</p>` : ''
   }<div class="coach-actions">
     <button class="ghost" data-act="tut-skip">${withIcon('skip', 'Пропустить обучение')}</button>
     ${h.ok ? `<button data-act="tut-ok" data-hint="${h.id}">${withIcon('confirm', 'Понятно')}</button>` : ''}</div>`;

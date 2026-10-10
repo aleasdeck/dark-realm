@@ -1,5 +1,6 @@
 import Peer, { type PeerOptions } from 'peerjs';
 import type { Action, GameState, PatronId, PlayerIdx } from '../engine/types';
+import type { PhraseId } from './phrases';
 import { relayHost, relayJoin } from './relay';
 
 /*
@@ -33,6 +34,8 @@ export type NetMessage =
   | { type: 'error'; message: string }
   /** The host turns this connection away; the guest gives up and goes back to the menu. */
   | { type: 'reject'; message: string }
+  /** A phrase said to the other player, from src/net/phrases.ts; either side may send it. */
+  | { type: 'say'; phrase: PhraseId }
   | { type: 'ping' }
   /** The answer to a ping, sent at once: a hidden tab's own timers may fire only once a minute. */
   | { type: 'pong' }

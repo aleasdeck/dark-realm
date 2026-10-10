@@ -1015,9 +1015,15 @@ button.coll-tab {
   color: var(--them);
   flex: 1 1 0;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+/* the name gives way to the marks after it */
+.who-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .res-group {
   display: flex;
@@ -1830,12 +1836,14 @@ button.coll-tab {
     justify-content: space-between;
   }
   .oh-name {
-    display: block;
+    display: flex;
+    align-items: center;
     position: absolute;
     left: 8px;
     top: 50%;
     transform: translateY(-50%);
-    max-width: calc(50% - 60px);
+    /* up to the leftmost card back: half of a back plus half the fan's spread, and a small gap */
+    max-width: calc(50% - 20px - max(0px, (var(--nb) - 1) * 6.5px));
     font-family: var(--title-font);
     font-weight: 700;
     color: var(--them);
@@ -3740,5 +3748,159 @@ summary > img.ic {
 @media (orientation: landscape) and (max-height: 560px) {
   .log-view .log {
     max-height: calc(100dvh - 150px);
+  }
+}
+
+/* ── network games: the room code, the opponent gone, phrases ── */
+
+/* the game menu's title carries the room's code */
+.menu-sheet h2 .room-tag {
+  margin-left: 10px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.menu-sheet h2 .room-tag b {
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+
+/* the opponent dropped out: a red, crossed out connection pulses by their name */
+.net-lost {
+  display: inline-flex;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-block: -5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  color: var(--them);
+  filter: drop-shadow(0 0 4px #ff2a1acc);
+  animation: net-lost 1.1s ease-in-out infinite;
+}
+.net-lost img.ic {
+  width: 100%;
+  height: 100%;
+}
+@keyframes net-lost {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.86);
+    filter: drop-shadow(0 0 0 #ff2a1a00);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .net-lost {
+    animation-duration: 2.4s;
+  }
+}
+/* held sideways the name sits in a narrow gap left of the opponent's hand */
+@media (orientation: landscape) and (max-height: 560px) {
+  .oh-name .net-lost {
+    width: 18px;
+    height: 18px;
+    margin-left: 3px;
+  }
+}
+.dialog.reconnect h2 .net-lost {
+  width: 26px;
+  height: 26px;
+  margin: 0 8px 0 0;
+}
+
+/* a name at a network table opens the phrases */
+[data-act='say'] {
+  cursor: pointer;
+  text-decoration: underline dotted #ffffff4d;
+  text-underline-offset: 3px;
+}
+.overlay.say-wrap {
+  background: #0007;
+  padding: 0;
+}
+.say-menu {
+  position: fixed;
+  left: clamp(8px, calc(var(--x) - 90px), calc(100vw - 188px));
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px #000c;
+  animation: say-in 0.16s ease-out;
+}
+.say-menu.below {
+  top: calc(var(--y) + 6px);
+}
+.say-menu.above {
+  bottom: calc(100dvh - var(--y) + 6px);
+}
+.say-menu button {
+  font-size: 15px;
+  padding: 8px 10px;
+}
+@keyframes say-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* what was said, by the speaker's name: red for the opponent, green for you */
+.say-bubble {
+  --edge: var(--them);
+  position: fixed;
+  z-index: 30;
+  max-width: min(240px, calc(100vw - 16px));
+  padding: 7px 12px;
+  background: #170f0c;
+  color: #eee2c8;
+  border: 1.5px solid var(--edge);
+  border-radius: 12px;
+  box-shadow:
+    0 6px 18px #000d,
+    0 0 10px color-mix(in srgb, var(--edge) 35%, transparent);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.25;
+  pointer-events: none;
+  animation: say-pop 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
+  transition: opacity 0.4s;
+}
+.say-bubble.me {
+  --edge: var(--you);
+  background: #0c1710;
+}
+.say-bubble::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--tail, 50%) - 7px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border: inherit;
+  transform: rotate(45deg);
+}
+.say-bubble.below::after {
+  top: -8px;
+  border-right: none;
+  border-bottom: none;
+}
+.say-bubble.above::after {
+  bottom: -8px;
+  border-left: none;
+  border-top: none;
+}
+.say-bubble.gone {
+  opacity: 0;
+}
+@keyframes say-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
   }
 }
