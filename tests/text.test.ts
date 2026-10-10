@@ -20,6 +20,17 @@ describe('resource icons in effect texts', () => {
     for (const t of texts) expect(t).not.toMatch(/монет|сил[аыу]|престиж/i);
   });
 
+  it('counts cards with the card icon, not the word', () => {
+    expect(effectText({ k: 'returnTop', n: 3 })).toBe('Вернуть до 3 ▯ из сброса наверх колоды');
+    expect(effectText({ k: 'draw', n: 1 })).toBe('Взять 1 ▯');
+    const texts = [
+      ...CARDS.flatMap((c) => cardLines(c).map((l) => l.text)),
+      ...Object.values(PATRON_RULES).flatMap((r) => [r.cost, r.effect]),
+    ];
+    for (const t of texts) expect(t).not.toMatch(/\d+ (верхн\S* )?карт/);
+    expect(richText('Взять 2 ▯')).toBe('Взять <span class="ri rcard">2 <i>▯</i></span>');
+  });
+
   it('paints the amount and its icon in the resource color', () => {
     expect(richText('Взять карту, +2 ⚔ <b>')).toBe('Взять карту, <span class="ri pow">+2 <i>⚔</i></span> &lt;b&gt;');
     expect(richText('все ● (мин. 1)')).toBe('все <span class="ri coin"><i>●</i></span> (мин. 1)');
