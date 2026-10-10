@@ -944,7 +944,10 @@ button.menu-btn {
   object-fit: cover;
 }
 .strip .agents .c-hp {
-  /* over every agent, so an overlapped one still shows its health (and taunt) */
+  /* top left, the corner an overlapping agent leaves showing, and over every agent */
+  top: -6px;
+  left: -6px;
+  right: auto;
   z-index: 3;
   width: 26px;
   height: 28px;
