@@ -44,6 +44,7 @@ import { savedBotGame } from './ui/savedGame';
 import { Coach, finale, hintAllows, showHint, type Hint } from './ui/tutorial';
 import { lessonDone, markLessonDone, newcomer } from './ui/lessons';
 import { isUnlocked, UNLOCK_AT, unlockHint, unlockLeft } from './ui/unlocks';
+import { bindCollection, collectionHtml } from './ui/collection';
 
 const app = document.getElementById('app')!;
 let ctrl: Controller | null = null;
@@ -130,7 +131,7 @@ let nickAsked = false;
 let nickNext: MenuView = 'net';
 
 /** Screens of the main menu; each one but the first has a way back to the one it came from. */
-type MenuView = 'home' | 'play' | 'learn' | 'bot' | 'net' | 'join' | 'nick' | 'rating' | 'settings';
+type MenuView = 'home' | 'play' | 'learn' | 'bot' | 'net' | 'join' | 'nick' | 'collection' | 'rating' | 'settings';
 const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   home: { title: '', back: 'home' },
   play: { title: 'Играть', back: 'home' },
@@ -139,6 +140,7 @@ const MENU_VIEWS: Record<MenuView, { title: string; back: MenuView }> = {
   net: { title: 'Сетевая игра', back: 'home' },
   join: { title: 'Присоединиться', back: 'net' },
   nick: { title: 'Ваш ник', back: 'home' },
+  collection: { title: 'Коллекция', back: 'home' },
   rating: { title: 'Рейтинг', back: 'home' },
   settings: { title: 'Настройки', back: 'home' },
 };
@@ -159,6 +161,7 @@ function menuBody(view: MenuView): string {
       return (
         menuButton('play', 'play_all', 'Играть') +
         menuButton('net', 'combo', 'Сетевая игра') +
+        menuButton('collection', 'pile_deck', 'Коллекция') +
         menuButton('rating', 'win', 'Рейтинг') +
         menuButton('settings', 'settings', 'Настройки')
       );
@@ -189,6 +192,8 @@ function menuBody(view: MenuView): string {
       return `<p class="nick-text">Придумайте ник: его увидит соперник, и под ним вы попадёте в рейтинг. Сменить ник можно в Настройках.</p>
         <input id="nick" maxlength="24" placeholder="Ваш ник" autocomplete="nickname">
         ${menuButton('nick-ok', 'confirm', 'Продолжить')}${menuButton('nick-skip', 'skip', 'Без ника')}`;
+    case 'collection':
+      return collectionHtml();
     case 'rating':
       return `<div class="rating-board">${ratingUrl() ? '<p class="wait">Загружаем…</p>' : '<p class="wait">Таблица рейтинга ещё не подключена.</p>'}</div>`;
     case 'settings':
@@ -198,7 +203,7 @@ function menuBody(view: MenuView): string {
   }
 }
 
-/** The main menu: three buttons, each opening a screen of its own. A room link opens straight on joining it. */
+/** The main menu: a few buttons, each opening a screen of its own. A room link opens straight on joining it. */
 function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
   // A player without a nick is offered one on the way to a network game.
   if ((view === 'net' || view === 'join') && !nickAsked && sameName(playerName(), DEFAULT_NAME)) {
@@ -245,7 +250,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
       const go = b.dataset.go!;
       const n = playerName();
       if (go === 'back') return menu('', v.back);
-      if (go === 'play' || go === 'learn' || go === 'net' || go === 'rating' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
+      if (go === 'play' || go === 'learn' || go === 'net' || go === 'collection' || go === 'rating' || go === 'settings' || go === 'bot' || go === 'join') return menu('', go);
       if (go === 'rules') return showRules();
       if (go === 'nick-ok') return setNick();
       if (go === 'nick-skip') {
@@ -261,6 +266,7 @@ function menu(message = '', view: MenuView = roomFromUrl() ? 'join' : 'home') {
     }),
   );
   if (view === 'rating' && ratingUrl()) loadRating();
+  bindCollection(app);
   themedScroll(app);
   playMenu(app, shot, depth);
 }

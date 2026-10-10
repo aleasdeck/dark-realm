@@ -442,6 +442,194 @@ button.menu-btn {
   font-size: 13px;
   color: var(--muted);
 }
+/* the collection: the same frame as the rating, a row of deck emblems on top, the cards scroll under it */
+.menu[data-view='collection'] {
+  height: 100dvh;
+}
+/* standing up the cards need the height, so the icon on top is smaller than on the other screens */
+@media (orientation: portrait) {
+  .menu.sub[data-view='collection'] .logo img {
+    width: min(28vw, 13dvh, 120px);
+  }
+}
+/* on its side the emblems are smaller, so more of the cards shows */
+@media (max-height: 500px) and (orientation: landscape) {
+  button.coll-tab {
+    max-width: 34px;
+    max-height: 34px;
+  }
+  .coll-tabs {
+    padding-bottom: 6px;
+    gap: 2px;
+  }
+}
+.menu[data-view='collection'] .menu-buttons {
+  flex: 1;
+  min-height: 0;
+  width: min(100%, 460px);
+}
+.coll-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: #07110bb8;
+  border: 1px solid #3f8a5c99;
+  border-radius: 10px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.coll-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line2);
+}
+button.coll-tab {
+  position: relative;
+  padding: 2px;
+  aspect-ratio: 1;
+  max-height: 46px;
+  justify-self: center;
+  width: 100%;
+  max-width: 46px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  box-shadow: none;
+}
+.coll-tab img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.coll-tab.neutral img {
+  width: 100%;
+  height: 100%;
+  padding: 14%;
+}
+.coll-tab.on {
+  border-color: var(--glow);
+  background: radial-gradient(circle, color-mix(in srgb, var(--glow) 30%, transparent) 30%, transparent 72%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 55%, transparent);
+}
+.coll-tab.locked img {
+  filter: grayscale(0.85) brightness(0.45);
+}
+.coll-tab img.coll-lock {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 45%;
+  height: 45%;
+  filter: none;
+}
+.coll-board .tscroll {
+  flex: 1;
+  min-height: 0;
+}
+.coll-body {
+  flex: 1;
+  container-type: inline-size;
+}
+.coll-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  text-align: left;
+  padding: 0 2px;
+}
+.coll-head h3 {
+  margin: 0;
+  font-family: var(--title-font);
+  font-size: 20px;
+}
+.coll-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+.coll-rule {
+  margin: 0;
+  padding: 0 2px;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.coll-rule b {
+  color: var(--text, #e8f0e8);
+}
+/* four tiles across (five on a wider frame), each as wide as its column */
+.coll-grid {
+  --cols: 4;
+  --tw: calc((100cqw - (var(--cols) - 1) * 8px) / var(--cols));
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: 10px 8px;
+  padding: 4px 0 6px;
+}
+@container (min-width: 430px) {
+  .coll-grid {
+    --cols: 5;
+  }
+}
+.coll-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.coll-cell > span {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.coll-cell .tile {
+  position: relative;
+  box-shadow: 0 2px 6px #0008;
+}
+.coll-closed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  padding: 12px;
+}
+.coll-closed-emblem {
+  position: relative;
+  width: min(150px, 40vw, 24dvh);
+}
+.coll-closed-emblem > img:first-child {
+  width: 100%;
+  display: block;
+  filter: grayscale(0.85) brightness(0.45);
+}
+.coll-closed-emblem img.coll-lock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 34%;
+}
+.coll-closed h3 {
+  margin: 0;
+  font-family: var(--title-font);
+  color: color-mix(in srgb, var(--glow) 60%, #888);
+}
+.coll-closed p {
+  margin: 0;
+  color: var(--muted);
+}
 /* the rating of a finished network game, under its result */
 .rating-line {
   display: flex;
@@ -450,20 +638,25 @@ button.menu-btn {
   gap: 6px;
 }
 @media (max-height: 500px) and (orientation: landscape) {
-  .menu.home[data-view='rating'] {
+  .menu.home[data-view='rating'],
+  .menu.home[data-view='collection'] {
     min-height: 0;
     grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr);
   }
-  .menu.home[data-view='rating'] .logo {
+  .menu.home[data-view='rating'] .logo,
+  .menu.home[data-view='collection'] .logo {
     grid-row: 2;
   }
-  .menu.home[data-view='rating'] .menu-title {
+  .menu.home[data-view='rating'] .menu-title,
+  .menu.home[data-view='collection'] .menu-title {
     grid-row: 3;
   }
-  .menu.home[data-view='rating'] > .menu-buttons {
+  .menu.home[data-view='rating'] > .menu-buttons,
+  .menu.home[data-view='collection'] > .menu-buttons {
     grid-row: 1 / span 4;
     align-self: stretch;
-  }  .menu.home[data-view='settings'] {
+  }
+  .menu.home[data-view='settings'] {
     min-height: 0;
     grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr);
   }
