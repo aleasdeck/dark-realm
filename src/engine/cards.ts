@@ -273,7 +273,8 @@ export const CARDS: CardDef[] = [
   { id: 'hunding_victory', name: 'Победа мастера клинка', patron: 'hunding', cost: 9, type: 'action', copies: 1, play: [pick([power(6)], [acquire(10)])], art: 'sword', seed: 180 },
   { id: 'hunding_oratory', name: 'Великая речь', patron: 'hunding', cost: 3, type: 'contractAction', copies: 2, play: [pick([power(2)], [refresh(1)])], combo: { 2: [coin(2)] }, art: 'scroll', seed: 181 },
   { id: 'hunding_herald', name: 'Вестник клинков', patron: 'hunding', cost: 6, type: 'agent', hp: 3, copies: 2, play: [refresh(2)], combo: { 2: [power(1)] }, art: 'banner', seed: 182 },
-  { id: 'hunding_fall', name: 'Падение крепости', patron: 'hunding', cost: 6, type: 'action', copies: 2, play: [pick([power(4)], [refresh(3)])], combo: { 2: [power(2)] }, art: 'castle', seed: 183 },
+  // Hira's End: в ToT равна «Походу»; на тесте сервера она обещала вернуть 4 карты, у нас так и есть (домашнее правило)
+  { id: 'hunding_fall', name: 'Падение крепости', patron: 'hunding', cost: 6, type: 'action', copies: 2, play: [pick([power(4)], [refresh(4)])], combo: { 2: [power(2)] }, art: 'castle', seed: 183 },
 
   // ── Олень (Druid King): карты, уходящие в сброс, кормят наймитов ──
   { id: 'druid_herbs', name: 'Обрядовые травы', patron: 'druid', cost: 0, type: 'starter', copies: 0, play: [coin(1)], art: 'potion', seed: 191 },
