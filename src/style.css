@@ -3696,6 +3696,10 @@ summary > img.ic {
 .ri.coin i {
   background-image: url('./assets/icons/res_coin.webp');
 }
+/* card counts, "3 ▯"; not .card, which is the card frame */
+.ri.rcard i {
+  background-image: url('./assets/icons/res_card.webp');
+}
 .fx.coin::after,
 .fx.pow::after,
 .fx.pre::after {
