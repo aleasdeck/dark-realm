@@ -1051,22 +1051,36 @@ button.coll-tab {
 }
 /* a player at the prestige goal: the counter pulses so the threat (or the lead) can't be missed */
 .res.pre.at-goal {
+  position: relative;
+  isolation: isolate;
   color: #fff;
   border-color: var(--prestige);
   background: #2a1a4a;
-  animation: at-goal 1.6s ease-in-out infinite;
+  box-shadow:
+    0 0 4px #c7a8ff88,
+    inset 0 0 4px #c7a8ff55;
 }
-@keyframes at-goal {
-  0%,
-  100% {
-    box-shadow:
-      0 0 4px #c7a8ff88,
-      inset 0 0 4px #c7a8ff55;
-  }
+/* The pulses below fade a ready-drawn glow in and out (opacity only), so the phone's graphics
+   chip blends it and nothing is redrawn every frame; an animated shadow or border colour is
+   repainted 60 times a second for as long as it lasts and heats the phone. */
+.res.pre.at-goal::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow:
+    0 0 14px #c7a8ff,
+    inset 0 0 8px #c7a8ffaa;
+  opacity: 0;
+  pointer-events: none;
+  animation: glow-pulse 1.6s ease-in-out infinite;
+  /* render.ts sets the delay on the counter, to keep the pulse in step across redraws */
+  animation-delay: inherit;
+}
+@keyframes glow-pulse {
   50% {
-    box-shadow:
-      0 0 14px #c7a8ff,
-      inset 0 0 8px #c7a8ffaa;
+    opacity: 1;
   }
 }
 .res.pow {
@@ -2649,12 +2663,16 @@ button.toggle[aria-pressed='true'] b {
 .toast.away {
   border-color: #c9a227;
   background: #2a2410;
-  animation: away-pulse 1.6s ease-in-out infinite;
 }
-@keyframes away-pulse {
-  50% {
-    border-color: #6b5715;
-  }
+.toast.away::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid #6b5715;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: glow-pulse 1.6s ease-in-out infinite;
 }
 .dialog.reconnect .wait {
   margin: 8px 0 14px;
@@ -2998,13 +3016,15 @@ button.toggle[aria-pressed='true'] b {
 }
 
 /* the opponent's bar breathes while they move */
-.opp-bar.active {
-  animation: their-turn 1.6s ease-in-out infinite;
-}
-@keyframes their-turn {
-  50% {
-    box-shadow: 0 0 22px #ff3b2fbb;
-  }
+.opp-bar.active::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 22px #ff3b2fbb;
+  opacity: 0;
+  pointer-events: none;
+  animation: glow-pulse 1.6s ease-in-out infinite;
 }
 /* ── selected card: slides out enlarged, a second tap confirms ── */
 .zoom {
@@ -3161,12 +3181,15 @@ button.zoom-act {
   border-radius: 10px;
   box-shadow: 0 0 0 200vmax #000000a0, 0 0 18px #f0c86088;
   pointer-events: none;
-  animation: coach-pulse 1.6s ease-in-out infinite;
 }
-@keyframes coach-pulse {
-  50% {
-    border-color: #fff1c4;
-  }
+.coach-spot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid #fff1c4;
+  border-radius: inherit;
+  opacity: 0;
+  animation: glow-pulse 1.6s ease-in-out infinite;
 }
 .coach {
   position: fixed;
@@ -3205,7 +3228,7 @@ button.zoom-act {
   padding-left: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .coach-spot {
+  .coach-spot::after {
     animation: none;
   }
 }
@@ -3385,13 +3408,19 @@ button.zoom-act {
 }
 /* a menu button that waits for a newcomer, and a note under a button */
 button.menu-btn.fresh {
-  animation: fresh-glow 2.4s ease-in-out infinite;
+  /* the glow reaches past the button; the press glow keeps inside it on its own (.press-clip) */
+  overflow: visible;
 }
-@keyframes fresh-glow {
-  50% {
-    box-shadow: inset 0 1px 0 #ffffff1a, 0 0 18px #f0c860aa;
-    border-color: #f0c860;
-  }
+button.menu-btn.fresh::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid #f0c860;
+  border-radius: inherit;
+  box-shadow: 0 0 18px #f0c860aa;
+  opacity: 0;
+  pointer-events: none;
+  animation: glow-pulse 2.4s ease-in-out infinite;
 }
 button.menu-btn small {
   display: block;
@@ -3401,7 +3430,7 @@ button.menu-btn small {
 }
 @media (prefers-reduced-motion: reduce) {
   .intro-patron img,
-  button.menu-btn.fresh {
+  button.menu-btn.fresh::after {
     animation: none;
   }
 }
@@ -3445,7 +3474,14 @@ button.menu-btn > img.ic {
 #app:has(> .menu) {
   overflow: clip;
 }
-/* the glow spreading from the finger */
+/* the glow spreading from the finger, kept inside the button */
+.press-clip {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
 .press-glow {
   position: absolute;
   border-radius: 50%;

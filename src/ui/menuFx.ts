@@ -51,7 +51,7 @@ export function shootMenu(root: ParentNode, depth: number, next: string): MenuSh
   ghost.classList.add('menu-ghost');
   ghost.removeAttribute('data-depth');
   Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-  ghost.querySelectorAll('.press-glow').forEach((g) => g.remove());
+  ghost.querySelectorAll('.press-clip').forEach((g) => g.remove());
   ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
   // Lists keep where they were scrolled to.
   const lists = old.querySelectorAll<HTMLElement>('.tscroll-body');
@@ -172,7 +172,11 @@ function glow(btn: HTMLElement, x: number, y: number) {
   const g = document.createElement('span');
   g.className = 'press-glow';
   Object.assign(g.style, { width: `${size}px`, height: `${size}px`, left: `${x - r.left - size / 2}px`, top: `${y - r.top - size / 2}px` });
-  btn.append(g);
+  // The glow is clipped to the button by a frame of its own, as a glowing button lets its edge show past it.
+  const clip = document.createElement('span');
+  clip.className = 'press-clip';
+  clip.append(g);
+  btn.append(clip);
   g.animate(
     [
       { transform: 'scale(0)', opacity: 0.55 },
@@ -180,8 +184,8 @@ function glow(btn: HTMLElement, x: number, y: number) {
     ],
     { duration: 520, easing: 'ease-out' },
   ).finished.then(
-    () => g.remove(),
-    () => g.remove(),
+    () => clip.remove(),
+    () => clip.remove(),
   );
 }
 
